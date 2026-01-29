@@ -440,7 +440,8 @@
       </div>
 
       <div class="btn-group">
-        <button class="btn" onclick="verifyProofOnChain()">🔗 On-chain Verify (Sepolia)</button>
+        <button class="btn" onclick="verifyProofOffChain()">🔒 Off-chain Verify</button>
+        <button class="btn btn-secondary" onclick="verifyProofOnChain()">🔗 On-chain Verify (Sepolia)</button>
       </div>
 
       <div id="verify-result" class="hidden"></div>
@@ -1067,6 +1068,85 @@
       }
     };
 
+    // Off-chain verification (calls verifier contract as view/read-only - no gas, no transaction)
+    window.verifyProofOffChain = async function() {
+      const proof = document.getElementById('proofInput').value;
+      const publicInputsStr = document.getElementById('publicInputsInput').value;
+      const circuit = document.getElementById('verifyCircuit').value;
+
+      if (!proof) {
+        log('Please enter proof', 'error');
+        return;
+      }
+
+      const publicInputs = publicInputsStr.split(',').map(s => s.trim()).filter(s => s);
+
+      log(`Starting off-chain verification for ${circuit}...`);
+
+      const verifierAddresses = {
+        age_verifier: '0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9',
+        coinbase_attestation: '0x121632902482B658e0F2D055126dBe977deb9FC1'
+      };
+
+      try {
+        const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
+
+        const provider = new ethers.providers.JsonRpcProvider(
+          'https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6'
+        );
+
+        const contract = new ethers.Contract(
+          verifierAddresses[circuit],
+          ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
+          provider
+        );
+
+        const publicInputsBytes32 = publicInputs.map(input => {
+          const hex = input.startsWith('0x') ? input : `0x${input}`;
+          return ethers.utils.hexZeroPad(hex, 32);
+        });
+
+        log(`Calling verifier contract (read-only) at ${verifierAddresses[circuit]}...`);
+
+        const isValid = await contract.verify(proof, publicInputsBytes32);
+
+        const resultDiv = document.getElementById('verify-result');
+        resultDiv.classList.remove('hidden');
+
+        if (isValid) {
+          resultDiv.innerHTML = `
+            <div class="result success">
+              <div class="result-title">✅ Off-chain Verification Successful</div>
+              <p>The proof is valid.</p>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Verifier: ${verifierAddresses[circuit]}
+              </p>
+            </div>
+          `;
+          log('Off-chain proof verified successfully!', 'success');
+          celebrate();
+        } else {
+          resultDiv.innerHTML = `
+            <div class="result error">
+              <div class="result-title">❌ Off-chain Verification Failed</div>
+              <p>The proof is invalid.</p>
+            </div>
+          `;
+          log('Off-chain proof verification failed', 'error');
+        }
+      } catch (error) {
+        log(`Off-chain verification error: ${error.message}`, 'error');
+        const resultDiv = document.getElementById('verify-result');
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+          <div class="result error">
+            <div class="result-title">❌ Error</div>
+            <p>${error.message}</p>
+          </div>
+        `;
+      }
+    };
+
     // On-chain verification
     window.verifyProofOnChain = async function() {
       const proof = document.getElementById('proofInput').value;
@@ -1123,6 +1203,7 @@
             </div>
           `;
           log('Proof verified successfully!', 'success');
+          celebrate();
         } else {
           resultDiv.innerHTML = `
             <div class="result error">
