@@ -725,15 +725,9 @@
           log(`Number of Public Inputs: ${numPublicInputs}`, 'info');
         }
 
-        // Update status badge based on verification result
-        const isVerified = verificationResult === true;
-        document.getElementById('request-status').textContent = isVerified ? 'Verified ✅' : 'Completed';
+        // Update status badge
+        document.getElementById('request-status').textContent = 'Completed';
         document.getElementById('request-status').className = 'status-badge completed';
-
-        // Celebrate on success!
-        if (isVerified) {
-          celebrate();
-        }
 
         // Hide QR/deeplink displays
         document.getElementById('qr-display').classList.add('hidden');
@@ -746,18 +740,17 @@
           timingInfo = `<br><small>Duration: ${duration}s</small>`;
         }
 
-        // Show success result with verification details
+        // Show proof received result
         const successHtml = `
           <div class="result success" style="margin-top: 1rem;">
             <div class="result-title">✅ Proof Received from App!</div>
             <p>
-              <strong>Verification Type:</strong> ${verificationType || 'N/A'}<br>
-              <strong>Verification Result:</strong> ${verificationResult === true ? '✅ VALID' : verificationResult === false ? '❌ INVALID' : 'N/A'}
+              The ZK proof has been successfully generated and sent back.
               ${timingInfo}
             </p>
             ${inputs ? `<p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">Inputs: ${JSON.stringify(inputs)}</p>` : ''}
             <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-              ${verificationResult ? 'The proof has been verified on-chain.' : 'You can verify the proof again using the section below.'}
+              You can verify the proof using the section below.
             </p>
           </div>
         `;
