@@ -1,3 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+
+# Package tarballs
+*.tgz
+
+# Demo runtime artifacts
+demo/results.json
+
 # OMC (oh-my-claudecode)
 .omc/
 
