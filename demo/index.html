@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProofPort SDK Demo</title>
+  <title>ZKProofPort SDK Demo</title>
+  <link rel="icon" href="https://zkproofport.com/favicon.ico" type="image/x-icon">
   <style>
     :root {
-      --primary: #6366f1;
-      --primary-hover: #4f46e5;
-      --success: #22c55e;
-      --error: #ef4444;
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --border: #334155;
+      --primary: #d6b15c;
+      --primary-hover: #f0d488;
+      --success: #34d399;
+      --error: #f87171;
+      --bg: #0e2233;
+      --card-bg: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      --text: #eef6ff;
+      --text-muted: #a9bfd1;
+      --border: rgba(255,255,255,0.12);
     }
 
     * {
@@ -39,7 +40,7 @@
     h1 {
       font-size: 2rem;
       margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, var(--primary), #a855f7);
+      background: linear-gradient(135deg, #d6b15c, #f0d488);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -72,15 +73,16 @@
     .tab.active {
       background: var(--primary);
       border-color: var(--primary);
-      color: white;
+      color: #0e2233;
     }
 
     .card {
-      background: var(--card-bg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
       border: 1px solid var(--border);
       border-radius: 1rem;
       padding: 1.5rem;
       margin-bottom: 1.5rem;
+      backdrop-filter: blur(10px);
     }
 
     .card-title {
@@ -132,8 +134,9 @@
       background: var(--primary);
       border: none;
       border-radius: 0.5rem;
-      color: white;
+      color: #0e2233;
       font-size: 1rem;
+      font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
     }
@@ -150,6 +153,7 @@
     .btn-secondary {
       background: transparent;
       border: 1px solid var(--border);
+      color: var(--text);
     }
 
     .btn-secondary:hover {
@@ -233,7 +237,7 @@
 
     .info-box {
       padding: 1rem;
-      background: rgba(99, 102, 241, 0.1);
+      background: rgba(214, 177, 92, 0.1);
       border: 1px solid var(--primary);
       border-radius: 0.5rem;
       margin-bottom: 1rem;
@@ -303,8 +307,8 @@
 </head>
 <body>
   <div class="container">
-    <h1>🔐 ProofPort SDK Demo</h1>
-    <p class="subtitle">ZK Proof 요청 및 검증 테스트</p>
+    <h1><img src="https://zkproofport.com/logo.png" alt="ZKProofPort" style="height: 1.8em; vertical-align: middle; margin-right: 0.4rem;">ZKProofPort SDK Demo</h1>
+    <p class="subtitle">ZK Proof Request &amp; Verification Test</p>
 
     <!-- Circuit Selection Tabs -->
     <div class="tabs">
@@ -320,12 +324,12 @@
     <div id="age-form" class="card">
       <h2 class="card-title">📋 Age Verification Request</h2>
       <div class="info-box">
-        출생년도를 공개하지 않고 나이 요건을 충족하는지 증명합니다.<br>
-        <strong>모든 입력값은 앱으로 전달되어 자동으로 검증이 시작됩니다.</strong>
+        Prove that you meet the age requirement without revealing your birth year.<br>
+        <strong>All inputs are sent to the app and verification starts automatically.</strong>
       </div>
 
       <div class="form-group">
-        <label for="birthYear">Birth Year (비공개) *</label>
+        <label for="birthYear">Birth Year (private) *</label>
         <input type="number" id="birthYear" value="2000" min="1900" max="2025" required>
         <div class="error-text hidden" id="birthYear-error"></div>
       </div>
@@ -343,11 +347,11 @@
       </div>
 
       <div class="form-group">
-        <label for="callbackUrl">Callback URL (비워두면 데모 서버로 결과 수신)</label>
-        <input type="url" id="callbackUrl" placeholder="비워두면 서버 콜백 엔드포인트 사용">
+        <label for="callbackUrl">Callback URL (leave empty to use demo server)</label>
+        <input type="url" id="callbackUrl" placeholder="Leave empty to use server callback endpoint">
       </div>
 
-      <div class="btn-group">
+      <div class="btn-group" id="age-btn-group">
         <button class="btn" onclick="createAgeRequest()">🔗 Generate Deep Link</button>
         <button class="btn btn-secondary" onclick="createAgeQR()">📱 Generate QR Code</button>
       </div>
@@ -357,23 +361,23 @@
     <div id="coinbase-form" class="card hidden">
       <h2 class="card-title">📋 Coinbase KYC Request</h2>
       <div class="info-box warning">
-        <strong>🔒 Coinbase KYC는 지갑 주소 입력이 필요 없습니다!</strong><br><br>
-        • Deep Link를 통해 앱이 열리면 <strong>앱에서 자동으로 지갑 연결</strong>을 시도합니다.<br>
-        • 연결된 지갑 주소로 Etherscan에서 Coinbase 인증 트랜잭션을 검색합니다.<br>
-        • 사용자의 실제 지갑으로만 증명이 가능합니다.
+        <strong>🔒 Coinbase KYC does not require a wallet address!</strong><br><br>
+        • When the app opens via deep link, it <strong>automatically connects to your wallet</strong>.<br>
+        • It searches Etherscan for a Coinbase attestation transaction using the connected wallet address.<br>
+        • Proofs can only be generated with the user's actual wallet.
       </div>
 
       <div class="form-group">
-        <label for="coinbaseCallbackUrl">Callback URL (비워두면 데모 서버로 결과 수신)</label>
-        <input type="url" id="coinbaseCallbackUrl" placeholder="비워두면 서버 콜백 엔드포인트 사용">
+        <label for="coinbaseCallbackUrl">Callback URL (leave empty to use demo server)</label>
+        <input type="url" id="coinbaseCallbackUrl" placeholder="Leave empty to use server callback endpoint">
       </div>
 
       <div class="form-group">
-        <label for="coinbaseMessage">사용자에게 표시할 메시지 (선택)</label>
-        <input type="text" id="coinbaseMessage" placeholder="예: 서비스 이용을 위해 Coinbase 본인인증이 필요합니다.">
+        <label for="coinbaseMessage">Message to display to user (optional)</label>
+        <input type="text" id="coinbaseMessage" placeholder="e.g. Coinbase identity verification is required to use this service.">
       </div>
 
-      <div class="btn-group">
+      <div class="btn-group" id="coinbase-btn-group">
         <button class="btn" onclick="createCoinbaseRequest()">🔗 Generate Deep Link</button>
         <button class="btn btn-secondary" onclick="createCoinbaseQR()">📱 Generate QR Code</button>
       </div>
@@ -396,14 +400,14 @@
       <!-- QR Code Display -->
       <div id="qr-display" class="qr-container hidden">
         <img id="qr-image" alt="QR Code">
-        <p class="qr-hint">ProofPort 앱으로 스캔하세요<br><small>앱에서 자동으로 검증이 시작됩니다</small></p>
+        <p class="qr-hint">Scan with ZKProofPort app<br><small>Verification will start automatically in the app</small></p>
       </div>
 
       <!-- Deep Link Display -->
       <div id="deeplink-display" class="hidden">
         <div class="btn-group" style="margin: 0;">
-          <button class="btn" onclick="openDeepLink()">📱 앱에서 열기</button>
-          <button class="copy-btn" onclick="copyDeepLink()">📋 복사</button>
+          <button class="btn" onclick="openDeepLink()">📱 Open in App</button>
+          <button class="copy-btn" onclick="copyDeepLink()">📋 Copy</button>
         </div>
         <div class="deeplink-url" id="deeplink-url"></div>
       </div>
@@ -413,8 +417,8 @@
     <div id="verify-section" class="card">
       <h2 class="card-title">✅ Proof Verification</h2>
       <div class="info-box">
-        앱에서 생성된 Proof를 여기에 붙여넣어 검증하세요.<br>
-        Callback URL로 전달된 응답은 자동으로 처리됩니다.
+        Paste the proof generated by the app here to verify.<br>
+        Responses delivered via callback URL are processed automatically.
       </div>
 
       <div class="form-group">
@@ -436,7 +440,7 @@
       </div>
 
       <div class="btn-group">
-        <button class="btn" onclick="verifyProofOnChain()">🔗 On-chain 검증 (Sepolia)</button>
+        <button class="btn" onclick="verifyProofOnChain()">🔗 On-chain Verify (Sepolia)</button>
       </div>
 
       <div id="verify-result" class="hidden"></div>
@@ -524,20 +528,32 @@
           angle: 60,
           spread: 55,
           origin: { x: 0 },
-          colors: ['#6366f1', '#a855f7', '#22c55e']
+          colors: ['#d6b15c', '#f0d488', '#34d399']
         });
         confetti({
           particleCount: 3,
           angle: 120,
           spread: 55,
           origin: { x: 1 },
-          colors: ['#6366f1', '#a855f7', '#22c55e']
+          colors: ['#d6b15c', '#f0d488', '#34d399']
         });
 
         if (Date.now() < end) {
           requestAnimationFrame(frame);
         }
       })();
+    }
+
+    // Toggle active button in a btn-group
+    function setActiveButton(groupId, activeIndex) {
+      const buttons = document.getElementById(groupId).querySelectorAll('.btn');
+      buttons.forEach((btn, i) => {
+        if (i === activeIndex) {
+          btn.classList.remove('btn-secondary');
+        } else {
+          btn.classList.add('btn-secondary');
+        }
+      });
     }
 
     // Utility functions
@@ -549,7 +565,7 @@
 
     function encodeData(data) {
       const json = JSON.stringify(data);
-      // UTF-8 문자열을 먼저 percent encoding 후 btoa 적용 (한글 등 지원)
+      // First percent-encode the UTF-8 string, then apply btoa
       const utf8Encoded = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
         String.fromCharCode(parseInt(p1, 16))
       );
@@ -611,7 +627,7 @@
       stopPolling(); // Clear any existing polling
 
       log(`Starting to poll for request: ${requestId}`, 'info');
-      document.getElementById('request-status').textContent = '요청 중...';
+      document.getElementById('request-status').textContent = 'Requesting...';
       document.getElementById('request-status').className = 'status-badge pending';
 
       pollingTimer = setInterval(async () => {
@@ -827,22 +843,22 @@
       clearError('minAge');
 
       if (!birthYear || birthYear < 1900 || birthYear > 2025) {
-        showError('birthYear', '1900-2025 사이의 값을 입력하세요');
+        showError('birthYear', 'Enter a value between 1900 and 2025');
         valid = false;
       }
 
       if (!currentYear || currentYear < 2020 || currentYear > 2100) {
-        showError('currentYear', '2020-2100 사이의 값을 입력하세요');
+        showError('currentYear', 'Enter a value between 2020 and 2100');
         valid = false;
       }
 
       if (!minAge || minAge < 1 || minAge > 150) {
-        showError('minAge', '1-150 사이의 값을 입력하세요');
+        showError('minAge', 'Enter a value between 1 and 150');
         valid = false;
       }
 
       if (valid && (currentYear - birthYear) < minAge) {
-        showError('birthYear', `현재 나이(${currentYear - birthYear})가 최소 나이(${minAge})보다 작습니다`);
+        showError('birthYear', `Current age (${currentYear - birthYear}) is less than minimum age (${minAge})`);
         valid = false;
       }
 
@@ -852,9 +868,10 @@
     // Age Verifier Request
     window.createAgeRequest = function() {
       if (!validateAgeInputs()) {
-        log('입력값을 확인해주세요', 'error');
+        log('Please check your input values', 'error');
         return;
       }
+      setActiveButton('age-btn-group', 0);
 
       // Use custom callback URL if provided, otherwise use server's callback endpoint
       const customCallbackUrl = document.getElementById('callbackUrl').value;
@@ -869,8 +886,8 @@
           minAge: parseInt(document.getElementById('minAge').value)
         },
         callbackUrl: callbackUrl,
-        dappName: 'ProofPort Demo',
-        message: '나이 검증이 필요합니다. 확인 후 자동으로 증명이 생성됩니다.',
+        dappName: 'ZKProofPort Demo',
+        message: 'Age verification is required. The proof will be generated automatically after confirmation.',
         createdAt: Date.now(),
         expiresAt: Date.now() + 600000
       };
@@ -888,21 +905,22 @@
 
     window.createAgeQR = async function() {
       if (!validateAgeInputs()) {
-        log('입력값을 확인해주세요', 'error');
+        log('Please check your input values', 'error');
         return;
       }
+      setActiveButton('age-btn-group', 1);
 
       // Check if using localhost - warn user about QR code limitation
       const qrCallbackUrl = getQRCallbackUrl();
       if (!qrCallbackUrl) {
         const localIP = await getLocalIPHint();
-        alert(`⚠️ QR 코드 사용 시 주의!\n\n` +
-              `현재 localhost로 접속 중입니다.\n` +
-              `모바일 기기에서 QR 스캔 시 콜백을 받을 수 없습니다.\n\n` +
-              `해결 방법:\n` +
-              `1. Callback URL에 서버 IP 입력: http://${localIP}:3333/callback\n` +
-              `2. 또는 http://${localIP}:3333 으로 접속하세요`);
-        log(`QR 사용 시 Callback URL에 로컬 IP 입력 필요: http://${localIP}:3333/callback`, 'warning');
+        alert(`⚠️ QR Code Warning!\n\n` +
+              `You are currently accessing via localhost.\n` +
+              `Mobile devices cannot receive callbacks when scanning the QR code.\n\n` +
+              `Solution:\n` +
+              `1. Enter server IP in Callback URL: http://${localIP}:3333/callback\n` +
+              `2. or access via http://${localIP}:3333`);
+        log(`When using QR, enter local IP in Callback URL: http://${localIP}:3333/callback`, 'warning');
       }
 
       // Use custom callback URL if provided, otherwise use server's callback endpoint
@@ -918,8 +936,8 @@
           minAge: parseInt(document.getElementById('minAge').value)
         },
         callbackUrl: callbackUrl,
-        dappName: 'ProofPort Demo',
-        message: '나이 검증이 필요합니다. 확인 후 자동으로 증명이 생성됩니다.',
+        dappName: 'ZKProofPort Demo',
+        message: 'Age verification is required. The proof will be generated automatically after confirmation.',
         createdAt: Date.now(),
         expiresAt: Date.now() + 600000
       };
@@ -935,8 +953,10 @@
       startPolling(request.requestId);
     };
 
-    // Coinbase KYC Request (지갑 주소 입력 불필요!)
+    // Coinbase KYC Request (no wallet address needed!)
     window.createCoinbaseRequest = function() {
+      setActiveButton('coinbase-btn-group', 0);
+
       // Use custom callback URL if provided, otherwise use server's callback endpoint
       const customCallbackUrl = document.getElementById('coinbaseCallbackUrl').value;
       const callbackUrl = customCallbackUrl || CALLBACK_URL;
@@ -945,11 +965,11 @@
         requestId: generateRequestId(),
         circuit: 'coinbase_attestation',
         inputs: {
-          // 지갑 주소 없음! 앱에서 연결하여 가져옴
+          // No wallet address needed! The app will connect and retrieve it
         },
         callbackUrl: callbackUrl,
-        dappName: 'ProofPort Demo',
-        message: document.getElementById('coinbaseMessage').value || 'Coinbase 본인인증을 증명해주세요. 앱에서 지갑을 연결하면 자동으로 검증이 시작됩니다.',
+        dappName: 'ZKProofPort Demo',
+        message: document.getElementById('coinbaseMessage').value || 'Please verify your Coinbase identity. Verification will start automatically once you connect your wallet in the app.',
         createdAt: Date.now(),
         expiresAt: Date.now() + 600000
       };
@@ -960,24 +980,26 @@
       showRequestResult(request, currentDeepLink, false);
       log(`Created Coinbase KYC request: ${request.requestId}`, 'success');
       log(`Callback URL: ${callbackUrl}`, 'info');
-      log('앱에서 지갑 연결 후 자동으로 검증이 시작됩니다', 'info');
+      log('Verification will start automatically after wallet connection in the app', 'info');
 
       // Start polling for result
       startPolling(request.requestId);
     };
 
     window.createCoinbaseQR = async function() {
+      setActiveButton('coinbase-btn-group', 1);
+
       // Check if using localhost - warn user about QR code limitation
       const qrCallbackUrl = getQRCallbackUrl();
       if (!qrCallbackUrl) {
         const localIP = await getLocalIPHint();
-        alert(`⚠️ QR 코드 사용 시 주의!\n\n` +
-              `현재 localhost로 접속 중입니다.\n` +
-              `모바일 기기에서 QR 스캔 시 콜백을 받을 수 없습니다.\n\n` +
-              `해결 방법:\n` +
-              `1. Callback URL에 서버 IP 입력: http://${localIP}:3333/callback\n` +
-              `2. 또는 http://${localIP}:3333 으로 접속하세요`);
-        log(`QR 사용 시 Callback URL에 로컬 IP 입력 필요: http://${localIP}:3333/callback`, 'warning');
+        alert(`⚠️ QR Code Warning!\n\n` +
+              `You are currently accessing via localhost.\n` +
+              `Mobile devices cannot receive callbacks when scanning the QR code.\n\n` +
+              `Solution:\n` +
+              `1. Enter server IP in Callback URL: http://${localIP}:3333/callback\n` +
+              `2. or access via http://${localIP}:3333`);
+        log(`When using QR, enter local IP in Callback URL: http://${localIP}:3333/callback`, 'warning');
       }
 
       // Use custom callback URL if provided, otherwise use server's callback endpoint
@@ -988,11 +1010,11 @@
         requestId: generateRequestId(),
         circuit: 'coinbase_attestation',
         inputs: {
-          // 지갑 주소 없음! 앱에서 연결하여 가져옴
+          // No wallet address needed! The app will connect and retrieve it
         },
         callbackUrl: callbackUrl,
-        dappName: 'ProofPort Demo',
-        message: document.getElementById('coinbaseMessage').value || 'Coinbase 본인인증을 증명해주세요. 앱에서 지갑을 연결하면 자동으로 검증이 시작됩니다.',
+        dappName: 'ZKProofPort Demo',
+        message: document.getElementById('coinbaseMessage').value || 'Please verify your Coinbase identity. Verification will start automatically once you connect your wallet in the app.',
         createdAt: Date.now(),
         expiresAt: Date.now() + 600000
       };
@@ -1003,7 +1025,7 @@
       await showRequestResult(request, currentDeepLink, true);
       log(`Created QR code for Coinbase KYC: ${request.requestId}`, 'success');
       log(`Callback URL: ${callbackUrl}`, 'info');
-      log('앱에서 지갑 연결 후 자동으로 검증이 시작됩니다', 'info');
+      log('Verification will start automatically after wallet connection in the app', 'info');
 
       // Start polling for result
       startPolling(request.requestId);
@@ -1191,7 +1213,7 @@
           document.getElementById('verify-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
           log('=== Ready for On-chain Verification ===', 'success');
-          log('Click "On-chain 검증" button below to verify the proof on Sepolia', 'info');
+          log('Click the "On-chain Verify" button below to verify the proof on Sepolia', 'info');
 
         } else if (status === 'error') {
           const error = params.get('error');
@@ -1237,7 +1259,7 @@
     document.getElementById('callbackUrl').value = CALLBACK_URL;
     document.getElementById('coinbaseCallbackUrl').value = CALLBACK_URL;
 
-    log('ProofPort SDK Demo initialized', 'info');
+    log('ZKProofPort SDK Demo initialized', 'info');
   </script>
 </body>
 </html>
