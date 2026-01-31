@@ -41,19 +41,19 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
 };
 
 /**
- * Default verifier contracts on Sepolia
+ * Default verifier contracts on Base Sepolia
  */
 export const DEFAULT_VERIFIERS: Record<CircuitType, VerifierContract> = {
   age_verifier: {
-    address: '0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9',
-    chainId: 11155111, // Sepolia
+    address: '', // TODO: deploy to Base Sepolia
+    chainId: 84532, // Base Sepolia
     abi: [
       'function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
     ],
   },
   coinbase_attestation: {
-    address: '0x121632902482B658e0F2D055126dBe977deb9FC1',
-    chainId: 11155111, // Sepolia
+    address: '0x07121eb50b2Ebe1675E7Cb96c84B580A3fF6589e',
+    chainId: 84532, // Base Sepolia
     abi: [
       'function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
     ],
@@ -64,8 +64,8 @@ export const DEFAULT_VERIFIERS: Record<CircuitType, VerifierContract> = {
  * RPC endpoints by chain ID
  */
 export const RPC_ENDPOINTS: Record<number, string> = {
-  11155111: 'https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6',
   84532: 'https://sepolia.base.org', // Base Sepolia
+  8453: 'https://mainnet.base.org', // Base Mainnet
 };
 
 /**
