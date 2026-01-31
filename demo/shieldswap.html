@@ -1650,7 +1650,7 @@
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">Verifier contract</span>
-            <span class="dev-config-value" style="font-size:11px">0x121632902482B658e0F2D055126dBe977deb9FC1</span>
+            <span class="dev-config-value" style="font-size:11px">From proof response</span>
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">Chain</span>
@@ -1682,7 +1682,7 @@
     const CALLBACK_URL = `${SERVER_URL}/callback`;
     const POLL_INTERVAL = 2000;
     const KYC_THRESHOLD = 10000;
-    const VERIFIER_ADDRESS = '0x121632902482B658e0F2D055126dBe977deb9FC1';
+    // Verifier address comes from proof response (no hardcoded fallback)
 
     // ========== TOKEN DATA ==========
     const TOKENS = {
@@ -2295,25 +2295,35 @@
           // On-chain verification
           try {
             const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
-            const provider = new ethers.providers.JsonRpcProvider('https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6');
-            const contract = new ethers.Contract(
-              VERIFIER_ADDRESS,
-              ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
-              provider
-            );
 
-            const publicInputsBytes32 = data.publicInputs.map(input => {
-              const hex = input.startsWith('0x') ? input : `0x${input}`;
-              return ethers.utils.hexZeroPad(hex, 32);
-            });
+            const address = data.verifierAddress;
+            const chainId = data.chainId;
 
-            devLog('VERIFY', `Calling verifier contract at ${VERIFIER_ADDRESS}...`);
-            const isValid = await contract.verify(data.proof, publicInputsBytes32);
-
-            if (isValid) {
-              devLog('VERIFY', 'On-chain verification PASSED');
+            if (!address || !chainId) {
+              devLog('VERIFY', 'No verifier address or chainId in response, skipping on-chain verification');
             } else {
-              devLog('VERIFY', 'On-chain verification FAILED - proceeding with proof receipt');
+              const rpcUrl = chainId === 8453 ? 'https://mainnet.base.org' : 'https://sepolia.base.org';
+
+              const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+              const contract = new ethers.Contract(
+                address,
+                ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
+                provider
+              );
+
+              const publicInputsBytes32 = data.publicInputs.map(input => {
+                const hex = input.startsWith('0x') ? input : `0x${input}`;
+                return ethers.utils.hexZeroPad(hex, 32);
+              });
+
+              devLog('VERIFY', `Calling verifier contract at ${address}...`);
+              const isValid = await contract.verify(data.proof, publicInputsBytes32);
+
+              if (isValid) {
+                devLog('VERIFY', 'On-chain verification PASSED');
+              } else {
+                devLog('VERIFY', 'On-chain verification FAILED - proceeding with proof receipt');
+              }
             }
           } catch (e) {
             devLog('VERIFY', `On-chain verification error: ${e.message}`);
