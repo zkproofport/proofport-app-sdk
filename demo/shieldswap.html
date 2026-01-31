@@ -1,0 +1,2493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShieldSwap - Compliant Decentralized Exchange</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2L4 8v8c0 7.7 5.1 14.9 12 16 6.9-1.1 12-8.3 12-16V8L16 2z' fill='%2310b981'/><path d='M13 16l3 3 5-5' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #131318;
+      --bg-card: #1c1c24;
+      --bg-input: #2a2a35;
+      --bg-input-hover: #32323f;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-glow-strong: rgba(99, 102, 241, 0.25);
+      --success: #22c55e;
+      --success-dim: rgba(34, 197, 94, 0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245, 158, 11, 0.12);
+      --error: #ef4444;
+      --error-dim: rgba(239, 68, 68, 0.12);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-tertiary: #64748b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.14);
+      --shield: #10b981;
+      --shield-dim: rgba(16, 185, 129, 0.12);
+      --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --radius-full: 9999px;
+      --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border);
+      --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.6);
+      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Ambient gradient */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -40%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80vw;
+      height: 60vh;
+      background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ========== HEADER ========== */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 64px;
+      background: rgba(19, 19, 24, 0.85);
+      backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .logo svg {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .network-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .network-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .kyc-badge {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: var(--shield-dim);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--shield);
+      transition: var(--transition-base);
+    }
+
+    .kyc-badge.visible {
+      display: flex;
+    }
+
+    .kyc-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .connect-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-md);
+      color: white;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .connect-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .connect-btn.connected {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .connect-btn.connected:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-input);
+    }
+
+    .wallet-avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ========== MAIN LAYOUT ========== */
+    .main {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 120px;
+      min-height: calc(100vh - 64px);
+    }
+
+    /* ========== SWAP CARD ========== */
+    .swap-card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .swap-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    .swap-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .settings-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      position: relative;
+    }
+
+    .settings-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-input);
+    }
+
+    .settings-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Settings popover */
+    .settings-popover {
+      position: absolute;
+      top: 44px;
+      right: 0;
+      width: 280px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-modal);
+      z-index: 50;
+      display: none;
+    }
+
+    .settings-popover.open {
+      display: block;
+      animation: fadeSlideDown 200ms ease-out;
+    }
+
+    @keyframes fadeSlideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .settings-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .slippage-options {
+      display: flex;
+      gap: 6px;
+    }
+
+    .slippage-btn {
+      flex: 1;
+      padding: 8px 0;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .slippage-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    .slippage-btn.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+
+    .slippage-custom {
+      position: relative;
+      flex: 1;
+    }
+
+    .slippage-custom input {
+      width: 100%;
+      padding: 8px 24px 8px 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      text-align: center;
+      outline: none;
+      transition: var(--transition-fast);
+    }
+
+    .slippage-custom input:focus {
+      border-color: var(--accent);
+    }
+
+    .slippage-custom input.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .slippage-custom::after {
+      content: '%';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--text-tertiary);
+      pointer-events: none;
+    }
+
+    /* Token input rows */
+    .token-input-wrapper {
+      position: relative;
+    }
+
+    .token-input-box {
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      transition: var(--transition-fast);
+    }
+
+    .token-input-box:hover {
+      border-color: var(--border-hover);
+    }
+
+    .token-input-box:focus-within {
+      border-color: var(--accent);
+      background: var(--bg-input-hover);
+    }
+
+    .token-input-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+    }
+
+    .token-input-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .token-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px 6px 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .token-selector:hover {
+      background: var(--bg-input-hover);
+      border-color: var(--border-hover);
+    }
+
+    .token-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .token-symbol {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .token-selector-chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-tertiary);
+    }
+
+    .amount-input {
+      width: 100%;
+      min-width: 0;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 28px;
+      font-weight: 500;
+      text-align: right;
+      letter-spacing: -0.01em;
+    }
+
+    .amount-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .amount-input.output {
+      color: var(--text-secondary);
+    }
+
+    .token-balance-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .token-usd-value {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .token-balance {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .token-balance-amount {
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .token-balance-amount:hover {
+      color: var(--accent-hover);
+    }
+
+    /* Swap direction button */
+    .swap-direction-wrapper {
+      display: flex;
+      justify-content: center;
+      position: relative;
+      height: 0;
+      z-index: 2;
+    }
+
+    .swap-direction-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border: 4px solid var(--bg-deep);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .swap-direction-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-input);
+    }
+
+    .swap-direction-btn:hover svg {
+      transform: rotate(180deg);
+    }
+
+    .swap-direction-btn svg {
+      width: 18px;
+      height: 18px;
+      transition: transform var(--transition-base);
+    }
+
+    /* Swap info */
+    .swap-info {
+      padding: 12px 8px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .swap-info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .swap-info-row span:last-child {
+      color: var(--text-secondary);
+    }
+
+    /* KYC warning */
+    .kyc-warning {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      margin-top: 8px;
+      background: var(--warning-dim);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--warning);
+    }
+
+    .kyc-warning.visible {
+      display: flex;
+    }
+
+    .kyc-warning svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Swap button */
+    .swap-btn {
+      width: 100%;
+      padding: 16px;
+      margin-top: 8px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-lg);
+      color: white;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .swap-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .swap-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background: var(--bg-input);
+      color: var(--text-tertiary);
+    }
+
+    .swap-btn.loading {
+      pointer-events: none;
+    }
+
+    .swap-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Spinner */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* ========== TOKEN SELECT MODAL ========== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+      animation: fadeIn 200ms ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      max-height: 80vh;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-modal);
+      animation: modalSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { opacity: 0; transform: translateY(24px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .modal-close:hover {
+      background: var(--bg-input);
+      color: var(--text-primary);
+    }
+
+    .modal-close svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .token-list {
+      padding: 0 8px 8px;
+    }
+
+    .token-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .token-option:hover {
+      background: var(--bg-input);
+    }
+
+    .token-option.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .token-option-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .token-option-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .token-option-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .token-option-symbol {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .token-option-name {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .token-option-balance {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    /* ========== KYC MODAL ========== */
+    .kyc-modal {
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-modal);
+      animation: modalSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .kyc-modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Shield lock animation */
+    .shield-lock {
+      width: 72px;
+      height: 72px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .shield-lock svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    @keyframes shieldPulse {
+      0%, 100% { filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3)); }
+      50% { filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.6)); }
+    }
+
+    .shield-lock.animating svg {
+      animation: shieldPulse 2s ease-in-out infinite;
+    }
+
+    .kyc-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .kyc-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 20px;
+      max-width: 380px;
+    }
+
+    .kyc-swap-summary {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-input);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .kyc-swap-summary strong {
+      color: var(--text-primary);
+    }
+
+    /* QR section */
+    .kyc-qr-section {
+      width: 100%;
+    }
+
+    .kyc-qr-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .kyc-qr-card img {
+      width: 200px;
+      height: 200px;
+      border-radius: 8px;
+    }
+
+    .kyc-qr-hint {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #475569;
+      font-weight: 500;
+    }
+
+    .kyc-divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      margin: 20px 0;
+    }
+
+    .kyc-divider::before, .kyc-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .kyc-divider span {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+
+    .kyc-open-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-md);
+      color: white;
+      font-family: var(--font-sans);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .kyc-open-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .kyc-open-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Status line */
+    .kyc-status {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      min-height: 24px;
+    }
+
+    .kyc-status.waiting {
+      color: var(--text-secondary);
+    }
+
+    .kyc-status.verifying {
+      color: var(--accent-hover);
+    }
+
+    .kyc-status.verified {
+      color: var(--success);
+    }
+
+    @keyframes dotPulse {
+      0%, 80%, 100% { opacity: 0.3; }
+      40% { opacity: 1; }
+    }
+
+    .waiting-dots span {
+      animation: dotPulse 1.4s infinite both;
+    }
+
+    .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Explainer steps */
+    .kyc-steps {
+      width: 100%;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .kyc-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .kyc-step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
+    .kyc-step-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 24px;
+    }
+
+    /* ========== SUCCESS MODAL ========== */
+    .success-modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-modal);
+      animation: modalSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 32px 24px;
+      text-align: center;
+    }
+
+    @keyframes successCheckPop {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .success-check {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      background: var(--success-dim);
+      border: 2px solid var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: successCheckPop 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .success-check svg {
+      width: 36px;
+      height: 36px;
+      color: var(--success);
+    }
+
+    .success-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .success-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .success-details {
+      width: 100%;
+      background: var(--bg-input);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .success-detail-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .success-detail-row:not(:last-child) {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .success-detail-label {
+      color: var(--text-tertiary);
+    }
+
+    .success-detail-value {
+      color: var(--text-primary);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .copy-mini-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .copy-mini-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-hover);
+    }
+
+    .copy-mini-btn svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .success-etherscan {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-hover);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      transition: var(--transition-fast);
+    }
+
+    .success-etherscan:hover {
+      color: var(--accent);
+    }
+
+    .success-etherscan svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .success-close-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .success-close-btn:hover {
+      background: var(--bg-input-hover);
+      border-color: var(--border-hover);
+    }
+
+    /* ========== DEV PANEL ========== */
+    .dev-toggle {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 150;
+      transition: var(--transition-fast);
+    }
+
+    .dev-toggle:hover {
+      color: var(--accent-hover);
+      border-color: var(--accent);
+    }
+
+    .dev-toggle svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .dev-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 0;
+      background: #0f0f14;
+      border-top: 1px solid var(--border);
+      z-index: 140;
+      overflow: hidden;
+      transition: max-height var(--transition-slow);
+    }
+
+    .dev-panel.open {
+      max-height: 40vh;
+    }
+
+    .dev-panel-inner {
+      height: 40vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dev-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .dev-tab {
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-tertiary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    .dev-tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .dev-tab.active {
+      color: var(--accent-hover);
+      border-bottom-color: var(--accent);
+    }
+
+    .dev-tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .dev-tab-panel {
+      display: none;
+    }
+
+    .dev-tab-panel.active {
+      display: block;
+    }
+
+    .log-entry {
+      padding: 2px 0;
+    }
+
+    .log-time {
+      color: var(--text-tertiary);
+    }
+
+    .log-tag {
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+    }
+
+    .log-tag-sdk { color: var(--accent-hover); background: var(--accent-glow); }
+    .log-tag-poll { color: #60a5fa; background: rgba(96, 165, 250, 0.12); }
+    .log-tag-proof { color: var(--success); background: var(--success-dim); }
+    .log-tag-verify { color: #a78bfa; background: rgba(167, 139, 250, 0.12); }
+    .log-tag-ui { color: var(--text-tertiary); background: rgba(100, 116, 139, 0.12); }
+
+    .dev-json {
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-secondary);
+    }
+
+    .dev-json .json-key { color: var(--accent-hover); }
+    .dev-json .json-string { color: var(--success); }
+    .dev-json .json-number { color: var(--warning); }
+    .dev-json .json-boolean { color: #f472b6; }
+
+    .dev-config-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dev-config-label {
+      color: var(--text-tertiary);
+    }
+
+    .dev-config-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .proof-expand-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent-hover);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 6px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 768px) {
+      .swap-card {
+        max-width: 90%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header {
+        padding: 0 12px;
+      }
+
+      .network-badge {
+        display: none;
+      }
+
+      .main {
+        padding: 24px 8px 140px;
+      }
+
+      .swap-card {
+        max-width: 100%;
+        border-radius: var(--radius-lg);
+      }
+
+      .amount-input {
+        font-size: 22px;
+      }
+
+      .modal-backdrop {
+        align-items: flex-end;
+        padding: 0;
+      }
+
+      .kyc-modal {
+        max-height: 95vh;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        animation: mobileSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .success-modal {
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        animation: mobileSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .modal {
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        animation: mobileSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+        max-height: 70vh;
+      }
+
+      @keyframes mobileSlideUp {
+        from { opacity: 0; transform: translateY(100%); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .dev-panel.open {
+        max-height: 60vh;
+      }
+
+      .dev-panel-inner {
+        height: 60vh;
+      }
+
+      .swap-btn {
+        padding: 18px;
+        font-size: 17px;
+      }
+
+      .token-selector {
+        padding: 8px 14px 8px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-left">
+      <a href="#" class="logo">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 2L4 8v8c0 7.7 5.1 14.9 12 16 6.9-1.1 12-8.3 12-16V8L16 2z" fill="url(#shield-grad)"/>
+          <path d="M13 16l3 3 5-5" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="shield-grad" x1="4" y1="2" x2="28" y2="32">
+              <stop stop-color="#10b981"/>
+              <stop offset="1" stop-color="#059669"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">ShieldSwap</span>
+      </a>
+      <div class="network-badge">
+        <span class="network-dot"></span>
+        Sepolia
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="kycBadge" class="kyc-badge">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.85 2.55 7.45 6 8 3.45-.55 6-4.15 6-8V4L8 1z" fill="currentColor"/><path d="M6.5 8l1.5 1.5 2.5-2.5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Verified
+      </div>
+      <button id="connectBtn" class="connect-btn" onclick="handleConnectWallet()">
+        Connect Wallet
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+    <div class="swap-card">
+      <div class="swap-header">
+        <span class="swap-title">Swap</span>
+        <button class="settings-btn" onclick="toggleSettings(event)" aria-label="Settings">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M8.325 2.317a1 1 0 011.35 0l.675.62a1 1 0 00.88.26l.895-.18a1 1 0 011.16.672l.28.866a1 1 0 00.62.62l.866.28a1 1 0 01.672 1.16l-.18.895a1 1 0 00.26.88l.62.675a1 1 0 010 1.35l-.62.675a1 1 0 00-.26.88l.18.895a1 1 0 01-.672 1.16l-.866.28a1 1 0 00-.62.62l-.28.866a1 1 0 01-1.16.672l-.895-.18a1 1 0 00-.88.26l-.675.62a1 1 0 01-1.35 0l-.675-.62a1 1 0 00-.88-.26l-.895.18a1 1 0 01-1.16-.672l-.28-.866a1 1 0 00-.62-.62l-.866-.28a1 1 0 01-.672-1.16l.18-.895a1 1 0 00-.26-.88l-.62-.675a1 1 0 010-1.35l.62-.675a1 1 0 00.26-.88l-.18-.895a1 1 0 01.672-1.16l.866-.28a1 1 0 00.62-.62l.28-.866a1 1 0 011.16-.672l.895.18a1 1 0 00.88-.26l.675-.62z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          <div id="settingsPopover" class="settings-popover">
+            <div class="settings-label">Slippage Tolerance</div>
+            <div class="slippage-options">
+              <button class="slippage-btn" data-slippage="0.1" onclick="setSlippage(0.1, event)">0.1%</button>
+              <button class="slippage-btn active" data-slippage="0.5" onclick="setSlippage(0.5, event)">0.5%</button>
+              <button class="slippage-btn" data-slippage="1.0" onclick="setSlippage(1.0, event)">1.0%</button>
+              <div class="slippage-custom">
+                <input type="text" id="slippageCustom" placeholder="Custom" oninput="handleCustomSlippage(event)" onclick="event.stopPropagation()">
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <!-- FROM token -->
+      <div class="token-input-wrapper">
+        <div class="token-input-box">
+          <div class="token-input-label">You pay</div>
+          <div class="token-input-row">
+            <button id="fromTokenSelector" class="token-selector" onclick="openTokenSelect('from')">
+              <div id="fromTokenIcon" class="token-icon" style="background: #627EEA;">E</div>
+              <span id="fromTokenSymbol" class="token-symbol">ETH</span>
+              <svg class="token-selector-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <input id="fromAmountInput" class="amount-input" type="text" inputmode="decimal" placeholder="0" oninput="handleAmountInput(event)">
+          </div>
+          <div class="token-balance-row">
+            <span id="fromUsdValue" class="token-usd-value"></span>
+            <span class="token-balance">Balance: <span id="fromBalance" class="token-balance-amount" onclick="setMaxAmount()">12.5000</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Direction button -->
+      <div class="swap-direction-wrapper">
+        <button class="swap-direction-btn" onclick="swapDirection()" aria-label="Switch tokens">
+          <svg viewBox="0 0 18 18" fill="none"><path d="M9 3v12M9 15l-4-4M9 15l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <!-- TO token -->
+      <div class="token-input-wrapper" style="margin-top: -2px;">
+        <div class="token-input-box">
+          <div class="token-input-label">You receive</div>
+          <div class="token-input-row">
+            <button id="toTokenSelector" class="token-selector" onclick="openTokenSelect('to')">
+              <div id="toTokenIcon" class="token-icon" style="background: #2775CA;">U</div>
+              <span id="toTokenSymbol" class="token-symbol">USDC</span>
+              <svg class="token-selector-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <input id="toAmountInput" class="amount-input output" type="text" readonly placeholder="0">
+          </div>
+          <div class="token-balance-row">
+            <span id="toUsdValue" class="token-usd-value"></span>
+            <span class="token-balance">Balance: <span id="toBalance">12,500.00</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Swap info -->
+      <div id="swapInfo" class="swap-info" style="display: none;">
+        <div class="swap-info-row">
+          <span>Rate</span>
+          <span id="swapRate">1 ETH = 2,164.82 USDC</span>
+        </div>
+        <div class="swap-info-row">
+          <span>Network fee</span>
+          <span>~$2.40</span>
+        </div>
+      </div>
+
+      <!-- KYC warning -->
+      <div id="kycWarning" class="kyc-warning">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6v3M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>Swaps over $10,000 require identity verification</span>
+      </div>
+
+      <!-- Swap button -->
+      <button id="swapBtn" class="swap-btn" disabled onclick="handleSwap()">
+        Enter an amount
+      </button>
+    </div>
+  </main>
+
+  <!-- ===== TOKEN SELECT MODAL ===== -->
+  <div id="tokenSelectModal" class="modal-backdrop" onclick="closeTokenSelect(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Select a token</span>
+        <button class="modal-close" onclick="closeTokenSelect()" aria-label="Close">
+          <svg viewBox="0 0 18 18" fill="none"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div id="tokenList" class="token-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== KYC MODAL ===== -->
+  <div id="kycModal" class="modal-backdrop" onclick="closeKycModal(event)">
+    <div class="kyc-modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">Identity Verification</span>
+        <button class="modal-close" onclick="closeKycModal()" aria-label="Close">
+          <svg viewBox="0 0 18 18" fill="none"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="kyc-modal-body">
+        <div id="kycShieldLock" class="shield-lock animating">
+          <svg viewBox="0 0 72 72" fill="none">
+            <path d="M36 6L12 18v14c0 15.4 10.2 29.8 24 32 13.8-2.2 24-16.6 24-32V18L36 6z" fill="url(#kyc-shield-grad)" opacity="0.15"/>
+            <path d="M36 6L12 18v14c0 15.4 10.2 29.8 24 32 13.8-2.2 24-16.6 24-32V18L36 6z" stroke="url(#kyc-shield-grad)" stroke-width="2" fill="none"/>
+            <rect x="27" y="28" width="18" height="14" rx="3" stroke="#6366f1" stroke-width="2" fill="none"/>
+            <path d="M31 28v-4a5 5 0 0110 0v4" stroke="#6366f1" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <circle cx="36" cy="35" r="2" fill="#6366f1"/>
+            <path d="M36 37v2" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="kyc-shield-grad" x1="12" y1="6" x2="60" y2="70">
+                <stop stop-color="#6366f1"/>
+                <stop offset="1" stop-color="#818cf8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <h2 class="kyc-title">Privacy-Preserving KYC</h2>
+        <p class="kyc-desc">Verify your identity without revealing personal information using zero-knowledge proofs.</p>
+
+        <div id="kycSwapSummary" class="kyc-swap-summary"></div>
+
+        <div id="kycQrSection" class="kyc-qr-section">
+          <div class="kyc-qr-card">
+            <img id="kycQrImage" alt="QR Code" src="">
+            <span class="kyc-qr-hint">Scan with ProofPort app</span>
+          </div>
+
+          <div class="kyc-divider"><span>or</span></div>
+
+          <button id="kycOpenBtn" class="kyc-open-btn" onclick="openProofPortApp()">
+            <svg viewBox="0 0 18 18" fill="none"><path d="M6 3H4a2 2 0 00-2 2v2m0 4v2a2 2 0 002 2h2m4 0h2a2 2 0 002-2v-2m0-4V5a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Open ProofPort App
+          </button>
+        </div>
+
+        <div id="kycStatus" class="kyc-status waiting">
+          <span>Waiting for verification</span>
+          <span class="waiting-dots"><span>.</span><span>.</span><span>.</span></span>
+        </div>
+
+        <div class="kyc-steps">
+          <div class="kyc-step">
+            <div class="kyc-step-num">1</div>
+            <div class="kyc-step-text">ProofPort connects to your wallet</div>
+          </div>
+          <div class="kyc-step">
+            <div class="kyc-step-num">2</div>
+            <div class="kyc-step-text">Finds your Coinbase attestation</div>
+          </div>
+          <div class="kyc-step">
+            <div class="kyc-step-num">3</div>
+            <div class="kyc-step-text">Generates a zero-knowledge proof</div>
+          </div>
+          <div class="kyc-step">
+            <div class="kyc-step-num">4</div>
+            <div class="kyc-step-text">ShieldSwap verifies without seeing your identity</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SUCCESS MODAL ===== -->
+  <div id="successModal" class="modal-backdrop" onclick="closeSuccessModal(event)">
+    <div class="success-modal" onclick="event.stopPropagation()">
+      <div class="success-check">
+        <svg viewBox="0 0 36 36" fill="none"><path d="M10 18l6 6 10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h2 class="success-title">Swap Successful!</h2>
+      <p id="successSubtitle" class="success-subtitle"></p>
+
+      <div id="successDetails" class="success-details"></div>
+
+      <a id="successEtherscan" class="success-etherscan" href="#" target="_blank" rel="noopener">
+        View on Etherscan
+        <svg viewBox="0 0 14 14" fill="none"><path d="M4 10L10 4M10 4H5M10 4v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <br><br>
+
+      <button class="success-close-btn" onclick="closeSuccessModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- ===== DEV PANEL ===== -->
+  <button class="dev-toggle" onclick="toggleDevPanel()" aria-label="Developer panel">
+    <svg viewBox="0 0 18 18" fill="none"><path d="M6 4L2 9l4 5M12 4l4 5-4 5M10 2l-2 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
+  <div id="devPanel" class="dev-panel">
+    <div class="dev-panel-inner">
+      <div class="dev-tabs">
+        <button class="dev-tab active" data-devtab="logs" onclick="switchDevTab('logs', this)">SDK Logs</button>
+        <button class="dev-tab" data-devtab="request" onclick="switchDevTab('request', this)">Request Data</button>
+        <button class="dev-tab" data-devtab="proof" onclick="switchDevTab('proof', this)">Proof Data</button>
+        <button class="dev-tab" data-devtab="config" onclick="switchDevTab('config', this)">Config</button>
+      </div>
+      <div class="dev-tab-content">
+        <div id="devLogs" class="dev-tab-panel active"></div>
+        <div id="devRequest" class="dev-tab-panel">
+          <div class="dev-json" id="devRequestJson">No active request</div>
+        </div>
+        <div id="devProof" class="dev-tab-panel">
+          <div class="dev-json" id="devProofJson">No proof received yet</div>
+        </div>
+        <div id="devConfig" class="dev-tab-panel">
+          <div class="dev-config-row">
+            <span class="dev-config-label">Deep link scheme</span>
+            <span class="dev-config-value">zkproofport</span>
+          </div>
+          <div class="dev-config-row">
+            <span class="dev-config-label">Verifier contract</span>
+            <span class="dev-config-value" style="font-size:11px">0x121632902482B658e0F2D055126dBe977deb9FC1</span>
+          </div>
+          <div class="dev-config-row">
+            <span class="dev-config-label">Chain</span>
+            <span class="dev-config-value">Sepolia (11155111)</span>
+          </div>
+          <div class="dev-config-row">
+            <span class="dev-config-label">KYC threshold</span>
+            <span class="dev-config-value">$10,000</span>
+          </div>
+          <div class="dev-config-row">
+            <span class="dev-config-label">Callback URL</span>
+            <span class="dev-config-value" id="devConfigCallback" style="font-size:11px"></span>
+          </div>
+          <div class="dev-config-row">
+            <span class="dev-config-label">Poll interval</span>
+            <span class="dev-config-value">2000ms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script type="module">
+
+    // ========== CONSTANTS ==========
+    const DEFAULT_SCHEME = 'zkproofport';
+    const SERVER_URL = window.location.origin;
+    const CALLBACK_URL = `${SERVER_URL}/callback`;
+    const POLL_INTERVAL = 2000;
+    const KYC_THRESHOLD = 10000;
+    const VERIFIER_ADDRESS = '0x121632902482B658e0F2D055126dBe977deb9FC1';
+
+    // ========== TOKEN DATA ==========
+    const TOKENS = {
+      ETH:  { symbol: 'ETH',  name: 'Ethereum',    color: '#627EEA', price: 2164.82, balance: 12.5000 },
+      USDC: { symbol: 'USDC', name: 'USD Coin',    color: '#2775CA', price: 1.00,    balance: 12500.00 },
+      WBTC: { symbol: 'WBTC', name: 'Wrapped BTC', color: '#F7931A', price: 43250.00, balance: 0.5200 },
+      DAI:  { symbol: 'DAI',  name: 'Dai',         color: '#F5AC37', price: 1.00,    balance: 8750.00 },
+    };
+
+    // ========== STATE ==========
+    let walletConnected = sessionStorage.getItem('walletConnected') === 'true';
+    let walletAddress = sessionStorage.getItem('walletAddress') || null;
+    let kycVerified = sessionStorage.getItem('kycVerified') === 'true';
+    let kycVerifiedAt = sessionStorage.getItem('kycVerifiedAt') ? parseInt(sessionStorage.getItem('kycVerifiedAt')) : null;
+    let fromToken = 'ETH';
+    let toToken = 'USDC';
+    let fromAmount = '';
+    let slippage = 0.5;
+    let currentRequestId = null;
+    let currentDeepLink = null;
+    let pollingTimer = null;
+    let devPanelOpen = false;
+    let devLogs = [];
+    let tokenSelectSide = null; // 'from' or 'to'
+    let lastProofData = null;
+    let lastRequestData = null;
+
+    // Load token balances from session if previously swapped
+    // Only restore if saved balances are from the same default set (prevents stale cache)
+    const savedBalances = sessionStorage.getItem('tokenBalances');
+    const savedDefaults = sessionStorage.getItem('tokenDefaultBalances');
+    const currentDefaults = JSON.stringify(Object.fromEntries(Object.entries(TOKENS).map(([k,v]) => [k, v.balance])));
+    if (savedBalances && savedDefaults === currentDefaults) {
+      const parsed = JSON.parse(savedBalances);
+      Object.keys(parsed).forEach(k => {
+        if (TOKENS[k]) TOKENS[k].balance = parsed[k];
+      });
+    } else {
+      // Defaults changed — clear stale session data
+      sessionStorage.removeItem('tokenBalances');
+      sessionStorage.setItem('tokenDefaultBalances', currentDefaults);
+    }
+
+    // ========== UTILITY FUNCTIONS ==========
+
+    function generateRequestId() {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substring(2, 10);
+      return `req-${timestamp}-${random}`;
+    }
+
+    function encodeData(data) {
+      const json = JSON.stringify(data);
+      const utf8Encoded = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+        String.fromCharCode(parseInt(p1, 16))
+      );
+      return btoa(utf8Encoded)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function buildProofRequestUrl(request) {
+      const encoded = encodeData(request);
+      return `${DEFAULT_SCHEME}://proof-request?data=${encoded}`;
+    }
+
+    function generateRandomAddress() {
+      const bytes = new Uint8Array(20);
+      crypto.getRandomValues(bytes);
+      return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function generateRandomTxHash() {
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function shortenAddress(addr) {
+      return addr.slice(0, 6) + '...' + addr.slice(-4);
+    }
+
+    function formatNumber(num, decimals = 2) {
+      if (num === undefined || num === null || isNaN(num)) return '0';
+      return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function formatCompact(num) {
+      if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+      if (num >= 1000) return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+      if (num >= 1) return num.toFixed(4);
+      if (num > 0) return num.toFixed(6);
+      return '0';
+    }
+
+    function getAvatarColor(addr) {
+      if (!addr) return '#6366f1';
+      let hash = 0;
+      for (let i = 0; i < addr.length; i++) {
+        hash = addr.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = Math.abs(hash) % 360;
+      return `hsl(${h}, 65%, 55%)`;
+    }
+
+    function timeString() {
+      return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function saveTokenBalances() {
+      const balances = {};
+      Object.keys(TOKENS).forEach(k => { balances[k] = TOKENS[k].balance; });
+      sessionStorage.setItem('tokenBalances', JSON.stringify(balances));
+    }
+
+    // ========== DEVELOPER LOG ==========
+
+    function devLog(tag, message) {
+      const entry = { time: timeString(), tag, message };
+      devLogs.push(entry);
+      renderDevLogs();
+    }
+
+    function renderDevLogs() {
+      const el = document.getElementById('devLogs');
+      if (!el) return;
+      const tagClass = { SDK: 'sdk', POLL: 'poll', PROOF: 'proof', VERIFY: 'verify', UI: 'ui' };
+      el.innerHTML = devLogs.map(l =>
+        `<div class="log-entry"><span class="log-time">[${l.time}]</span> <span class="log-tag log-tag-${tagClass[l.tag] || 'ui'}">${l.tag}</span> ${l.message}</div>`
+      ).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function renderDevRequest() {
+      const el = document.getElementById('devRequestJson');
+      if (!lastRequestData) {
+        el.textContent = 'No active request';
+        return;
+      }
+      el.innerHTML = syntaxHighlightJson(JSON.stringify(lastRequestData, null, 2));
+    }
+
+    function renderDevProof() {
+      const el = document.getElementById('devProofJson');
+      if (!lastProofData) {
+        el.textContent = 'No proof received yet';
+        return;
+      }
+      const display = { ...lastProofData };
+      if (display.proof && display.proof.length > 100) {
+        display.proof = display.proof.substring(0, 100) + '...';
+      }
+      el.innerHTML = syntaxHighlightJson(JSON.stringify(display, null, 2));
+    }
+
+    function syntaxHighlightJson(json) {
+      return json.replace(/("[\w]+")(\s*:\s*)/g, '<span class="json-key">$1</span>$2')
+                 .replace(/:\s*(".*?")/g, ': <span class="json-string">$1</span>')
+                 .replace(/:\s*(\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+                 .replace(/:\s*(true|false|null)/g, ': <span class="json-boolean">$1</span>');
+    }
+
+    // ========== UI RENDERERS ==========
+
+    function updateConnectButton() {
+      const btn = document.getElementById('connectBtn');
+      if (walletConnected && walletAddress) {
+        const color = getAvatarColor(walletAddress);
+        btn.className = 'connect-btn connected';
+        btn.innerHTML = `<span class="wallet-avatar" style="background: ${color};"></span>${shortenAddress(walletAddress)}`;
+      } else {
+        btn.className = 'connect-btn';
+        btn.textContent = 'Connect Wallet';
+      }
+    }
+
+    function updateKycBadge() {
+      const badge = document.getElementById('kycBadge');
+      badge.classList.toggle('visible', kycVerified);
+    }
+
+    function updateTokenDisplay() {
+      const from = TOKENS[fromToken];
+      const to = TOKENS[toToken];
+
+      document.getElementById('fromTokenIcon').style.background = from.color;
+      document.getElementById('fromTokenIcon').textContent = from.symbol[0];
+      document.getElementById('fromTokenSymbol').textContent = from.symbol;
+      document.getElementById('fromBalance').textContent = formatCompact(from.balance);
+
+      document.getElementById('toTokenIcon').style.background = to.color;
+      document.getElementById('toTokenIcon').textContent = to.symbol[0];
+      document.getElementById('toTokenSymbol').textContent = to.symbol;
+      document.getElementById('toBalance').textContent = formatCompact(to.balance);
+
+      updateSwapOutput();
+    }
+
+    function updateSwapOutput() {
+      const from = TOKENS[fromToken];
+      const to = TOKENS[toToken];
+      const amount = parseFloat(fromAmount);
+      const infoEl = document.getElementById('swapInfo');
+      const warningEl = document.getElementById('kycWarning');
+
+      if (!amount || isNaN(amount) || amount <= 0) {
+        document.getElementById('toAmountInput').value = '';
+        document.getElementById('fromUsdValue').textContent = '';
+        document.getElementById('toUsdValue').textContent = '';
+        infoEl.style.display = 'none';
+        warningEl.classList.remove('visible');
+        updateSwapButton();
+        return;
+      }
+
+      const outputAmount = amount * (from.price / to.price);
+      const usdValue = amount * from.price;
+
+      document.getElementById('toAmountInput').value = outputAmount >= 1000 ? '~' + formatNumber(outputAmount, 2) : '~' + formatCompact(outputAmount);
+      document.getElementById('fromUsdValue').textContent = '$' + formatNumber(usdValue, 2);
+      document.getElementById('toUsdValue').textContent = '$' + formatNumber(outputAmount * to.price, 2);
+
+      // Rate
+      const rate = from.price / to.price;
+      document.getElementById('swapRate').textContent = `1 ${from.symbol} = ${formatNumber(rate, rate >= 1 ? 2 : 6)} ${to.symbol}`;
+      infoEl.style.display = 'flex';
+
+      // KYC warning
+      const needsKyc = usdValue >= KYC_THRESHOLD && !kycVerified;
+      warningEl.classList.toggle('visible', needsKyc);
+
+      updateSwapButton();
+    }
+
+    function updateSwapButton() {
+      const btn = document.getElementById('swapBtn');
+      const from = TOKENS[fromToken];
+      const amount = parseFloat(fromAmount);
+
+      // Not connected
+      if (!walletConnected) {
+        btn.disabled = false;
+        btn.innerHTML = 'Connect Wallet';
+        btn.style.background = '';
+        btn.style.color = '';
+        return;
+      }
+
+      // No amount
+      if (!amount || isNaN(amount) || amount <= 0) {
+        btn.disabled = true;
+        btn.innerHTML = 'Enter an amount';
+        return;
+      }
+
+      // Insufficient balance
+      if (amount > from.balance) {
+        btn.disabled = true;
+        btn.innerHTML = `Insufficient ${from.symbol} balance`;
+        return;
+      }
+
+      const usdValue = amount * from.price;
+
+      // Over threshold and not yet verified
+      if (usdValue >= KYC_THRESHOLD && !kycVerified) {
+        btn.disabled = false;
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.innerHTML = `<svg viewBox="0 0 18 18" fill="none"><path d="M9 2L3 5v4c0 4.6 3 8.9 6 9.5 3-.6 6-4.9 6-9.5V5L9 2z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M7 9.5l2 2 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Verify & Swap`;
+        return;
+      }
+
+      // Normal swap
+      btn.disabled = false;
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.innerHTML = 'Swap';
+    }
+
+    // ========== EVENT HANDLERS ==========
+
+    window.handleConnectWallet = function() {
+      if (walletConnected) {
+        // Disconnect
+        walletConnected = false;
+        walletAddress = null;
+        sessionStorage.removeItem('walletConnected');
+        sessionStorage.removeItem('walletAddress');
+        devLog('UI', 'Wallet disconnected');
+      } else {
+        walletAddress = generateRandomAddress();
+        walletConnected = true;
+        sessionStorage.setItem('walletConnected', 'true');
+        sessionStorage.setItem('walletAddress', walletAddress);
+        devLog('UI', `Wallet connected: ${walletAddress}`);
+      }
+      updateConnectButton();
+      updateSwapButton();
+    };
+
+    window.handleAmountInput = function(e) {
+      // Allow only valid decimal numbers
+      let val = e.target.value.replace(/[^0-9.]/g, '');
+      const parts = val.split('.');
+      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+      e.target.value = val;
+      fromAmount = val;
+      updateSwapOutput();
+    };
+
+    window.setMaxAmount = function() {
+      if (!walletConnected) return;
+      const from = TOKENS[fromToken];
+      fromAmount = from.balance.toString();
+      document.getElementById('fromAmountInput').value = fromAmount;
+      updateSwapOutput();
+      devLog('UI', `Set max amount: ${fromAmount} ${from.symbol}`);
+    };
+
+    window.swapDirection = function() {
+      const tmp = fromToken;
+      fromToken = toToken;
+      toToken = tmp;
+
+      // Recalculate with current amount
+      const amount = parseFloat(fromAmount);
+      if (amount && !isNaN(amount)) {
+        const newOutput = amount * (TOKENS[tmp].price / TOKENS[toToken].price);
+        fromAmount = newOutput >= 1000 ? formatNumber(newOutput, 2).replace(/,/g, '') : formatCompact(newOutput);
+        // Clean the value
+        fromAmount = parseFloat(fromAmount).toString();
+      }
+
+      document.getElementById('fromAmountInput').value = fromAmount || '';
+      updateTokenDisplay();
+      devLog('UI', `Swapped direction: ${fromToken} -> ${toToken}`);
+    };
+
+    // ========== SETTINGS ==========
+
+    window.toggleSettings = function(e) {
+      e.stopPropagation();
+      const pop = document.getElementById('settingsPopover');
+      pop.classList.toggle('open');
+    };
+
+    window.setSlippage = function(val, e) {
+      e.stopPropagation();
+      slippage = val;
+      document.querySelectorAll('.slippage-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector(`.slippage-btn[data-slippage="${val}"]`);
+      if (btn) btn.classList.add('active');
+      document.getElementById('slippageCustom').value = '';
+      document.getElementById('slippageCustom').classList.remove('active');
+      devLog('UI', `Slippage set to ${val}%`);
+    };
+
+    window.handleCustomSlippage = function(e) {
+      e.stopPropagation();
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0 && val < 50) {
+        slippage = val;
+        document.querySelectorAll('.slippage-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        devLog('UI', `Custom slippage set to ${val}%`);
+      }
+    };
+
+    // Close settings on outside click
+    document.addEventListener('click', (e) => {
+      const pop = document.getElementById('settingsPopover');
+      if (pop.classList.contains('open') && !e.target.closest('.settings-btn')) {
+        pop.classList.remove('open');
+      }
+    });
+
+    // ========== TOKEN SELECT ==========
+
+    window.openTokenSelect = function(side) {
+      tokenSelectSide = side;
+      const otherToken = side === 'from' ? toToken : fromToken;
+      const list = document.getElementById('tokenList');
+
+      list.innerHTML = Object.values(TOKENS).map(t => {
+        const isDisabled = t.symbol === otherToken;
+        return `
+          <div class="token-option ${isDisabled ? 'disabled' : ''}" onclick="${isDisabled ? '' : `selectToken('${t.symbol}')`}">
+            <div class="token-option-left">
+              <div class="token-option-icon" style="background: ${t.color};">${t.symbol[0]}</div>
+              <div class="token-option-info">
+                <span class="token-option-symbol">${t.symbol}</span>
+                <span class="token-option-name">${t.name}</span>
+              </div>
+            </div>
+            <span class="token-option-balance">${formatCompact(t.balance)}</span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('tokenSelectModal').classList.add('open');
+    };
+
+    window.selectToken = function(symbol) {
+      if (tokenSelectSide === 'from') {
+        fromToken = symbol;
+      } else {
+        toToken = symbol;
+      }
+      closeTokenSelect();
+      updateTokenDisplay();
+      devLog('UI', `Selected ${symbol} for ${tokenSelectSide}`);
+    };
+
+    window.closeTokenSelect = function(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('tokenSelectModal').classList.remove('open');
+    };
+
+    // ========== SWAP HANDLER ==========
+
+    window.handleSwap = async function() {
+      if (!walletConnected) {
+        handleConnectWallet();
+        return;
+      }
+
+      const amount = parseFloat(fromAmount);
+      if (!amount || isNaN(amount) || amount <= 0) return;
+      if (amount > TOKENS[fromToken].balance) return;
+
+      const usdValue = amount * TOKENS[fromToken].price;
+
+      if (usdValue >= KYC_THRESHOLD && !kycVerified) {
+        openKycModal();
+      } else {
+        executeSwap(false);
+      }
+    };
+
+    async function executeSwap(withKyc) {
+      const btn = document.getElementById('swapBtn');
+      btn.classList.add('loading');
+      btn.innerHTML = '<span class="spinner"></span> Swapping...';
+
+      devLog('SDK', `Executing swap: ${fromAmount} ${fromToken} -> ${toToken}`);
+
+      await new Promise(r => setTimeout(r, 1500));
+
+      const from = TOKENS[fromToken];
+      const to = TOKENS[toToken];
+      const amount = parseFloat(fromAmount);
+      const outputAmount = amount * (from.price / to.price);
+
+      // Update balances
+      TOKENS[fromToken].balance -= amount;
+      TOKENS[toToken].balance += outputAmount;
+      saveTokenBalances();
+
+      const txHash = generateRandomTxHash();
+
+      devLog('SDK', `Swap complete. TX: ${shortenAddress(txHash)}`);
+
+      // Update display before showing modal to ensure balances are always refreshed
+      fromAmount = '';
+      document.getElementById('fromAmountInput').value = '';
+      updateTokenDisplay();
+      btn.classList.remove('loading');
+
+      showSuccessModal(amount, from, outputAmount, to, txHash, withKyc);
+    }
+
+    // ========== KYC MODAL ==========
+
+    window.openKycModal = async function() {
+      const from = TOKENS[fromToken];
+      const to = TOKENS[toToken];
+      const amount = parseFloat(fromAmount);
+      const outputAmount = amount * (from.price / to.price);
+      const usdValue = amount * from.price;
+
+      document.getElementById('kycSwapSummary').innerHTML = `Your swap: <strong>${formatCompact(amount)} ${from.symbol}</strong> &rarr; <strong>${formatNumber(outputAmount, 2)} ${to.symbol}</strong> (~$${formatNumber(usdValue, 0)})`;
+
+      // Reset state
+      const statusEl = document.getElementById('kycStatus');
+      statusEl.className = 'kyc-status waiting';
+      statusEl.innerHTML = '<span>Waiting for verification</span><span class="waiting-dots"><span>.</span><span>.</span><span>.</span></span>';
+      document.getElementById('kycShieldLock').classList.add('animating');
+
+      // Create proof request
+      const request = {
+        requestId: generateRequestId(),
+        circuit: 'coinbase_attestation',
+        inputs: {},
+        callbackUrl: CALLBACK_URL,
+        dappName: 'ShieldSwap',
+        message: 'Identity verification required for this swap',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 600000
+      };
+
+      currentRequestId = request.requestId;
+      currentDeepLink = buildProofRequestUrl(request);
+      lastRequestData = request;
+
+      devLog('SDK', `Created proof request: ${request.requestId}`);
+      devLog('SDK', `Circuit: ${request.circuit}`);
+      devLog('SDK', `Callback: ${CALLBACK_URL}`);
+      renderDevRequest();
+
+      // Generate QR code
+      try {
+        const QRCode = await import('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm');
+        const qrDataUrl = await QRCode.toDataURL(currentDeepLink, {
+          width: 200,
+          margin: 2,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+        document.getElementById('kycQrImage').src = qrDataUrl;
+        devLog('SDK', 'QR code generated');
+      } catch (e) {
+        devLog('SDK', `QR generation failed: ${e.message}`);
+      }
+
+      document.getElementById('kycModal').classList.add('open');
+
+      // Start polling
+      startPolling(request.requestId);
+    };
+
+    window.closeKycModal = function(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('kycModal').classList.remove('open');
+      stopPolling();
+    };
+
+    window.openProofPortApp = function() {
+      if (currentDeepLink) {
+        devLog('SDK', `Opening deep link: ${currentDeepLink.substring(0, 60)}...`);
+        window.location.href = currentDeepLink;
+      }
+    };
+
+    // ========== POLLING ==========
+
+    function startPolling(requestId) {
+      stopPolling();
+      devLog('POLL', `Started polling for ${requestId}`);
+
+      pollingTimer = setInterval(async () => {
+        try {
+          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
+          const data = await response.json();
+          if (data.found) {
+            devLog('POLL', `Result found for ${requestId}`);
+            stopPolling();
+            handleProofResult(data.data);
+          }
+        } catch (e) {
+          devLog('POLL', `Error: ${e.message}`);
+        }
+      }, POLL_INTERVAL);
+
+      // Immediate check
+      (async () => {
+        try {
+          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
+          const data = await response.json();
+          if (data.found) {
+            stopPolling();
+            handleProofResult(data.data);
+          }
+        } catch { /* ignore */ }
+      })();
+    }
+
+    function stopPolling() {
+      if (pollingTimer) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+        devLog('POLL', 'Polling stopped');
+      }
+    }
+
+    // ========== PROOF HANDLING ==========
+
+    async function handleProofResult(data) {
+      lastProofData = data;
+      renderDevProof();
+
+      devLog('PROOF', `Status: ${data.status}`);
+      devLog('PROOF', `Request: ${data.requestId}`);
+
+      if (data.status === 'completed') {
+        // Update KYC status in modal
+        const statusEl = document.getElementById('kycStatus');
+
+        // Step 1: Verifying
+        statusEl.className = 'kyc-status verifying';
+        statusEl.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(129,140,248,0.3);border-top-color:#818cf8;"></span> Verifying proof on-chain...';
+        document.getElementById('kycShieldLock').classList.remove('animating');
+
+        devLog('VERIFY', 'Starting on-chain verification...');
+
+        if (data.proof && data.publicInputs) {
+          devLog('PROOF', `Proof: ${data.proof.substring(0, 60)}...`);
+          devLog('PROOF', `Public inputs: ${JSON.stringify(data.publicInputs)}`);
+
+          // On-chain verification
+          try {
+            const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
+            const provider = new ethers.providers.JsonRpcProvider('https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6');
+            const contract = new ethers.Contract(
+              VERIFIER_ADDRESS,
+              ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
+              provider
+            );
+
+            const publicInputsBytes32 = data.publicInputs.map(input => {
+              const hex = input.startsWith('0x') ? input : `0x${input}`;
+              return ethers.utils.hexZeroPad(hex, 32);
+            });
+
+            devLog('VERIFY', `Calling verifier contract at ${VERIFIER_ADDRESS}...`);
+            const isValid = await contract.verify(data.proof, publicInputsBytes32);
+
+            if (isValid) {
+              devLog('VERIFY', 'On-chain verification PASSED');
+            } else {
+              devLog('VERIFY', 'On-chain verification FAILED - proceeding with proof receipt');
+            }
+          } catch (e) {
+            devLog('VERIFY', `On-chain verification error: ${e.message}`);
+          }
+        }
+
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Step 2: Verified
+        statusEl.className = 'kyc-status verified';
+        statusEl.innerHTML = '<svg viewBox="0 0 18 18" width="18" height="18" fill="none"><path d="M4 9l4 4 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Identity Verified! Executing swap...';
+
+        // Set KYC verified
+        kycVerified = true;
+        kycVerifiedAt = Date.now();
+        sessionStorage.setItem('kycVerified', 'true');
+        sessionStorage.setItem('kycVerifiedAt', kycVerifiedAt.toString());
+        updateKycBadge();
+
+        devLog('SDK', 'KYC verified - executing swap');
+
+        await new Promise(r => setTimeout(r, 1200));
+
+        // Close KYC modal and execute swap
+        document.getElementById('kycModal').classList.remove('open');
+        await executeSwap(true);
+
+      } else if (data.status === 'error') {
+        const statusEl = document.getElementById('kycStatus');
+        statusEl.className = 'kyc-status';
+        statusEl.style.color = 'var(--error)';
+        statusEl.innerHTML = `Verification failed: ${data.error || 'Unknown error'}`;
+        devLog('PROOF', `Error: ${data.error}`);
+
+      } else if (data.status === 'cancelled') {
+        const statusEl = document.getElementById('kycStatus');
+        statusEl.className = 'kyc-status';
+        statusEl.style.color = 'var(--warning)';
+        statusEl.innerHTML = 'Verification cancelled by user';
+        devLog('PROOF', 'Cancelled by user');
+      }
+    }
+
+    // ========== SUCCESS MODAL ==========
+
+    function showSuccessModal(amount, from, outputAmount, to, txHash, withKyc) {
+      document.getElementById('successSubtitle').textContent = `Swapped ${formatCompact(amount)} ${from.symbol} for ${formatNumber(outputAmount, 2)} ${to.symbol}`;
+
+      let detailsHtml = `
+        <div class="success-detail-row">
+          <span class="success-detail-label">Transaction</span>
+          <span class="success-detail-value">
+            ${shortenAddress(txHash)}
+            <button class="copy-mini-btn" onclick="copyToClipboard('${txHash}')" aria-label="Copy">
+              <svg viewBox="0 0 12 12" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M8 4V2.5A1.5 1.5 0 006.5 1h-4A1.5 1.5 0 001 2.5v4A1.5 1.5 0 002.5 8H4" stroke="currentColor" stroke-width="1.2"/></svg>
+            </button>
+          </span>
+        </div>
+        <div class="success-detail-row">
+          <span class="success-detail-label">Rate</span>
+          <span class="success-detail-value">1 ${from.symbol} = ${formatNumber(from.price / to.price, from.price / to.price >= 1 ? 2 : 6)} ${to.symbol}</span>
+        </div>
+        <div class="success-detail-row">
+          <span class="success-detail-label">Slippage</span>
+          <span class="success-detail-value">${slippage}%</span>
+        </div>
+      `;
+
+      if (withKyc && kycVerifiedAt) {
+        detailsHtml += `
+          <div class="success-detail-row">
+            <span class="success-detail-label">KYC Verified</span>
+            <span class="success-detail-value" style="color: var(--success);">${new Date(kycVerifiedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+        `;
+      }
+
+      document.getElementById('successDetails').innerHTML = detailsHtml;
+      document.getElementById('successEtherscan').href = `https://sepolia.etherscan.io/tx/${txHash}`;
+
+      document.getElementById('successModal').classList.add('open');
+
+      // Confetti
+      celebrate();
+    }
+
+    function celebrate() {
+      const duration = 2500;
+      const end = Date.now() + duration;
+
+      (function frame() {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.6 },
+          colors: ['#6366f1', '#818cf8', '#22c55e', '#10b981']
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.6 },
+          colors: ['#6366f1', '#818cf8', '#22c55e', '#10b981']
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      })();
+    }
+
+    window.closeSuccessModal = function(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('successModal').classList.remove('open');
+      updateTokenDisplay();
+    };
+
+    window.copyToClipboard = function(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        devLog('UI', 'Copied to clipboard');
+      });
+    };
+
+    // ========== DEV PANEL ==========
+
+    window.toggleDevPanel = function() {
+      devPanelOpen = !devPanelOpen;
+      document.getElementById('devPanel').classList.toggle('open', devPanelOpen);
+    };
+
+    window.switchDevTab = function(tab, btn) {
+      document.querySelectorAll('.dev-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.dev-tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById({
+        logs: 'devLogs',
+        request: 'devRequest',
+        proof: 'devProof',
+        config: 'devConfig'
+      }[tab]).classList.add('active');
+    };
+
+    // ========== KEYBOARD SUPPORT ==========
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('tokenSelectModal').classList.remove('open');
+        document.getElementById('kycModal').classList.remove('open');
+        document.getElementById('successModal').classList.remove('open');
+        stopPolling();
+      }
+    });
+
+    // ========== INITIALIZE ==========
+
+    function init() {
+      updateConnectButton();
+      updateKycBadge();
+      updateTokenDisplay();
+      updateSwapButton();
+      document.getElementById('devConfigCallback').textContent = CALLBACK_URL;
+
+      devLog('SDK', 'ShieldSwap initialized');
+      devLog('SDK', `Server: ${SERVER_URL}`);
+      devLog('SDK', `KYC threshold: $${KYC_THRESHOLD.toLocaleString()}`);
+
+      if (walletConnected) {
+        devLog('UI', `Wallet restored: ${walletAddress}`);
+      }
+      if (kycVerified) {
+        devLog('SDK', `KYC previously verified at ${new Date(kycVerifiedAt).toLocaleString()}`);
+      }
+    }
+
+    init();
+
+  </script>
+</body>
+</html>

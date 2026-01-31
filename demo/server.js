@@ -2,7 +2,8 @@
  * ProofPort SDK Demo Server
  *
  * Endpoints:
- * - GET /              : Serve demo HTML
+ * - GET /              : Serve SDK demo HTML
+ * - GET /shieldswap    : Serve ShieldSwap DEX demo
  * - POST /callback     : Receive proof results from ProofPortApp (webhook)
  * - GET /status/:id    : Poll for request status
  */
@@ -104,6 +105,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /shieldswap - Serve ShieldSwap DEX demo
+  if (req.method === 'GET' && url.pathname === '/shieldswap') {
+    const htmlPath = path.join(__dirname, 'shieldswap.html');
+    try {
+      const html = fs.readFileSync(htmlPath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500);
+      res.end('Error loading shieldswap.html');
+    }
+    return;
+  }
+
   // POST /callback - Receive proof results from ProofPortApp
   if (req.method === 'POST' && url.pathname === '/callback') {
     try {
@@ -162,7 +177,8 @@ server.listen(PORT, () => {
   console.log(`\n🚀 ProofPort SDK Demo Server`);
   console.log(`   http://localhost:${PORT}\n`);
   console.log(`Endpoints:`);
-  console.log(`   GET  /              - Demo page`);
+  console.log(`   GET  /              - SDK demo page`);
+  console.log(`   GET  /shieldswap    - ShieldSwap DEX demo`);
   console.log(`   POST /callback      - Receive proof from app`);
   console.log(`   GET  /status/:id    - Poll for result\n`);
 });
