@@ -49,7 +49,7 @@ sdk.openProofRequest(request);
 
 Proves the user is above a certain age without revealing their birth year.
 
-- **Verifier Address (Sepolia)**: `0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9`
+- **Verifier Address**: Provided by the ProofPort app in the proof response
 - **Public Inputs**: `current_year`, `min_age`
 - **Status**: Production-ready
 
@@ -66,7 +66,7 @@ Proves the user is above a certain age without revealing their birth year.
 
 Proves Coinbase KYC identity verification without revealing the user's identity.
 
-- **Verifier Address (Sepolia)**: `0x121632902482B658e0F2D055126dBe977deb9FC1`
+- **Verifier Address**: Provided by the ProofPort app in the proof response
 - **Public Inputs**: `signal_hash`, `signer_list_merkle_root`
 - **Status**: Production-ready
 
@@ -261,20 +261,20 @@ const result = await sdk.verifyResponseOnChain(response, provider);
 
 #### getVerifierAddress(circuit)
 
-Gets the verifier contract address for a circuit.
+Gets the verifier contract address for a circuit (requires verifier configuration in SDK config).
 
 ```typescript
 const address = sdk.getVerifierAddress('age_verifier');
-// Returns: '0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9' on Sepolia
+// Returns the address configured via SDK verifiers option
 ```
 
 #### getVerifierChainId(circuit)
 
-Gets the chain ID where the verifier is deployed.
+Gets the chain ID where the verifier is deployed (requires verifier configuration in SDK config).
 
 ```typescript
 const chainId = sdk.getVerifierChainId('age_verifier');
-// Returns: 11155111 (Sepolia)
+// Returns the chainId configured via SDK verifiers option
 ```
 
 #### getCircuitMetadata(circuit)

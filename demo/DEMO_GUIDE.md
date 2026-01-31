@@ -110,7 +110,7 @@ Once the app sends the proof:
 - Makes real RPC call to Sepolia testnet
 
 **Phase 3: Verification Call**
-- Calls verifier contract at: `0x121632902482B658e0F2D055126dBe977deb9FC1`
+- Calls verifier contract at address provided in the proof response
 - Passes proof hex and public inputs
 - Contract performs SNARK proof verification
 
@@ -177,8 +177,8 @@ Complete proof verification results:
 
 ### Tab 4: Config
 Static configuration for the demo:
-- **Verifier Address:** 0x121632902482B658e0F2D055126dBe977deb9FC1
-- **Chain:** Sepolia Testnet
+- **Verifier Address:** Provided by proof response
+- **Chain:** Determined by proof response chainId
 - **Circuit:** coinbase_attestation
 - **KYC Threshold:** $10,000 USD
 - **Callback URL:** http://localhost:3333/callback
@@ -202,8 +202,8 @@ Static configuration for the demo:
 - **Verification:** SNARK proof verification on-chain
 
 ### Verifier Contract
-- **Address:** 0x121632902482B658e0F2D055126dBe977deb9FC1
-- **Network:** Sepolia Testnet
+- **Address:** Provided dynamically via proof response from the ProofPort app
+- **Network:** Determined by chainId in proof response
 - **Function Signature:** `verify(bytes calldata _proof, bytes32[] calldata _publicInputs) public view returns (bool)`
 
 ### Deep Link Scheme
