@@ -517,6 +517,7 @@
     let currentDeepLink = null;
     let currentCircuit = 'age_verifier';
     let pollingTimer = null;
+    window.currentProofData = null;
 
     // Confetti celebration animation
     function celebrate() {
@@ -664,12 +665,16 @@
     function handleProofResult(data) {
       const {
         requestId, status, proof, publicInputs, numPublicInputs, circuit, error,
-        verificationType, verificationResult, startedAt, completedAt, expiresAt, inputs
+        verificationType, verificationResult, startedAt, completedAt, expiresAt, inputs,
+        verifierAddress, chainId
       } = data;
 
       log(`=== Proof Result Received ===`, 'info');
       log(`Request ID: ${requestId}`, 'info');
       log(`Status: ${status}`, status === 'completed' ? 'success' : 'error');
+
+      // Store the proof data for verification functions
+      window.currentProofData = data;
 
       const resultDiv = document.getElementById('request-result');
       resultDiv.classList.remove('hidden');
@@ -1068,8 +1073,16 @@
       }
     };
 
-    // Off-chain verification (calls verifier contract as view/read-only - no gas, no transaction)
-    window.verifyProofOffChain = async function() {
+    // Shared verification logic (both off-chain and on-chain call verify as a read-only view)
+    function getRpcUrl(chainId) {
+      return chainId === 8453 ? 'https://mainnet.base.org' : 'https://sepolia.base.org';
+    }
+
+    function getNetworkName(chainId) {
+      return chainId === 8453 ? 'Base Mainnet' : 'Base Sepolia';
+    }
+
+    async function verifyProof(label) {
       const proof = document.getElementById('proofInput').value;
       const publicInputsStr = document.getElementById('publicInputsInput').value;
       const circuit = document.getElementById('verifyCircuit').value;
@@ -1081,22 +1094,31 @@
 
       const publicInputs = publicInputsStr.split(',').map(s => s.trim()).filter(s => s);
 
-      log(`Starting off-chain verification for ${circuit}...`);
+      log(`Starting ${label} verification for ${circuit}...`);
 
-      const verifierAddresses = {
-        age_verifier: '0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9',
-        coinbase_attestation: '0x121632902482B658e0F2D055126dBe977deb9FC1'
-      };
+      const address = window.currentProofData?.verifierAddress;
+      const chainId = window.currentProofData?.chainId;
+
+      if (!address) {
+        log('No verifier address available. The proof response must include verifierAddress.', 'error');
+        return;
+      }
+      if (!chainId) {
+        log('No chain ID available. The proof response must include chainId.', 'error');
+        return;
+      }
+
+      const rpcUrl = getRpcUrl(chainId);
+      const networkName = getNetworkName(chainId);
+      const resultDiv = document.getElementById('verify-result');
 
       try {
         const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
 
-        const provider = new ethers.providers.JsonRpcProvider(
-          'https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6'
-        );
+        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
 
         const contract = new ethers.Contract(
-          verifierAddresses[circuit],
+          address,
           ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
           provider
         );
@@ -1106,37 +1128,36 @@
           return ethers.utils.hexZeroPad(hex, 32);
         });
 
-        log(`Calling verifier contract (read-only) at ${verifierAddresses[circuit]}...`);
+        log(`Calling verifier contract at ${address} on ${networkName} (chain ${chainId})...`);
 
         const isValid = await contract.verify(proof, publicInputsBytes32);
 
-        const resultDiv = document.getElementById('verify-result');
         resultDiv.classList.remove('hidden');
 
         if (isValid) {
           resultDiv.innerHTML = `
             <div class="result success">
-              <div class="result-title">✅ Off-chain Verification Successful</div>
-              <p>The proof is valid.</p>
+              <div class="result-title">✅ ${label} Verification Successful</div>
+              <p>The proof is valid on ${networkName}.</p>
               <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-                Verifier: ${verifierAddresses[circuit]}
+                Verifier: ${address}<br>
+                Chain ID: ${chainId}
               </p>
             </div>
           `;
-          log('Off-chain proof verified successfully!', 'success');
+          log(`${label} proof verified successfully!`, 'success');
           celebrate();
         } else {
           resultDiv.innerHTML = `
             <div class="result error">
-              <div class="result-title">❌ Off-chain Verification Failed</div>
+              <div class="result-title">❌ ${label} Verification Failed</div>
               <p>The proof is invalid.</p>
             </div>
           `;
-          log('Off-chain proof verification failed', 'error');
+          log(`${label} proof verification failed`, 'error');
         }
       } catch (error) {
-        log(`Off-chain verification error: ${error.message}`, 'error');
-        const resultDiv = document.getElementById('verify-result');
+        log(`${label} verification error: ${error.message}`, 'error');
         resultDiv.classList.remove('hidden');
         resultDiv.innerHTML = `
           <div class="result error">
@@ -1145,85 +1166,16 @@
           </div>
         `;
       }
+    }
+
+    // Off-chain verification (calls verifier contract as view/read-only - no gas, no transaction)
+    window.verifyProofOffChain = function() {
+      return verifyProof('Off-chain');
     };
 
     // On-chain verification
-    window.verifyProofOnChain = async function() {
-      const proof = document.getElementById('proofInput').value;
-      const publicInputsStr = document.getElementById('publicInputsInput').value;
-      const circuit = document.getElementById('verifyCircuit').value;
-
-      if (!proof) {
-        log('Please enter proof', 'error');
-        return;
-      }
-
-      const publicInputs = publicInputsStr.split(',').map(s => s.trim()).filter(s => s);
-
-      log(`Starting on-chain verification for ${circuit}...`);
-
-      const verifierAddresses = {
-        age_verifier: '0x33316f0A1F6638AbC8D5a6aCce5a1cF13427A0c9',
-        coinbase_attestation: '0x121632902482B658e0F2D055126dBe977deb9FC1'
-      };
-
-      try {
-        const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
-
-        const provider = new ethers.providers.JsonRpcProvider(
-          'https://sepolia.infura.io/v3/2fe2d28467784ababcae918bb18b4bf6'
-        );
-
-        const contract = new ethers.Contract(
-          verifierAddresses[circuit],
-          ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
-          provider
-        );
-
-        const publicInputsBytes32 = publicInputs.map(input => {
-          const hex = input.startsWith('0x') ? input : `0x${input}`;
-          return ethers.utils.hexZeroPad(hex, 32);
-        });
-
-        log(`Calling verifier contract at ${verifierAddresses[circuit]}...`);
-
-        const isValid = await contract.verify(proof, publicInputsBytes32);
-
-        const resultDiv = document.getElementById('verify-result');
-        resultDiv.classList.remove('hidden');
-
-        if (isValid) {
-          resultDiv.innerHTML = `
-            <div class="result success">
-              <div class="result-title">✅ Verification Successful</div>
-              <p>The proof is valid on Sepolia testnet.</p>
-              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-                Verifier: ${verifierAddresses[circuit]}
-              </p>
-            </div>
-          `;
-          log('Proof verified successfully!', 'success');
-          celebrate();
-        } else {
-          resultDiv.innerHTML = `
-            <div class="result error">
-              <div class="result-title">❌ Verification Failed</div>
-              <p>The proof is invalid.</p>
-            </div>
-          `;
-          log('Proof verification failed', 'error');
-        }
-      } catch (error) {
-        log(`Verification error: ${error.message}`, 'error');
-        const resultDiv = document.getElementById('verify-result');
-        resultDiv.classList.remove('hidden');
-        resultDiv.innerHTML = `
-          <div class="result error">
-            <div class="result-title">❌ Error</div>
-            <p>${error.message}</p>
-          </div>
-        `;
-      }
+    window.verifyProofOnChain = function() {
+      return verifyProof('On-chain');
     };
 
     // Check for callback response on page load
