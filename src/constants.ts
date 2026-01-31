@@ -2,7 +2,7 @@
  * ProofPort SDK Constants
  */
 
-import type { CircuitType, VerifierContract } from './types';
+import type { CircuitType } from './types';
 
 /**
  * Default deep link scheme
@@ -41,24 +41,11 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
 };
 
 /**
- * Default verifier contracts on Base Sepolia
+ * Standard verifier contract ABI (shared across all circuits)
  */
-export const DEFAULT_VERIFIERS: Record<CircuitType, VerifierContract> = {
-  age_verifier: {
-    address: '', // TODO: deploy to Base Sepolia
-    chainId: 84532, // Base Sepolia
-    abi: [
-      'function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
-    ],
-  },
-  coinbase_attestation: {
-    address: '0x07121eb50b2Ebe1675E7Cb96c84B580A3fF6589e',
-    chainId: 84532, // Base Sepolia
-    abi: [
-      'function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
-    ],
-  },
-};
+export const VERIFIER_ABI = [
+  'function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
+];
 
 /**
  * RPC endpoints by chain ID

@@ -84,6 +84,10 @@ export interface ProofResponse {
   error?: string;
   /** Timestamp when proof was generated */
   timestamp?: number;
+  /** Verifier contract address (provided by app) */
+  verifierAddress?: string;
+  /** Chain ID where verifier is deployed (provided by app) */
+  chainId?: number;
 }
 
 /**

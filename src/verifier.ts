@@ -4,18 +4,34 @@
 
 import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
-import { DEFAULT_VERIFIERS, RPC_ENDPOINTS } from './constants';
+import { VERIFIER_ABI, RPC_ENDPOINTS } from './constants';
+
+/**
+ * Resolve verifier from SDK config or proof response.
+ * SDK config (customVerifier) takes priority over response-provided verifier.
+ */
+function resolveVerifier(
+  customVerifier?: VerifierContract,
+  responseVerifier?: { verifierAddress?: string; chainId?: number }
+): VerifierContract | null {
+  if (customVerifier) return customVerifier;
+  if (responseVerifier?.verifierAddress) {
+    return {
+      address: responseVerifier.verifierAddress,
+      chainId: responseVerifier.chainId ?? 0,
+      abi: VERIFIER_ABI,
+    };
+  }
+  return null;
+}
 
 /**
  * Get verifier contract instance
  */
 export function getVerifierContract(
-  circuit: CircuitType,
   providerOrSigner: ethers.providers.Provider | ethers.Signer,
-  customVerifier?: VerifierContract
+  verifier: VerifierContract
 ): ethers.Contract {
-  const verifier = customVerifier || DEFAULT_VERIFIERS[circuit];
-
   return new ethers.Contract(
     verifier.address,
     verifier.abi,
@@ -41,24 +57,31 @@ export async function verifyProofOnChain(
   circuit: CircuitType,
   parsedProof: ParsedProof,
   providerOrSigner?: ethers.providers.Provider | ethers.Signer,
-  customVerifier?: VerifierContract
+  customVerifier?: VerifierContract,
+  responseVerifier?: { verifierAddress?: string; chainId?: number }
 ): Promise<{ valid: boolean; error?: string }> {
+  const verifier = resolveVerifier(customVerifier, responseVerifier);
+  if (!verifier) {
+    return {
+      valid: false,
+      error: 'No verifier address provided. Configure via SDK or ensure proof response includes verifierAddress.',
+    };
+  }
+
+  const provider = providerOrSigner || (verifier.chainId > 0 ? getDefaultProvider(verifier.chainId) : null);
+  if (!provider) {
+    return {
+      valid: false,
+      error: 'No provider available. Provide a provider or ensure chainId is set for RPC lookup.',
+    };
+  }
+
+  const contract = getVerifierContract(provider, verifier);
+
   try {
-    const verifier = customVerifier || DEFAULT_VERIFIERS[circuit];
-    const provider = providerOrSigner || getDefaultProvider(verifier.chainId);
-    const contract = getVerifierContract(circuit, provider, customVerifier);
-
-    // Convert public inputs to bytes32 array
-    const publicInputsBytes32 = parsedProof.publicInputsHex.map((input) => {
-      // Ensure proper padding to 32 bytes
-      const hex = input.startsWith('0x') ? input : `0x${input}`;
-      return ethers.utils.hexZeroPad(hex, 32);
-    });
-
-    // Call verify function
     const isValid = await contract.verify(
       parsedProof.proofHex,
-      publicInputsBytes32
+      parsedProof.publicInputsHex
     );
 
     return { valid: isValid };
@@ -69,24 +92,25 @@ export async function verifyProofOnChain(
 }
 
 /**
- * Parse proof response into format suitable for on-chain verification
+ * Ensure a hex string has the 0x prefix
+ */
+function ensureHexPrefix(hex: string): string {
+  return hex.startsWith('0x') ? hex : `0x${hex}`;
+}
+
+/**
+ * Parse proof response into format suitable for on-chain verification.
+ * Public inputs are zero-padded to 32 bytes (bytes32).
  */
 export function parseProofForOnChain(
   proof: string,
   publicInputs: string[],
   numPublicInputs: number
 ): ParsedProof {
-  // Ensure proof has 0x prefix
-  const proofHex = proof.startsWith('0x') ? proof : `0x${proof}`;
+  const proofHex = ensureHexPrefix(proof);
 
-  // Ensure all public inputs have 0x prefix and are properly padded
   const publicInputsHex = publicInputs.map((input) => {
-    const hex = input.startsWith('0x') ? input : `0x${input}`;
-    // Pad to 32 bytes if needed
-    if (hex.length < 66) { // 0x + 64 hex chars = 32 bytes
-      return ethers.utils.hexZeroPad(hex, 32);
-    }
-    return hex;
+    return ethers.utils.hexZeroPad(ensureHexPrefix(input), 32);
   });
 
   return {
@@ -97,21 +121,31 @@ export function parseProofForOnChain(
 }
 
 /**
+ * Require a verifier or throw with a helpful message
+ */
+function requireVerifier(circuit: CircuitType, verifier?: VerifierContract): VerifierContract {
+  if (!verifier) {
+    throw new Error(`No verifier configured for circuit '${circuit}'. Configure via SDK verifiers option.`);
+  }
+  return verifier;
+}
+
+/**
  * Get verifier contract address for a circuit
  */
 export function getVerifierAddress(
   circuit: CircuitType,
   customVerifier?: VerifierContract
 ): string {
-  return customVerifier?.address || DEFAULT_VERIFIERS[circuit].address;
+  return requireVerifier(circuit, customVerifier).address;
 }
 
 /**
- * Get chain ID for a circuit's default verifier
+ * Get chain ID for a circuit's verifier
  */
 export function getVerifierChainId(
   circuit: CircuitType,
   customVerifier?: VerifierContract
 ): number {
-  return customVerifier?.chainId || DEFAULT_VERIFIERS[circuit].chainId;
+  return requireVerifier(circuit, customVerifier).chainId;
 }
