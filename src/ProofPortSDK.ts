@@ -262,12 +262,18 @@ export class ProofPortSDK {
       return { valid: false, error: 'Invalid or incomplete response' };
     }
 
-    return this.verifyOnChain(
-      response.circuit,
+    const parsedProof = parseProofForOnChain(
       response.proof,
       response.publicInputs,
-      providerOrSigner
+      response.publicInputs.length
     );
+
+    const customVerifier = this.config.verifiers[response.circuit];
+    const responseVerifier = {
+      verifierAddress: response.verifierAddress,
+      chainId: response.chainId,
+    };
+    return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, customVerifier, responseVerifier);
   }
 
   // ============ Utility Methods ============
