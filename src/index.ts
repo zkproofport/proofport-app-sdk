@@ -11,12 +11,8 @@
  *   defaultCallbackUrl: 'https://myapp.com/verify'
  * });
  *
- * // Create age verification request
- * const request = sdk.createAgeVerificationRequest({
- *   birthYear: 2000,
- *   currentYear: 2026,
- *   minAge: 18
- * });
+ * // Create Coinbase KYC proof request
+ * const request = sdk.createProofRequest('coinbase_attestation', {});
  *
  * // Generate QR code
  * const qrDataUrl = await sdk.generateQRCode(request);
@@ -33,8 +29,8 @@ export { ProofPortSDK, default } from './ProofPortSDK';
 export type {
   CircuitType,
   ProofRequestStatus,
-  AgeVerifierInputs,
   CoinbaseKycInputs,
+  CoinbaseCountryInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,

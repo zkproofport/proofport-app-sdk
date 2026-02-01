@@ -5,21 +5,12 @@
 /**
  * Supported circuit types
  */
-export type CircuitType = 'age_verifier' | 'coinbase_attestation';
+export type CircuitType = 'coinbase_attestation' | 'coinbase_country_attestation';
 
 /**
  * Proof request status
  */
 export type ProofRequestStatus = 'pending' | 'completed' | 'error' | 'cancelled';
-
-/**
- * Age verifier input parameters
- */
-export interface AgeVerifierInputs {
-  birthYear: number;
-  currentYear: number;
-  minAge: number;
-}
 
 /**
  * Coinbase KYC input parameters
@@ -31,6 +22,16 @@ export interface CoinbaseKycInputs {
 }
 
 /**
+ * Coinbase Country attestation input parameters
+ */
+export interface CoinbaseCountryInputs {
+  userAddress?: string;
+  rawTransaction?: string;
+  countryList?: string[]; // ISO 3166-1 alpha-2 codes (e.g., ['US', 'KR'])
+  isIncluded?: boolean; // true = inclusion check, false = exclusion check
+}
+
+/**
  * Empty inputs (for circuits that get all data from app)
  */
 export interface EmptyInputs {}
@@ -38,7 +39,7 @@ export interface EmptyInputs {}
 /**
  * Circuit-specific inputs union type
  */
-export type CircuitInputs = AgeVerifierInputs | CoinbaseKycInputs | EmptyInputs;
+export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | EmptyInputs;
 
 /**
  * Proof request configuration

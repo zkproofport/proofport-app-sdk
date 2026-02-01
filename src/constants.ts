@@ -26,17 +26,17 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   publicInputsCount: number;
   publicInputNames: string[];
 }> = {
-  age_verifier: {
-    name: 'Age Verifier',
-    description: 'Verify age without revealing birth year',
-    publicInputsCount: 2,
-    publicInputNames: ['current_year', 'min_age'],
-  },
   coinbase_attestation: {
     name: 'Coinbase KYC',
     description: 'Prove Coinbase identity verification',
     publicInputsCount: 2,
     publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
+  },
+  coinbase_country_attestation: {
+    name: 'Coinbase Country',
+    description: 'Prove Coinbase country verification',
+    publicInputsCount: 14,
+    publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included'],
   },
 };
 
