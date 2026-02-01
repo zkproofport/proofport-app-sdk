@@ -7,8 +7,8 @@ import type {
   ProofResponse,
   CircuitType,
   CircuitInputs,
-  AgeVerifierInputs,
   CoinbaseKycInputs,
+  CoinbaseCountryInputs,
   ProofPortConfig,
   QRCodeOptions,
   ParsedProof,
@@ -60,35 +60,6 @@ export class ProofPortSDK {
   // ============ Request Creation ============
 
   /**
-   * Create an age verification request
-   */
-  createAgeVerificationRequest(
-    inputs: AgeVerifierInputs,
-    options: {
-      callbackUrl?: string;
-      message?: string;
-      dappName?: string;
-      dappIcon?: string;
-      expiresInMs?: number;
-    } = {}
-  ): ProofRequest {
-    const request: ProofRequest = {
-      requestId: generateRequestId(),
-      circuit: 'age_verifier',
-      inputs,
-      callbackUrl: options.callbackUrl || this.config.defaultCallbackUrl,
-      message: options.message,
-      dappName: options.dappName,
-      dappIcon: options.dappIcon,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + (options.expiresInMs || DEFAULT_REQUEST_EXPIRY_MS),
-    };
-
-    this.pendingRequests.set(request.requestId, request);
-    return request;
-  }
-
-  /**
    * Create a Coinbase KYC verification request
    */
   createCoinbaseKycRequest(
@@ -118,6 +89,35 @@ export class ProofPortSDK {
   }
 
   /**
+   * Create a Coinbase Country attestation request
+   */
+  createCoinbaseCountryRequest(
+    inputs: CoinbaseCountryInputs,
+    options: {
+      callbackUrl?: string;
+      message?: string;
+      dappName?: string;
+      dappIcon?: string;
+      expiresInMs?: number;
+    } = {}
+  ): ProofRequest {
+    const request: ProofRequest = {
+      requestId: generateRequestId(),
+      circuit: 'coinbase_country_attestation',
+      inputs,
+      callbackUrl: options.callbackUrl || this.config.defaultCallbackUrl,
+      message: options.message,
+      dappName: options.dappName,
+      dappIcon: options.dappIcon,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (options.expiresInMs || DEFAULT_REQUEST_EXPIRY_MS),
+    };
+
+    this.pendingRequests.set(request.requestId, request);
+    return request;
+  }
+
+  /**
    * Create a generic proof request
    */
   createProofRequest(
@@ -131,8 +131,8 @@ export class ProofPortSDK {
       expiresInMs?: number;
     } = {}
   ): ProofRequest {
-    if (circuit === 'age_verifier') {
-      return this.createAgeVerificationRequest(inputs as AgeVerifierInputs, options);
+    if (circuit === 'coinbase_country_attestation') {
+      return this.createCoinbaseCountryRequest(inputs as CoinbaseCountryInputs, options);
     } else {
       return this.createCoinbaseKycRequest(inputs as CoinbaseKycInputs, options);
     }
@@ -153,6 +153,27 @@ export class ProofPortSDK {
   openProofRequest(request: ProofRequest): void {
     const url = this.getDeepLinkUrl(request);
     window.location.href = url;
+  }
+
+  /**
+   * Request a proof — auto-detects platform.
+   * Mobile: opens deep link directly.
+   * Desktop: returns QR code data URL and deep link URL for display.
+   */
+  async requestProof(
+    request: ProofRequest,
+    qrOptions?: QRCodeOptions
+  ): Promise<{ deepLink: string; qrDataUrl?: string; mobile: boolean }> {
+    const deepLink = this.getDeepLinkUrl(request);
+    const mobile = ProofPortSDK.isMobile();
+
+    if (mobile) {
+      window.location.href = deepLink;
+      return { deepLink, mobile: true };
+    }
+
+    const qrDataUrl = await this.generateQRCode(request, qrOptions);
+    return { deepLink, qrDataUrl, mobile: false };
   }
 
   // ============ QR Code Generation ============
@@ -336,6 +357,16 @@ export class ProofPortSDK {
    */
   static create(config?: ProofPortConfig): ProofPortSDK {
     return new ProofPortSDK(config);
+  }
+
+  /**
+   * Detect if running on a mobile device
+   */
+  static isMobile(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
   }
 }
 
