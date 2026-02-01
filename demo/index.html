@@ -3,21 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZKProofPort SDK Demo</title>
-  <link rel="icon" href="https://zkproofport.com/favicon.ico" type="image/x-icon">
+  <title>ProofPort SDK Demo</title>
   <style>
-    :root {
-      --primary: #d6b15c;
-      --primary-hover: #f0d488;
-      --success: #34d399;
-      --error: #f87171;
-      --bg: #0e2233;
-      --card-bg: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-      --text: #eef6ff;
-      --text-muted: #a9bfd1;
-      --border: rgba(255,255,255,0.12);
-    }
-
     * {
       box-sizing: border-box;
       margin: 0;
@@ -25,11 +12,10 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      line-height: 1.6;
     }
 
     .container {
@@ -38,1254 +24,478 @@
     }
 
     h1 {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, #d6b15c, #f0d488);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: #111;
+      margin-bottom: 10px;
+      font-size: 2em;
     }
 
     .subtitle {
-      color: var(--text-muted);
-      margin-bottom: 2rem;
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 30px;
+      margin-bottom: 20px;
     }
 
     .tabs {
       display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #eee;
     }
 
     .tab {
-      padding: 0.75rem 1.5rem;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-      color: var(--text-muted);
+      padding: 12px 24px;
+      background: none;
+      border: none;
       cursor: pointer;
+      font-size: 16px;
+      color: #666;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
       transition: all 0.2s;
     }
 
     .tab:hover {
-      border-color: var(--primary);
+      color: #2563eb;
     }
 
     .tab.active {
-      background: var(--primary);
-      border-color: var(--primary);
-      color: #0e2233;
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+      font-weight: 600;
     }
 
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      backdrop-filter: blur(10px);
+    .tab-content {
+      display: none;
     }
 
-    .card-title {
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+    .tab-content.active {
+      display: block;
     }
 
     .form-group {
-      margin-bottom: 1rem;
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
-      color: var(--text-muted);
-      font-size: 0.875rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
     }
 
     input, select {
       width: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-      color: var(--text);
-      font-size: 1rem;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
     }
 
     input:focus, select:focus {
       outline: none;
-      border-color: var(--primary);
+      border-color: #2563eb;
     }
 
-    input.error {
-      border-color: var(--error);
+    .help-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
     }
 
-    .error-text {
-      color: var(--error);
-      font-size: 0.75rem;
-      margin-top: 0.25rem;
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
     }
 
-    .btn {
-      padding: 0.75rem 1.5rem;
-      background: var(--primary);
+    button {
+      flex: 1;
+      padding: 14px 24px;
       border: none;
-      border-radius: 0.5rem;
-      color: #0e2233;
-      font-size: 1rem;
+      border-radius: 6px;
+      font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
 
-    .btn:hover {
-      background: var(--primary-hover);
+    button.primary {
+      background: #2563eb;
+      color: white;
     }
 
-    .btn:disabled {
+    button.primary:hover {
+      background: #1d4ed8;
+    }
+
+    button.secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    button.secondary:hover {
+      background: #e5e7eb;
+    }
+
+    button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .btn-secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--primary);
-      background: transparent;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-
-    .qr-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
-      background: white;
-      border-radius: 1rem;
-      margin: 1rem 0;
-    }
-
-    .qr-container img {
-      max-width: 250px;
-    }
-
-    .qr-hint {
-      color: #333;
-      margin-top: 1rem;
-      font-size: 0.875rem;
-      text-align: center;
-    }
-
-    .deeplink-url {
-      word-break: break-all;
-      padding: 1rem;
-      background: var(--bg);
-      border-radius: 0.5rem;
-      font-family: monospace;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 1rem;
-    }
-
     .result {
-      padding: 1rem;
-      border-radius: 0.5rem;
-      margin-top: 1rem;
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
     }
 
-    .result.success {
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid var(--success);
+    .result h3 {
+      margin-bottom: 15px;
+      color: #1e293b;
     }
 
-    .result.error {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid var(--error);
+    .result-item {
+      margin-bottom: 12px;
     }
 
-    .result-title {
+    .result-label {
       font-weight: 600;
-      margin-bottom: 0.5rem;
+      color: #475569;
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    .result-value {
+      color: #1e293b;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    #qrcode {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    #qrcode img {
+      max-width: 300px;
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      background: white;
+    }
+
+    .toggle-group {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      gap: 10px;
+      margin-top: 8px;
     }
 
-    .result.success .result-title {
-      color: var(--success);
+    .toggle-option {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
     }
 
-    .result.error .result-title {
-      color: var(--error);
+    .toggle-option.active {
+      border-color: #2563eb;
+      background: #eff6ff;
+      color: #2563eb;
+      font-weight: 600;
     }
 
     .hidden {
       display: none;
     }
-
-    .info-box {
-      padding: 1rem;
-      background: rgba(214, 177, 92, 0.1);
-      border: 1px solid var(--primary);
-      border-radius: 0.5rem;
-      margin-bottom: 1rem;
-      font-size: 0.875rem;
-    }
-
-    .info-box.warning {
-      background: rgba(234, 179, 8, 0.1);
-      border-color: #eab308;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      border-radius: 1rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .status-badge.pending {
-      background: rgba(234, 179, 8, 0.2);
-      color: #eab308;
-    }
-
-    .status-badge.completed {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
-    }
-
-    .status-badge.error {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--error);
-    }
-
-    .copy-btn {
-      padding: 0.25rem 0.5rem;
-      font-size: 0.75rem;
-      background: var(--border);
-      border: none;
-      border-radius: 0.25rem;
-      color: var(--text);
-      cursor: pointer;
-    }
-
-    .copy-btn:hover {
-      background: var(--primary);
-    }
-
-    @media (max-width: 640px) {
-      body {
-        padding: 1rem;
-      }
-
-      h1 {
-        font-size: 1.5rem;
-      }
-
-      .tabs {
-        flex-direction: column;
-      }
-
-      .btn-group {
-        flex-direction: column;
-      }
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1><img src="https://zkproofport.com/logo.png" alt="ZKProofPort" style="height: 1.8em; vertical-align: middle; margin-right: 0.4rem;">ZKProofPort SDK Demo</h1>
-    <p class="subtitle">ZK Proof Request &amp; Verification Test</p>
+    <h1>ProofPort SDK Demo</h1>
+    <p class="subtitle">Generate ZK proof requests using the ProofPort SDK</p>
 
-    <!-- Circuit Selection Tabs -->
-    <div class="tabs">
-      <button class="tab active" data-circuit="age_verifier">
-        🎂 Age Verifier
-      </button>
-      <button class="tab" data-circuit="coinbase_attestation">
-        🏦 Coinbase KYC
-      </button>
-    </div>
-
-    <!-- Age Verifier Form -->
-    <div id="age-form" class="card">
-      <h2 class="card-title">📋 Age Verification Request</h2>
-      <div class="info-box">
-        Prove that you meet the age requirement without revealing your birth year.<br>
-        <strong>All inputs are sent to the app and verification starts automatically.</strong>
-      </div>
-
-      <div class="form-group">
-        <label for="birthYear">Birth Year (private) *</label>
-        <input type="number" id="birthYear" value="2000" min="1900" max="2025" required>
-        <div class="error-text hidden" id="birthYear-error"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="currentYear">Current Year *</label>
-        <input type="number" id="currentYear" value="2026" min="2020" max="2100" required>
-        <div class="error-text hidden" id="currentYear-error"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="minAge">Minimum Age *</label>
-        <input type="number" id="minAge" value="18" min="1" max="150" required>
-        <div class="error-text hidden" id="minAge-error"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="callbackUrl">Callback URL (leave empty to use demo server)</label>
-        <input type="url" id="callbackUrl" placeholder="Leave empty to use server callback endpoint">
-      </div>
-
-      <div class="btn-group" id="age-btn-group">
-        <button class="btn" onclick="createAgeRequest()">🔗 Generate Deep Link</button>
-        <button class="btn btn-secondary" onclick="createAgeQR()">📱 Generate QR Code</button>
-      </div>
-    </div>
-
-    <!-- Coinbase KYC Form -->
-    <div id="coinbase-form" class="card hidden">
-      <h2 class="card-title">📋 Coinbase KYC Request</h2>
-      <div class="info-box warning">
-        <strong>🔒 Coinbase KYC does not require a wallet address!</strong><br><br>
-        • When the app opens via deep link, it <strong>automatically connects to your wallet</strong>.<br>
-        • It searches Etherscan for a Coinbase attestation transaction using the connected wallet address.<br>
-        • Proofs can only be generated with the user's actual wallet.
-      </div>
-
-      <div class="form-group">
-        <label for="coinbaseCallbackUrl">Callback URL (leave empty to use demo server)</label>
-        <input type="url" id="coinbaseCallbackUrl" placeholder="Leave empty to use server callback endpoint">
-      </div>
-
-      <div class="form-group">
-        <label for="coinbaseMessage">Message to display to user (optional)</label>
-        <input type="text" id="coinbaseMessage" placeholder="e.g. Coinbase identity verification is required to use this service.">
-      </div>
-
-      <div class="btn-group" id="coinbase-btn-group">
-        <button class="btn" onclick="createCoinbaseRequest()">🔗 Generate Deep Link</button>
-        <button class="btn btn-secondary" onclick="createCoinbaseQR()">📱 Generate QR Code</button>
-      </div>
-    </div>
-
-    <!-- Generated Request -->
-    <div id="request-result" class="card hidden">
-      <h2 class="card-title">📤 Generated Request</h2>
-
-      <div style="margin-bottom: 1rem;">
-        <span class="status-badge pending" id="request-status">Pending</span>
-        <span style="margin-left: 0.5rem; color: var(--text-muted); font-size: 0.875rem;">
-          Request ID: <code id="request-id"></code>
-        </span>
-        <span style="margin-left: 0.5rem; color: var(--text-muted); font-size: 0.875rem;">
-          Circuit: <code id="request-circuit"></code>
-        </span>
-      </div>
-
-      <!-- QR Code Display -->
-      <div id="qr-display" class="qr-container hidden">
-        <img id="qr-image" alt="QR Code">
-        <p class="qr-hint">Scan with ZKProofPort app<br><small>Verification will start automatically in the app</small></p>
-      </div>
-
-      <!-- Deep Link Display -->
-      <div id="deeplink-display" class="hidden">
-        <div class="btn-group" style="margin: 0;">
-          <button class="btn" onclick="openDeepLink()">📱 Open in App</button>
-          <button class="copy-btn" onclick="copyDeepLink()">📋 Copy</button>
-        </div>
-        <div class="deeplink-url" id="deeplink-url"></div>
-      </div>
-    </div>
-
-    <!-- Proof Verification -->
-    <div id="verify-section" class="card">
-      <h2 class="card-title">✅ Proof Verification</h2>
-      <div class="info-box">
-        Paste the proof generated by the app here to verify.<br>
-        Responses delivered via callback URL are processed automatically.
-      </div>
-
-      <div class="form-group">
-        <label for="proofInput">Proof (hex)</label>
-        <input type="text" id="proofInput" placeholder="0x...">
-      </div>
-
-      <div class="form-group">
-        <label for="publicInputsInput">Public Inputs (comma separated)</label>
-        <input type="text" id="publicInputsInput" placeholder="0x..., 0x...">
-      </div>
-
-      <div class="form-group">
-        <label for="verifyCircuit">Circuit</label>
-        <select id="verifyCircuit">
-          <option value="age_verifier">Age Verifier</option>
-          <option value="coinbase_attestation">Coinbase KYC</option>
-        </select>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn" onclick="verifyProofOffChain()">🔒 Off-chain Verify</button>
-        <button class="btn btn-secondary" onclick="verifyProofOnChain()">🔗 On-chain Verify (Sepolia)</button>
-      </div>
-
-      <div id="verify-result" class="hidden"></div>
-    </div>
-
-    <!-- Logs -->
     <div class="card">
-      <h2 class="card-title">📝 Logs</h2>
-      <div id="logs" style="font-family: monospace; font-size: 0.75rem; max-height: 200px; overflow-y: auto; background: var(--bg); padding: 1rem; border-radius: 0.5rem;">
-        <div style="color: var(--text-muted);">Ready...</div>
+      <div class="tabs">
+        <button class="tab active" data-tab="kyc">Coinbase KYC</button>
+        <button class="tab" data-tab="country">Coinbase Country</button>
+      </div>
+
+      <div id="kyc-tab" class="tab-content active">
+        <form id="kyc-form">
+          <div class="form-group">
+            <label for="kyc-callback">Callback URL *</label>
+            <input
+              type="url"
+              id="kyc-callback"
+              placeholder="http://localhost:3300/api/callback"
+              value="http://localhost:3300/api/callback"
+              required
+            >
+            <div class="help-text">URL where the proof will be sent after completion</div>
+          </div>
+
+          <div class="form-group">
+            <label for="kyc-dapp-name">Dapp Name (optional)</label>
+            <input
+              type="text"
+              id="kyc-dapp-name"
+              placeholder="My Dapp"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="kyc-message">Message (optional)</label>
+            <input
+              type="text"
+              id="kyc-message"
+              placeholder="Please verify your Coinbase KYC"
+            >
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="primary">Generate QR Code</button>
+            <button type="button" id="kyc-open" class="secondary">Open in ProofPort</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="country-tab" class="tab-content">
+        <form id="country-form">
+          <div class="form-group">
+            <label for="country-callback">Callback URL *</label>
+            <input
+              type="url"
+              id="country-callback"
+              placeholder="http://localhost:3300/api/callback"
+              value="http://localhost:3300/api/callback"
+              required
+            >
+            <div class="help-text">URL where the proof will be sent after completion</div>
+          </div>
+
+          <div class="form-group">
+            <label for="country-list">Country List *</label>
+            <input
+              type="text"
+              id="country-list"
+              placeholder="US,KR,JP"
+              value="US,KR,JP"
+              required
+            >
+            <div class="help-text">Comma-separated ISO 3166-1 alpha-2 country codes</div>
+          </div>
+
+          <div class="form-group">
+            <label>List Type</label>
+            <div class="toggle-group">
+              <div class="toggle-option active" data-value="include">
+                Include List (user IN list)
+              </div>
+              <div class="toggle-option" data-value="exclude">
+                Exclude List (user NOT IN list)
+              </div>
+            </div>
+            <div class="help-text">Whether to check if user is in or not in the country list</div>
+          </div>
+
+          <div class="form-group">
+            <label for="country-dapp-name">Dapp Name (optional)</label>
+            <input
+              type="text"
+              id="country-dapp-name"
+              placeholder="My Dapp"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="country-message">Message (optional)</label>
+            <input
+              type="text"
+              id="country-message"
+              placeholder="Please verify your country"
+            >
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="primary">Generate QR Code</button>
+            <button type="button" id="country-open" class="secondary">Open in ProofPort</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="result" class="result hidden">
+        <h3>Generated Proof Request</h3>
+        <div class="result-item">
+          <span class="result-label">Request ID:</span>
+          <span class="result-value" id="result-request-id"></span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Circuit:</span>
+          <span class="result-value" id="result-circuit"></span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Expires:</span>
+          <span class="result-value" id="result-expires"></span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Deep Link:</span>
+          <span class="result-value" id="result-deeplink"></span>
+        </div>
+        <div id="qrcode"></div>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
   <script type="module">
-    const DEFAULT_SCHEME = 'zkproofport';
-    const SERVER_URL = window.location.origin; // Same origin as server
-    const CALLBACK_URL = `${SERVER_URL}/callback`;
-    const POLL_INTERVAL = 2000; // Poll every 2 seconds
+    import { ProofPortSDK } from '../dist/index.mjs';
 
-    // Get local network IP for QR code callbacks (mobile devices can't reach localhost)
-    let LOCAL_IP_CALLBACK_URL = CALLBACK_URL;
-
-    // Try to detect if we need to use a different callback URL for QR codes
-    function getQRCallbackUrl() {
-      // If user specified a custom callback URL, use that
-      const customUrl = document.getElementById('callbackUrl')?.value ||
-                        document.getElementById('coinbaseCallbackUrl')?.value;
-      if (customUrl) return customUrl;
-
-      // If accessing via IP already, use the same
-      if (!window.location.hostname.includes('localhost') &&
-          !window.location.hostname.includes('127.0.0.1')) {
-        return CALLBACK_URL;
-      }
-
-      // Otherwise show warning about localhost
-      return null;
-    }
-
-    // Get local IP hint (best effort)
-    async function getLocalIPHint() {
-      try {
-        // Try WebRTC method to get local IP
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        pc.createDataChannel('');
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        return new Promise((resolve) => {
-          pc.onicecandidate = (e) => {
-            if (e.candidate) {
-              const match = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
-              if (match && !match[1].startsWith('127.')) {
-                pc.close();
-                resolve(match[1]);
-              }
-            }
-          };
-          // Fallback after timeout
-          setTimeout(() => {
-            pc.close();
-            resolve('<YOUR_LOCAL_IP>');
-          }, 1000);
-        });
-      } catch {
-        return '<YOUR_LOCAL_IP>';
-      }
-    }
+    const sdk = new ProofPortSDK({
+      defaultCallbackUrl: 'http://localhost:3300/api/callback'
+    });
 
     let currentRequest = null;
-    let currentDeepLink = null;
-    let currentCircuit = 'age_verifier';
-    let pollingTimer = null;
-    window.currentProofData = null;
-
-    // Confetti celebration animation
-    function celebrate() {
-      const duration = 3000;
-      const end = Date.now() + duration;
-
-      (function frame() {
-        confetti({
-          particleCount: 3,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
-          colors: ['#d6b15c', '#f0d488', '#34d399']
-        });
-        confetti({
-          particleCount: 3,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
-          colors: ['#d6b15c', '#f0d488', '#34d399']
-        });
-
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
-      })();
-    }
-
-    // Toggle active button in a btn-group
-    function setActiveButton(groupId, activeIndex) {
-      const buttons = document.getElementById(groupId).querySelectorAll('.btn');
-      buttons.forEach((btn, i) => {
-        if (i === activeIndex) {
-          btn.classList.remove('btn-secondary');
-        } else {
-          btn.classList.add('btn-secondary');
-        }
-      });
-    }
-
-    // Utility functions
-    function generateRequestId() {
-      const timestamp = Date.now().toString(36);
-      const random = Math.random().toString(36).substring(2, 10);
-      return `req-${timestamp}-${random}`;
-    }
-
-    function encodeData(data) {
-      const json = JSON.stringify(data);
-      // First percent-encode the UTF-8 string, then apply btoa
-      const utf8Encoded = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-        String.fromCharCode(parseInt(p1, 16))
-      );
-      return btoa(utf8Encoded)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-    }
-
-    function buildProofRequestUrl(request) {
-      const encoded = encodeData(request);
-      return `${DEFAULT_SCHEME}://proof-request?data=${encoded}`;
-    }
-
-    function log(message, type = 'info') {
-      const logsDiv = document.getElementById('logs');
-      const colors = {
-        info: 'var(--text-muted)',
-        success: 'var(--success)',
-        error: 'var(--error)',
-        warning: '#eab308'
-      };
-      const time = new Date().toLocaleTimeString();
-      logsDiv.innerHTML += `<div style="color: ${colors[type]}">[${time}] ${message}</div>`;
-      logsDiv.scrollTop = logsDiv.scrollHeight;
-    }
-
-    function clearError(fieldId) {
-      const input = document.getElementById(fieldId);
-      const errorDiv = document.getElementById(`${fieldId}-error`);
-      if (input) input.classList.remove('error');
-      if (errorDiv) {
-        errorDiv.classList.add('hidden');
-        errorDiv.textContent = '';
-      }
-    }
-
-    function showError(fieldId, message) {
-      const input = document.getElementById(fieldId);
-      const errorDiv = document.getElementById(`${fieldId}-error`);
-      if (input) input.classList.add('error');
-      if (errorDiv) {
-        errorDiv.classList.remove('hidden');
-        errorDiv.textContent = message;
-      }
-    }
-
-    // Stop polling
-    function stopPolling() {
-      if (pollingTimer) {
-        clearInterval(pollingTimer);
-        pollingTimer = null;
-        log('Polling stopped');
-      }
-    }
-
-    // Start polling for result
-    function startPolling(requestId) {
-      stopPolling(); // Clear any existing polling
-
-      log(`Starting to poll for request: ${requestId}`, 'info');
-      document.getElementById('request-status').textContent = 'Requesting...';
-      document.getElementById('request-status').className = 'status-badge pending';
-
-      pollingTimer = setInterval(async () => {
-        try {
-          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
-          const data = await response.json();
-
-          if (data.found) {
-            stopPolling();
-            handleProofResult(data.data);
-          }
-        } catch (e) {
-          log(`Polling error: ${e.message}`, 'error');
-        }
-      }, POLL_INTERVAL);
-
-      // Also poll immediately
-      (async () => {
-        try {
-          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
-          const data = await response.json();
-          if (data.found) {
-            stopPolling();
-            handleProofResult(data.data);
-          }
-        } catch (e) {
-          // Ignore initial poll error
-        }
-      })();
-    }
-
-    // Handle proof result received from server
-    function handleProofResult(data) {
-      const {
-        requestId, status, proof, publicInputs, numPublicInputs, circuit, error,
-        verificationType, verificationResult, startedAt, completedAt, expiresAt, inputs,
-        verifierAddress, chainId
-      } = data;
-
-      log(`=== Proof Result Received ===`, 'info');
-      log(`Request ID: ${requestId}`, 'info');
-      log(`Status: ${status}`, status === 'completed' ? 'success' : 'error');
-
-      // Store the proof data for verification functions
-      window.currentProofData = data;
-
-      const resultDiv = document.getElementById('request-result');
-      resultDiv.classList.remove('hidden');
-      document.getElementById('request-id').textContent = requestId;
-
-      // Remove any existing result messages
-      const existingResults = resultDiv.querySelectorAll('.result');
-      existingResults.forEach(el => el.remove());
-
-      if (status === 'completed') {
-        // Log verification details
-        if (verificationType) {
-          log(`Verification Type: ${verificationType}`, 'info');
-        }
-        if (verificationResult !== undefined) {
-          log(`Verification Result: ${verificationResult ? '✅ VALID' : '❌ INVALID'}`, verificationResult ? 'success' : 'error');
-        }
-
-        // Log timing info
-        if (startedAt) {
-          log(`Started At: ${new Date(startedAt).toLocaleString()}`, 'info');
-        }
-        if (completedAt) {
-          log(`Completed At: ${new Date(completedAt).toLocaleString()}`, 'info');
-        }
-        if (startedAt && completedAt) {
-          const duration = ((completedAt - startedAt) / 1000).toFixed(2);
-          log(`Duration: ${duration}s`, 'info');
-        }
-        if (expiresAt) {
-          log(`Expires At: ${new Date(expiresAt).toLocaleString()}`, 'info');
-        }
-
-        // Log original inputs
-        if (inputs && Object.keys(inputs).length > 0) {
-          log(`Original Inputs: ${JSON.stringify(inputs)}`, 'info');
-        }
-
-        if (proof) {
-          document.getElementById('proofInput').value = proof;
-          log(`Proof: ${proof.substring(0, 60)}...`, 'success');
-        }
-        if (publicInputs) {
-          const publicInputsStr = Array.isArray(publicInputs) ? publicInputs.join(', ') : publicInputs;
-          document.getElementById('publicInputsInput').value = publicInputsStr;
-          log(`Public Inputs: ${publicInputsStr}`, 'success');
-        }
-        if (circuit) {
-          document.getElementById('verifyCircuit').value = circuit;
-          document.getElementById('request-circuit').textContent = circuit;
-          log(`Circuit: ${circuit}`, 'info');
-        }
-        if (numPublicInputs) {
-          log(`Number of Public Inputs: ${numPublicInputs}`, 'info');
-        }
-
-        // Update status badge
-        document.getElementById('request-status').textContent = 'Completed';
-        document.getElementById('request-status').className = 'status-badge completed';
-
-        // Hide QR/deeplink displays
-        document.getElementById('qr-display').classList.add('hidden');
-        document.getElementById('deeplink-display').classList.add('hidden');
-
-        // Build timing info string
-        let timingInfo = '';
-        if (startedAt && completedAt) {
-          const duration = ((completedAt - startedAt) / 1000).toFixed(2);
-          timingInfo = `<br><small>Duration: ${duration}s</small>`;
-        }
-
-        // Show proof received result
-        const successHtml = `
-          <div class="result success" style="margin-top: 1rem;">
-            <div class="result-title">✅ Proof Received from App!</div>
-            <p>
-              The ZK proof has been successfully generated and sent back.
-              ${timingInfo}
-            </p>
-            ${inputs ? `<p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">Inputs: ${JSON.stringify(inputs)}</p>` : ''}
-            <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-              You can verify the proof using the section below.
-            </p>
-          </div>
-        `;
-        resultDiv.insertAdjacentHTML('beforeend', successHtml);
-
-        // Scroll to verification section
-        document.getElementById('verify-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-        log('=== Proof Processing Complete ===', 'success');
-
-      } else if (status === 'error') {
-        log(`Error from app: ${error}`, 'error');
-
-        document.getElementById('request-status').textContent = 'Error';
-        document.getElementById('request-status').className = 'status-badge error';
-
-        // Show error
-        const errorHtml = `
-          <div class="result error" style="margin-top: 1rem;">
-            <div class="result-title">❌ Error</div>
-            <p>${error || 'Unknown error occurred'}</p>
-          </div>
-        `;
-        resultDiv.insertAdjacentHTML('beforeend', errorHtml);
-
-      } else if (status === 'cancelled') {
-        log('Request was cancelled by user', 'warning');
-
-        document.getElementById('request-status').textContent = 'Cancelled';
-        document.getElementById('request-status').className = 'status-badge error';
-
-        // Show cancelled
-        const cancelHtml = `
-          <div class="result error" style="margin-top: 1rem;">
-            <div class="result-title">🚫 Cancelled</div>
-            <p>The user cancelled the proof request.</p>
-          </div>
-        `;
-        resultDiv.insertAdjacentHTML('beforeend', cancelHtml);
-      }
-    }
-
-    // Clear generated request when switching tabs
-    function clearRequestResult() {
-      stopPolling();
-      currentRequest = null;
-      currentDeepLink = null;
-      const resultDiv = document.getElementById('request-result');
-      resultDiv.classList.add('hidden');
-      document.getElementById('qr-display').classList.add('hidden');
-      document.getElementById('deeplink-display').classList.add('hidden');
-      document.getElementById('request-status').textContent = 'Pending';
-      document.getElementById('request-status').className = 'status-badge pending';
-    }
+    let isIncludedCountry = true;
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
         tab.classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
 
-        currentCircuit = tab.dataset.circuit;
-        document.getElementById('age-form').classList.toggle('hidden', currentCircuit !== 'age_verifier');
-        document.getElementById('coinbase-form').classList.toggle('hidden', currentCircuit !== 'coinbase_attestation');
-
-        // Clear previous request when switching tabs
-        clearRequestResult();
-
-        log(`Switched to ${currentCircuit} circuit`);
+        document.getElementById('result').classList.add('hidden');
       });
     });
 
-    // Validate Age Verifier inputs
-    function validateAgeInputs() {
-      let valid = true;
+    // Country list type toggle
+    document.querySelectorAll('.toggle-option').forEach(option => {
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.toggle-option').forEach(o => o.classList.remove('active'));
+        option.classList.add('active');
+        isIncludedCountry = option.dataset.value === 'include';
+      });
+    });
 
-      const birthYear = parseInt(document.getElementById('birthYear').value);
-      const currentYear = parseInt(document.getElementById('currentYear').value);
-      const minAge = parseInt(document.getElementById('minAge').value);
+    // KYC Form
+    document.getElementById('kyc-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-      clearError('birthYear');
-      clearError('currentYear');
-      clearError('minAge');
+      const callbackUrl = document.getElementById('kyc-callback').value;
+      const dappName = document.getElementById('kyc-dapp-name').value;
+      const message = document.getElementById('kyc-message').value;
 
-      if (!birthYear || birthYear < 1900 || birthYear > 2025) {
-        showError('birthYear', 'Enter a value between 1900 and 2025');
-        valid = false;
-      }
+      currentRequest = sdk.createCoinbaseKycRequest(
+        {},
+        {
+          callbackUrl,
+          dappName: dappName || undefined,
+          message: message || undefined
+        }
+      );
 
-      if (!currentYear || currentYear < 2020 || currentYear > 2100) {
-        showError('currentYear', 'Enter a value between 2020 and 2100');
-        valid = false;
-      }
+      await displayResult(currentRequest);
+    });
 
-      if (!minAge || minAge < 1 || minAge > 150) {
-        showError('minAge', 'Enter a value between 1 and 150');
-        valid = false;
-      }
+    document.getElementById('kyc-open').addEventListener('click', () => {
+      if (!currentRequest) {
+        const callbackUrl = document.getElementById('kyc-callback').value;
+        const dappName = document.getElementById('kyc-dapp-name').value;
+        const message = document.getElementById('kyc-message').value;
 
-      if (valid && (currentYear - birthYear) < minAge) {
-        showError('birthYear', `Current age (${currentYear - birthYear}) is less than minimum age (${minAge})`);
-        valid = false;
-      }
-
-      return valid;
-    }
-
-    // Age Verifier Request
-    window.createAgeRequest = function() {
-      if (!validateAgeInputs()) {
-        log('Please check your input values', 'error');
-        return;
-      }
-      setActiveButton('age-btn-group', 0);
-
-      // Use custom callback URL if provided, otherwise use server's callback endpoint
-      const customCallbackUrl = document.getElementById('callbackUrl').value;
-      const callbackUrl = customCallbackUrl || CALLBACK_URL;
-
-      const request = {
-        requestId: generateRequestId(),
-        circuit: 'age_verifier',
-        inputs: {
-          birthYear: parseInt(document.getElementById('birthYear').value),
-          currentYear: parseInt(document.getElementById('currentYear').value),
-          minAge: parseInt(document.getElementById('minAge').value)
-        },
-        callbackUrl: callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: 'Age verification is required. The proof will be generated automatically after confirmation.',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 600000
-      };
-
-      currentRequest = request;
-      currentDeepLink = buildProofRequestUrl(request);
-
-      showRequestResult(request, currentDeepLink, false);
-      log(`Created age verification request: ${request.requestId}`, 'success');
-      log(`Callback URL: ${callbackUrl}`, 'info');
-
-      // Start polling for result
-      startPolling(request.requestId);
-    };
-
-    window.createAgeQR = async function() {
-      if (!validateAgeInputs()) {
-        log('Please check your input values', 'error');
-        return;
-      }
-      setActiveButton('age-btn-group', 1);
-
-      // Check if using localhost - warn user about QR code limitation
-      const qrCallbackUrl = getQRCallbackUrl();
-      if (!qrCallbackUrl) {
-        const localIP = await getLocalIPHint();
-        alert(`⚠️ QR Code Warning!\n\n` +
-              `You are currently accessing via localhost.\n` +
-              `Mobile devices cannot receive callbacks when scanning the QR code.\n\n` +
-              `Solution:\n` +
-              `1. Enter server IP in Callback URL: http://${localIP}:3333/callback\n` +
-              `2. or access via http://${localIP}:3333`);
-        log(`When using QR, enter local IP in Callback URL: http://${localIP}:3333/callback`, 'warning');
-      }
-
-      // Use custom callback URL if provided, otherwise use server's callback endpoint
-      const customCallbackUrl = document.getElementById('callbackUrl').value;
-      const callbackUrl = customCallbackUrl || CALLBACK_URL;
-
-      const request = {
-        requestId: generateRequestId(),
-        circuit: 'age_verifier',
-        inputs: {
-          birthYear: parseInt(document.getElementById('birthYear').value),
-          currentYear: parseInt(document.getElementById('currentYear').value),
-          minAge: parseInt(document.getElementById('minAge').value)
-        },
-        callbackUrl: callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: 'Age verification is required. The proof will be generated automatically after confirmation.',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 600000
-      };
-
-      currentRequest = request;
-      currentDeepLink = buildProofRequestUrl(request);
-
-      await showRequestResult(request, currentDeepLink, true);
-      log(`Created QR code for age verification: ${request.requestId}`, 'success');
-      log(`Callback URL: ${callbackUrl}`, 'info');
-
-      // Start polling for result
-      startPolling(request.requestId);
-    };
-
-    // Coinbase KYC Request (no wallet address needed!)
-    window.createCoinbaseRequest = function() {
-      setActiveButton('coinbase-btn-group', 0);
-
-      // Use custom callback URL if provided, otherwise use server's callback endpoint
-      const customCallbackUrl = document.getElementById('coinbaseCallbackUrl').value;
-      const callbackUrl = customCallbackUrl || CALLBACK_URL;
-
-      const request = {
-        requestId: generateRequestId(),
-        circuit: 'coinbase_attestation',
-        inputs: {
-          // No wallet address needed! The app will connect and retrieve it
-        },
-        callbackUrl: callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: document.getElementById('coinbaseMessage').value || 'Please verify your Coinbase identity. Verification will start automatically once you connect your wallet in the app.',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 600000
-      };
-
-      currentRequest = request;
-      currentDeepLink = buildProofRequestUrl(request);
-
-      showRequestResult(request, currentDeepLink, false);
-      log(`Created Coinbase KYC request: ${request.requestId}`, 'success');
-      log(`Callback URL: ${callbackUrl}`, 'info');
-      log('Verification will start automatically after wallet connection in the app', 'info');
-
-      // Start polling for result
-      startPolling(request.requestId);
-    };
-
-    window.createCoinbaseQR = async function() {
-      setActiveButton('coinbase-btn-group', 1);
-
-      // Check if using localhost - warn user about QR code limitation
-      const qrCallbackUrl = getQRCallbackUrl();
-      if (!qrCallbackUrl) {
-        const localIP = await getLocalIPHint();
-        alert(`⚠️ QR Code Warning!\n\n` +
-              `You are currently accessing via localhost.\n` +
-              `Mobile devices cannot receive callbacks when scanning the QR code.\n\n` +
-              `Solution:\n` +
-              `1. Enter server IP in Callback URL: http://${localIP}:3333/callback\n` +
-              `2. or access via http://${localIP}:3333`);
-        log(`When using QR, enter local IP in Callback URL: http://${localIP}:3333/callback`, 'warning');
-      }
-
-      // Use custom callback URL if provided, otherwise use server's callback endpoint
-      const customCallbackUrl = document.getElementById('coinbaseCallbackUrl').value;
-      const callbackUrl = customCallbackUrl || CALLBACK_URL;
-
-      const request = {
-        requestId: generateRequestId(),
-        circuit: 'coinbase_attestation',
-        inputs: {
-          // No wallet address needed! The app will connect and retrieve it
-        },
-        callbackUrl: callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: document.getElementById('coinbaseMessage').value || 'Please verify your Coinbase identity. Verification will start automatically once you connect your wallet in the app.',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 600000
-      };
-
-      currentRequest = request;
-      currentDeepLink = buildProofRequestUrl(request);
-
-      await showRequestResult(request, currentDeepLink, true);
-      log(`Created QR code for Coinbase KYC: ${request.requestId}`, 'success');
-      log(`Callback URL: ${callbackUrl}`, 'info');
-      log('Verification will start automatically after wallet connection in the app', 'info');
-
-      // Start polling for result
-      startPolling(request.requestId);
-    };
-
-    async function showRequestResult(request, deepLink, showQR) {
-      const resultDiv = document.getElementById('request-result');
-      resultDiv.classList.remove('hidden');
-
-      document.getElementById('request-id').textContent = request.requestId;
-      document.getElementById('request-circuit').textContent = request.circuit;
-      document.getElementById('request-status').textContent = 'Pending';
-      document.getElementById('request-status').className = 'status-badge pending';
-
-      const qrDisplay = document.getElementById('qr-display');
-      const deeplinkDisplay = document.getElementById('deeplink-display');
-
-      if (showQR) {
-        const QRCode = await import('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm');
-        const qrDataUrl = await QRCode.toDataURL(deepLink, {
-          width: 250,
-          margin: 2,
-          color: { dark: '#000000', light: '#ffffff' }
-        });
-        document.getElementById('qr-image').src = qrDataUrl;
-        qrDisplay.classList.remove('hidden');
-        deeplinkDisplay.classList.add('hidden');
-      } else {
-        document.getElementById('deeplink-url').textContent = deepLink;
-        deeplinkDisplay.classList.remove('hidden');
-        qrDisplay.classList.add('hidden');
-      }
-    }
-
-    window.openDeepLink = function() {
-      if (currentDeepLink) {
-        log(`Opening deep link: ${currentDeepLink.substring(0, 50)}...`);
-        window.location.href = currentDeepLink;
-      }
-    };
-
-    window.copyDeepLink = function() {
-      if (currentDeepLink) {
-        navigator.clipboard.writeText(currentDeepLink);
-        log('Deep link copied to clipboard', 'success');
-      }
-    };
-
-    // Shared verification logic (both off-chain and on-chain call verify as a read-only view)
-    function getRpcUrl(chainId) {
-      return chainId === 8453 ? 'https://mainnet.base.org' : 'https://sepolia.base.org';
-    }
-
-    function getNetworkName(chainId) {
-      return chainId === 8453 ? 'Base Mainnet' : 'Base Sepolia';
-    }
-
-    async function verifyProof(label) {
-      const proof = document.getElementById('proofInput').value;
-      const publicInputsStr = document.getElementById('publicInputsInput').value;
-      const circuit = document.getElementById('verifyCircuit').value;
-
-      if (!proof) {
-        log('Please enter proof', 'error');
-        return;
-      }
-
-      const publicInputs = publicInputsStr.split(',').map(s => s.trim()).filter(s => s);
-
-      log(`Starting ${label} verification for ${circuit}...`);
-
-      const address = window.currentProofData?.verifierAddress;
-      const chainId = window.currentProofData?.chainId;
-
-      if (!address) {
-        log('No verifier address available. The proof response must include verifierAddress.', 'error');
-        return;
-      }
-      if (!chainId) {
-        log('No chain ID available. The proof response must include chainId.', 'error');
-        return;
-      }
-
-      const rpcUrl = getRpcUrl(chainId);
-      const networkName = getNetworkName(chainId);
-      const resultDiv = document.getElementById('verify-result');
-
-      try {
-        const { ethers } = await import('https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js');
-
-        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-
-        const contract = new ethers.Contract(
-          address,
-          ['function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)'],
-          provider
+        currentRequest = sdk.createCoinbaseKycRequest(
+          {},
+          {
+            callbackUrl,
+            dappName: dappName || undefined,
+            message: message || undefined
+          }
         );
-
-        const publicInputsBytes32 = publicInputs.map(input => {
-          const hex = input.startsWith('0x') ? input : `0x${input}`;
-          return ethers.utils.hexZeroPad(hex, 32);
-        });
-
-        log(`Calling verifier contract at ${address} on ${networkName} (chain ${chainId})...`);
-
-        const isValid = await contract.verify(proof, publicInputsBytes32);
-
-        resultDiv.classList.remove('hidden');
-
-        if (isValid) {
-          resultDiv.innerHTML = `
-            <div class="result success">
-              <div class="result-title">✅ ${label} Verification Successful</div>
-              <p>The proof is valid on ${networkName}.</p>
-              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-                Verifier: ${address}<br>
-                Chain ID: ${chainId}
-              </p>
-            </div>
-          `;
-          log(`${label} proof verified successfully!`, 'success');
-          celebrate();
-        } else {
-          resultDiv.innerHTML = `
-            <div class="result error">
-              <div class="result-title">❌ ${label} Verification Failed</div>
-              <p>The proof is invalid.</p>
-            </div>
-          `;
-          log(`${label} proof verification failed`, 'error');
-        }
-      } catch (error) {
-        log(`${label} verification error: ${error.message}`, 'error');
-        resultDiv.classList.remove('hidden');
-        resultDiv.innerHTML = `
-          <div class="result error">
-            <div class="result-title">❌ Error</div>
-            <p>${error.message}</p>
-          </div>
-        `;
       }
-    }
+      sdk.openProofRequest(currentRequest);
+    });
 
-    // Off-chain verification (calls verifier contract as view/read-only - no gas, no transaction)
-    window.verifyProofOffChain = function() {
-      return verifyProof('Off-chain');
-    };
+    // Country Form
+    document.getElementById('country-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    // On-chain verification
-    window.verifyProofOnChain = function() {
-      return verifyProof('On-chain');
-    };
+      const callbackUrl = document.getElementById('country-callback').value;
+      const countryListStr = document.getElementById('country-list').value;
+      const dappName = document.getElementById('country-dapp-name').value;
+      const message = document.getElementById('country-message').value;
 
-    // Check for callback response on page load
-    function checkCallbackResponse() {
-      const params = new URLSearchParams(window.location.search);
-      const requestId = params.get('requestId');
-      const status = params.get('status');
+      const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
 
-      if (requestId && status) {
-        log(`=== Callback Response Received ===`, 'info');
-        log(`Request ID: ${requestId}`, 'info');
-        log(`Status: ${status}`, status === 'completed' ? 'success' : 'error');
-
-        const resultDiv = document.getElementById('request-result');
-        resultDiv.classList.remove('hidden');
-        document.getElementById('request-id').textContent = requestId;
-
-        if (status === 'completed') {
-          const proof = params.get('proof');
-          const publicInputs = params.get('publicInputs');
-          const circuit = params.get('circuit');
-          const numPublicInputs = params.get('numPublicInputs');
-
-          if (proof) {
-            document.getElementById('proofInput').value = proof;
-            log(`Proof: ${proof.substring(0, 60)}...`, 'success');
-          }
-          if (publicInputs) {
-            document.getElementById('publicInputsInput').value = publicInputs;
-            log(`Public Inputs: ${publicInputs}`, 'success');
-          }
-          if (circuit) {
-            document.getElementById('verifyCircuit').value = circuit;
-            document.getElementById('request-circuit').textContent = circuit;
-            log(`Circuit: ${circuit}`, 'info');
-          }
-          if (numPublicInputs) {
-            log(`Number of Public Inputs: ${numPublicInputs}`, 'info');
-          }
-
-          document.getElementById('request-status').textContent = 'Completed';
-          document.getElementById('request-status').className = 'status-badge completed';
-
-          // Hide QR/deeplink displays, show success message
-          document.getElementById('qr-display').classList.add('hidden');
-          document.getElementById('deeplink-display').classList.add('hidden');
-
-          // Show success result in request-result
-          const successHtml = `
-            <div class="result success" style="margin-top: 1rem;">
-              <div class="result-title">✅ Proof Received from App!</div>
-              <p>The ZK proof has been successfully generated and sent back.</p>
-              <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-                You can now verify the proof on-chain using the Verification section below.
-              </p>
-            </div>
-          `;
-          resultDiv.insertAdjacentHTML('beforeend', successHtml);
-
-          // Scroll to verification section
-          document.getElementById('verify-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-          log('=== Ready for On-chain Verification ===', 'success');
-          log('Click the "On-chain Verify" button below to verify the proof on Sepolia', 'info');
-
-        } else if (status === 'error') {
-          const error = params.get('error');
-          log(`Error from app: ${error}`, 'error');
-
-          document.getElementById('request-status').textContent = 'Error';
-          document.getElementById('request-status').className = 'status-badge error';
-
-          // Show error in request-result
-          const errorHtml = `
-            <div class="result error" style="margin-top: 1rem;">
-              <div class="result-title">❌ Error</div>
-              <p>${error || 'Unknown error occurred'}</p>
-            </div>
-          `;
-          resultDiv.insertAdjacentHTML('beforeend', errorHtml);
-
-        } else if (status === 'cancelled') {
-          log('Request was cancelled by user', 'warning');
-
-          document.getElementById('request-status').textContent = 'Cancelled';
-          document.getElementById('request-status').className = 'status-badge error';
-
-          // Show cancelled in request-result
-          const cancelHtml = `
-            <div class="result error" style="margin-top: 1rem;">
-              <div class="result-title">🚫 Cancelled</div>
-              <p>The user cancelled the proof request.</p>
-            </div>
-          `;
-          resultDiv.insertAdjacentHTML('beforeend', cancelHtml);
+      currentRequest = sdk.createCoinbaseCountryRequest(
+        {
+          countryList,
+          isIncluded: isIncludedCountry
+        },
+        {
+          callbackUrl,
+          dappName: dappName || undefined,
+          message: message || undefined
         }
+      );
 
-        // Clean URL
-        window.history.replaceState({}, '', window.location.pathname);
+      await displayResult(currentRequest);
+    });
+
+    document.getElementById('country-open').addEventListener('click', () => {
+      if (!currentRequest) {
+        const callbackUrl = document.getElementById('country-callback').value;
+        const countryListStr = document.getElementById('country-list').value;
+        const dappName = document.getElementById('country-dapp-name').value;
+        const message = document.getElementById('country-message').value;
+
+        const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+
+        currentRequest = sdk.createCoinbaseCountryRequest(
+          {
+            countryList,
+            isIncluded: isIncludedCountry
+          },
+          {
+            callbackUrl,
+            dappName: dappName || undefined,
+            message: message || undefined
+          }
+        );
       }
+      sdk.openProofRequest(currentRequest);
+    });
+
+    async function displayResult(request) {
+      const deepLink = sdk.getDeepLinkUrl(request);
+      const expiresAt = new Date(request.expiresAt);
+
+      document.getElementById('result-request-id').textContent = request.requestId;
+      document.getElementById('result-circuit').textContent = request.circuit;
+      document.getElementById('result-expires').textContent = expiresAt.toLocaleString();
+      document.getElementById('result-deeplink').textContent = deepLink;
+
+      const qrDataUrl = await sdk.generateQRCode(request, { width: 300 });
+      document.getElementById('qrcode').innerHTML = `<img src="${qrDataUrl}" alt="QR Code" />`;
+
+      document.getElementById('result').classList.remove('hidden');
     }
-
-    // Initialize
-    checkCallbackResponse();
-
-    // Set default callback URLs
-    document.getElementById('callbackUrl').value = CALLBACK_URL;
-    document.getElementById('coinbaseCallbackUrl').value = CALLBACK_URL;
-
-    log('ZKProofPort SDK Demo initialized', 'info');
   </script>
 </body>
 </html>

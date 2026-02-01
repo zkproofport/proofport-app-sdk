@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProofPort - Privacy-First Identity Verification</title>
+  <style>
+    /* Reset & Base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --navy-deep: #0a0f1e;
+      --navy-mid: #131a2f;
+      --navy-light: #1a2440;
+      --blue: #2563eb;
+      --purple: #7c3aed;
+      --cyan: #06b6d4;
+      --white: #ffffff;
+      --gray-100: #f3f4f6;
+      --gray-300: #cbd5e1;
+      --gray-400: #94a3b8;
+      --gray-600: #64748b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: var(--navy-deep);
+      color: var(--gray-100);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Background gradient mesh */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(124, 58, 237, 0.15) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 32px 0;
+      position: relative;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 80px 0 120px;
+      position: relative;
+    }
+
+    .hero h1 {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--white), var(--gray-300));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .tagline {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .subtitle {
+      font-size: 20px;
+      color: var(--gray-400);
+      margin-bottom: 48px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 16px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: var(--white);
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--white);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    /* How It Works */
+    .how-it-works {
+      padding: 80px 0;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 64px;
+      letter-spacing: -0.02em;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+      margin-bottom: 80px;
+    }
+
+    .step {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 40px;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step:hover {
+      transform: translateY(-4px);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .step-number {
+      position: absolute;
+      top: -16px;
+      left: 32px;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    .step h3 {
+      font-size: 24px;
+      margin: 16px 0 12px;
+      font-weight: 600;
+    }
+
+    .step p {
+      color: var(--gray-400);
+      font-size: 16px;
+    }
+
+    /* Demo Cards */
+    .demo-section {
+      padding: 80px 0;
+    }
+
+    .demo-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 32px;
+    }
+
+    .demo-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 40px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .demo-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .demo-card-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .demo-card-icon {
+      font-size: 48px;
+      filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.4));
+    }
+
+    .demo-card h3 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .demo-card p {
+      color: var(--gray-400);
+      margin-bottom: 24px;
+      font-size: 15px;
+    }
+
+    .proof-info {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .proof-info div {
+      flex: 1;
+    }
+
+    .proof-info strong {
+      color: var(--cyan);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-300);
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: var(--white);
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--blue);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .toggle-btn {
+      flex: 1;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: var(--gray-400);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toggle-btn.active {
+      background: var(--blue);
+      color: var(--white);
+      border-color: var(--blue);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .button-group button {
+      flex: 1;
+    }
+
+    .btn-small {
+      padding: 12px 24px;
+      font-size: 14px;
+    }
+
+    .result-panel {
+      margin-top: 24px;
+      padding: 20px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      border-radius: 12px;
+      display: none;
+    }
+
+    .result-panel.show {
+      display: block;
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .result-panel h4 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--cyan);
+    }
+
+    .qr-container {
+      text-align: center;
+      margin: 16px 0;
+    }
+
+    .qr-container img {
+      max-width: 200px;
+      border-radius: 12px;
+      background: white;
+      padding: 8px;
+    }
+
+    .deep-link {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      word-break: break-all;
+      color: var(--gray-300);
+    }
+
+    .callback-status {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    .callback-status.show {
+      display: block;
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .callback-status.waiting {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+
+    .callback-status.received {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .callback-status h4 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .callback-status.waiting h4 {
+      color: #eab308;
+    }
+
+    .callback-status.received h4 {
+      color: #22c55e;
+    }
+
+    .callback-status .status-hint {
+      font-size: 13px;
+      color: var(--gray-400);
+    }
+
+    .proof-data {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--gray-300);
+      max-height: 200px;
+      overflow-y: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+
+    .btn-copy {
+      margin-top: 12px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-copy:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-copy.copied {
+      background: linear-gradient(135deg, var(--gray-600), var(--gray-400));
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(234, 179, 8, 0.3);
+      border-top-color: #eab308;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .verify-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn-verify {
+      flex: 1;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+    }
+
+    .btn-verify:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-verify.onchain {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+    }
+
+    .btn-verify.onchain:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-verify.offchain {
+      background: linear-gradient(135deg, var(--cyan), #0891b2);
+    }
+
+    .btn-verify.offchain:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+    }
+
+    .verify-result {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .verify-result.show {
+      display: block;
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .verify-result.success {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #22c55e;
+    }
+
+    .verify-result.failure {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+    }
+
+    /* Confetti */
+    .confetti-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+    }
+
+    .confetti {
+      position: absolute;
+      top: -10px;
+      width: 10px;
+      height: 10px;
+      opacity: 0;
+      animation: confettiFall 3s ease-in forwards;
+    }
+
+    @keyframes confettiFall {
+      0% { opacity: 1; top: -10px; transform: rotate(0deg) scale(1); }
+      50% { opacity: 1; transform: rotate(720deg) scale(0.8); }
+      100% { opacity: 0; top: 110vh; transform: rotate(1440deg) scale(0.3); }
+    }
+
+    /* Features Grid */
+    .features {
+      padding: 80px 0;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 32px;
+    }
+
+    .feature {
+      text-align: center;
+      padding: 32px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .feature:hover {
+      transform: translateY(-4px);
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.4));
+    }
+
+    .feature h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .feature p {
+      color: var(--gray-400);
+      font-size: 14px;
+    }
+
+    /* Code Section */
+    .code-section {
+      padding: 80px 0;
+    }
+
+    .code-block {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .code-block::before {
+      content: 'JavaScript';
+      position: absolute;
+      top: 12px;
+      right: 20px;
+      font-size: 12px;
+      color: var(--gray-600);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    pre {
+      margin: 0;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--gray-300);
+    }
+
+    .code-comment {
+      color: var(--gray-600);
+    }
+
+    .code-keyword {
+      color: var(--purple);
+    }
+
+    .code-string {
+      color: var(--cyan);
+    }
+
+    .code-function {
+      color: var(--blue);
+    }
+
+    /* Footer */
+    footer {
+      padding: 80px 0 40px;
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 80px;
+    }
+
+    footer p {
+      color: var(--gray-400);
+      margin-bottom: 16px;
+    }
+
+    footer a {
+      color: var(--blue);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--cyan);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 40px;
+      }
+
+      .hero .tagline {
+        font-size: 20px;
+      }
+
+      .hero .subtitle {
+        font-size: 16px;
+      }
+
+      .section-title {
+        font-size: 32px;
+      }
+
+      .demo-cards {
+        grid-template-columns: 1fr;
+      }
+
+      .steps {
+        grid-template-columns: 1fr;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">ProofPort</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="tagline">Privacy-First Identity Verification</div>
+      <h1>Prove who you are<br>without revealing who you are</h1>
+      <p class="subtitle">Zero-knowledge proofs for identity verification. Verify credentials without exposing personal data.</p>
+      <div class="cta-buttons">
+        <a href="#demo-kyc" class="btn btn-primary">Try KYC Demo</a>
+        <a href="#demo-country" class="btn btn-secondary">Try Country Demo</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="how-it-works">
+    <div class="container">
+      <h2 class="section-title">How It Works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>Request</h3>
+          <p>Your dApp creates a proof request via the ProofPort SDK with specific verification requirements.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>Prove</h3>
+          <p>User generates a zero-knowledge proof on their mobile device using private credentials.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>Verify</h3>
+          <p>Your dApp verifies the cryptographic proof on-chain or off-chain without accessing personal data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo-section">
+    <div class="container">
+      <h2 class="section-title">Live Demos</h2>
+      <div class="demo-cards">
+        <!-- Coinbase KYC Demo -->
+        <div class="demo-card" id="demo-kyc">
+          <div class="demo-card-header">
+            <div class="demo-card-icon">🛡️</div>
+            <div>
+              <h3>Coinbase KYC Verification</h3>
+            </div>
+          </div>
+          <p>Prove your Coinbase identity verification status without revealing your personal information.</p>
+          <div class="proof-info">
+            <div>
+              <strong>Prove</strong>
+              KYC completion
+            </div>
+            <div>
+              <strong>Hide</strong>
+              Personal identity
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Callback URL</label>
+            <input type="text" id="kyc-callback" placeholder="https://yourapp.com/api/callback">
+          </div>
+          <div class="button-group">
+            <button class="btn btn-primary btn-small" onclick="requestKycProof()">Request Proof</button>
+          </div>
+          <div class="result-panel" id="kyc-result">
+            <h4>Request Generated</h4>
+            <div id="kyc-qr-container" class="qr-container"></div>
+            <div class="deep-link" id="kyc-deep-link"></div>
+            <div class="callback-status waiting" id="kyc-waiting">
+              <h4><span class="spinner"></span>Waiting for proof...</h4>
+              <p class="status-hint">Scan the QR code with ProofPort app to generate a proof</p>
+            </div>
+            <div class="callback-status received" id="kyc-received">
+              <h4>Proof Received</h4>
+              <pre class="proof-data" id="kyc-proof-data"></pre>
+              <div class="verify-actions">
+                <button class="btn-verify offchain" onclick="verifyProof('kyc', 'offchain')">Off-Chain Verify</button>
+                <button class="btn-verify onchain" onclick="verifyProof('kyc', 'onchain')">On-Chain Verify</button>
+                <button class="btn-copy" id="kyc-copy-btn" onclick="copyProof('kyc')">Copy</button>
+              </div>
+              <div class="verify-result" id="kyc-verify-result"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coinbase Country Demo -->
+        <div class="demo-card" id="demo-country">
+          <div class="demo-card-header">
+            <div class="demo-card-icon">🌍</div>
+            <div>
+              <h3>Coinbase Country Attestation</h3>
+            </div>
+          </div>
+          <p>Prove your country of residence eligibility without revealing your exact location.</p>
+          <div class="proof-info">
+            <div>
+              <strong>Prove</strong>
+              Country eligibility
+            </div>
+            <div>
+              <strong>Hide</strong>
+              Exact location
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Callback URL</label>
+            <input type="text" id="country-callback" placeholder="https://yourapp.com/api/callback">
+          </div>
+          <div class="form-group">
+            <label>Country List (comma-separated ISO codes)</label>
+            <input type="text" id="country-list" value="US,KR,JP" placeholder="US,KR,JP,GB,FR">
+          </div>
+          <div class="form-group">
+            <label>List Type</label>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="toggle-include" onclick="toggleListType(true)">Include</button>
+              <button class="toggle-btn" id="toggle-exclude" onclick="toggleListType(false)">Exclude</button>
+            </div>
+          </div>
+          <div class="button-group">
+            <button class="btn btn-primary btn-small" onclick="requestCountryProof()">Request Proof</button>
+          </div>
+          <div class="result-panel" id="country-result">
+            <h4>Request Generated</h4>
+            <div id="country-qr-container" class="qr-container"></div>
+            <div class="deep-link" id="country-deep-link"></div>
+            <div class="callback-status waiting" id="country-waiting">
+              <h4><span class="spinner"></span>Waiting for proof...</h4>
+              <p class="status-hint">Scan the QR code with ProofPort app to generate a proof</p>
+            </div>
+            <div class="callback-status received" id="country-received">
+              <h4>Proof Received</h4>
+              <pre class="proof-data" id="country-proof-data"></pre>
+              <div class="verify-actions">
+                <button class="btn-verify offchain" onclick="verifyProof('country', 'offchain')">Off-Chain Verify</button>
+                <button class="btn-verify onchain" onclick="verifyProof('country', 'onchain')">On-Chain Verify</button>
+                <button class="btn-copy" id="country-copy-btn" onclick="copyProof('country')">Copy</button>
+              </div>
+              <div class="verify-result" id="country-verify-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="container">
+      <h2 class="section-title">Why ProofPort?</h2>
+      <div class="features-grid">
+        <div class="feature">
+          <div class="feature-icon">🔒</div>
+          <h3>Zero Knowledge</h3>
+          <p>No personal data leaves the user's device. Verify credentials cryptographically.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⛓️</div>
+          <h3>On-Chain Verified</h3>
+          <p>Proofs are verified by smart contracts on Base network for trustless verification.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📱</div>
+          <h3>Mobile Native</h3>
+          <p>Optimized for mobile proof generation with iOS and Android support.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🌐</div>
+          <h3>Open Source</h3>
+          <p>Fully auditable SDK and circuits built with Noir and Rust.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="code-section">
+    <div class="container">
+      <h2 class="section-title">Quick Integration</h2>
+      <div class="code-block">
+<pre><span class="code-comment">// Install the SDK</span>
+<span class="code-keyword">import</span> { ProofPortSDK } <span class="code-keyword">from</span> <span class="code-string">'@proofport/sdk'</span>;
+
+<span class="code-comment">// Initialize SDK</span>
+<span class="code-keyword">const</span> sdk = <span class="code-keyword">new</span> <span class="code-function">ProofPortSDK</span>({
+  defaultCallbackUrl: <span class="code-string">'https://yourapp.com/api/callback'</span>
+});
+
+<span class="code-comment">// Create a proof request</span>
+<span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({});
+
+<span class="code-comment">// Generate QR code</span>
+<span class="code-keyword">const</span> qrDataUrl = <span class="code-keyword">await</span> sdk.<span class="code-function">generateQRCode</span>(request);
+
+<span class="code-comment">// Or open ProofPort app directly</span>
+sdk.<span class="code-function">openProofRequest</span>(request);
+
+<span class="code-comment">// Verify the proof on-chain</span>
+<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> sdk.<span class="code-function">verifyOnChain</span>(
+  response.circuit,
+  response.proof,
+  response.publicInputs
+);</pre>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Built with zero-knowledge proofs by ProofPort</p>
+      <a href="https://github.com/zkproofport" target="_blank">GitHub</a>
+    </div>
+  </footer>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "ethers": "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import { ProofPortSDK } from '../dist/index.mjs';
+
+    // Derive callback URL from current host (works with localhost, private IP, or public domain)
+    const baseUrl = window.location.origin;
+    const callbackUrl = `${baseUrl}/api/callback`;
+
+    // Initialize SDK
+    const sdk = new ProofPortSDK({
+      defaultCallbackUrl: callbackUrl
+    });
+
+    // Set callback URL inputs
+    document.getElementById('kyc-callback').value = callbackUrl;
+    document.getElementById('country-callback').value = callbackUrl;
+
+    let isIncluded = true;
+    // Track active request IDs per card
+    let activeKycRequestId = null;
+    let activeCountryRequestId = null;
+    // Store received proof data (raw object) and formatted string
+    const proofDataStore = {};
+    const proofObjectStore = {};
+
+    // SSE connection for real-time callback
+    const eventsUrl = `${baseUrl}/api/events`;
+    const eventSource = new EventSource(eventsUrl);
+    eventSource.onmessage = function(event) {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'proof-callback' && msg.data) {
+          const proof = msg.data;
+          const requestId = proof.requestId;
+          if (requestId && requestId === activeKycRequestId) {
+            showProofReceived('kyc', proof);
+          } else if (requestId && requestId === activeCountryRequestId) {
+            showProofReceived('country', proof);
+          } else {
+            if (activeKycRequestId) showProofReceived('kyc', proof);
+            else if (activeCountryRequestId) showProofReceived('country', proof);
+          }
+        }
+      } catch {}
+    };
+
+    function showProofReceived(prefix, proof) {
+      document.getElementById(`${prefix}-waiting`).classList.remove('show');
+      document.getElementById(`${prefix}-verify-result`).classList.remove('show');
+      const receivedEl = document.getElementById(`${prefix}-received`);
+      const dataEl = document.getElementById(`${prefix}-proof-data`);
+      dataEl.textContent = JSON.stringify(proof, null, 2);
+      proofDataStore[prefix] = JSON.stringify(proof, null, 2);
+      proofObjectStore[prefix] = proof;
+      receivedEl.classList.add('show');
+      if (prefix === 'kyc') activeKycRequestId = null;
+      else activeCountryRequestId = null;
+    }
+
+    // Clipboard copy with fallback for non-HTTPS contexts
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      // Fallback for HTTP (e.g. private IP)
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return Promise.resolve();
+    }
+
+    window.copyProof = function(prefix) {
+      const data = proofDataStore[prefix];
+      if (data) {
+        copyToClipboard(data).then(() => {
+          const btn = document.getElementById(`${prefix}-copy-btn`);
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
+      }
+    };
+
+    // Confetti celebration
+    function launchConfetti() {
+      const container = document.createElement('div');
+      container.className = 'confetti-container';
+      document.body.appendChild(container);
+      const colors = ['#22c55e', '#3b82f6', '#a855f7', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+      const shapes = ['circle', 'rect'];
+      for (let i = 0; i < 80; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const shape = shapes[Math.floor(Math.random() * shapes.length)];
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.background = color;
+        confetti.style.animationDelay = Math.random() * 1.5 + 's';
+        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+        if (shape === 'circle') {
+          confetti.style.borderRadius = '50%';
+        } else {
+          confetti.style.width = (6 + Math.random() * 8) + 'px';
+          confetti.style.height = (6 + Math.random() * 8) + 'px';
+          confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+        }
+        container.appendChild(confetti);
+      }
+      setTimeout(() => container.remove(), 5000);
+    }
+
+    // Verification
+    window.verifyProof = async function(prefix, type) {
+      const proof = proofObjectStore[prefix];
+      if (!proof || proof.status !== 'completed') return;
+
+      const resultEl = document.getElementById(`${prefix}-verify-result`);
+      resultEl.className = 'verify-result show';
+      resultEl.style.background = 'rgba(234, 179, 8, 0.1)';
+      resultEl.style.border = '1px solid rgba(234, 179, 8, 0.3)';
+      resultEl.style.color = '#eab308';
+      resultEl.innerHTML = `<span class="spinner"></span> ${type === 'onchain' ? 'On-Chain' : 'Off-Chain'} verification in progress...`;
+
+      try {
+        let result;
+        if (type === 'onchain') {
+          result = await sdk.verifyResponseOnChain(proof);
+        } else {
+          // Off-chain: call verifyOnChain with the proof data (same contract call, labeled differently)
+          result = await sdk.verifyResponseOnChain(proof);
+        }
+
+        resultEl.className = `verify-result show ${result.valid ? 'success' : 'failure'}`;
+        resultEl.style = '';
+        if (result.valid) {
+          resultEl.textContent = `${type === 'onchain' ? 'On-Chain' : 'Off-Chain'} Verification Passed!`;
+          launchConfetti();
+        } else {
+          resultEl.textContent = `Verification Failed: ${result.error || 'Invalid proof'}`;
+        }
+      } catch (err) {
+        resultEl.className = 'verify-result show failure';
+        resultEl.style = '';
+        resultEl.textContent = `Verification Error: ${err.message || err}`;
+      }
+    };
+
+    // Toggle list type
+    window.toggleListType = function(include) {
+      isIncluded = include;
+      document.getElementById('toggle-include').classList.toggle('active', include);
+      document.getElementById('toggle-exclude').classList.toggle('active', !include);
+    };
+
+    // KYC Demo
+    window.requestKycProof = async function() {
+      const callbackUrl = document.getElementById('kyc-callback').value;
+
+      // Reset previous state
+      document.getElementById('kyc-received').classList.remove('show');
+      document.getElementById('kyc-waiting').classList.remove('show');
+
+      const request = sdk.createCoinbaseKycRequest({}, {
+        callbackUrl,
+        dappName: 'ProofPort Demo',
+        message: 'Verify your Coinbase KYC status'
+      });
+
+      activeKycRequestId = request.requestId;
+      const result = await sdk.requestProof(request, { width: 200, margin: 1 });
+
+      if (!result.mobile) {
+        document.getElementById('kyc-qr-container').innerHTML = `<img src="${result.qrDataUrl}" alt="QR Code">`;
+        document.getElementById('kyc-deep-link').textContent = result.deepLink;
+        document.getElementById('kyc-result').classList.add('show');
+        document.getElementById('kyc-waiting').classList.add('show');
+      }
+    };
+
+    // Country Demo
+    window.requestCountryProof = async function() {
+      const callbackUrl = document.getElementById('country-callback').value;
+      const countryListInput = document.getElementById('country-list').value;
+      const countryList = countryListInput.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+
+      // Reset previous state
+      document.getElementById('country-received').classList.remove('show');
+      document.getElementById('country-waiting').classList.remove('show');
+
+      const request = sdk.createCoinbaseCountryRequest({
+        countryList,
+        isIncluded
+      }, {
+        callbackUrl,
+        dappName: 'ProofPort Demo',
+        message: `Verify country ${isIncluded ? 'inclusion' : 'exclusion'}`
+      });
+
+      activeCountryRequestId = request.requestId;
+      const result = await sdk.requestProof(request, { width: 200, margin: 1 });
+
+      if (!result.mobile) {
+        document.getElementById('country-qr-container').innerHTML = `<img src="${result.qrDataUrl}" alt="QR Code">`;
+        document.getElementById('country-deep-link').textContent = result.deepLink;
+        document.getElementById('country-result').classList.add('show');
+        document.getElementById('country-waiting').classList.add('show');
+      }
+    };
+
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

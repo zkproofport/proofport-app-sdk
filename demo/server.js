@@ -1,184 +1,135 @@
-/**
- * ProofPort SDK Demo Server
- *
- * Endpoints:
- * - GET /              : Serve SDK demo HTML
- * - GET /shieldswap    : Serve ShieldSwap DEX demo
- * - POST /callback     : Receive proof results from ProofPortApp (webhook)
- * - GET /status/:id    : Poll for request status
- */
-
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 
-const PORT = process.env.PORT || 3333;
-const RESULTS_FILE = path.join(__dirname, 'results.json');
+const PORT = process.env.PORT || 3300;
 
-// Initialize results file
-function initResultsFile() {
-  if (!fs.existsSync(RESULTS_FILE)) {
-    fs.writeFileSync(RESULTS_FILE, JSON.stringify({}, null, 2));
+// SSE clients for real-time callback push
+const sseClients = new Set();
+
+function broadcastSSE(data) {
+  const message = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    client.write(message);
   }
 }
 
-// Read results from file
-function readResults() {
-  try {
-    const data = fs.readFileSync(RESULTS_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
-}
+const server = http.createServer((req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
 
-// Write results to file
-function writeResults(results) {
-  fs.writeFileSync(RESULTS_FILE, JSON.stringify(results, null, 2));
-}
-
-// Save a proof result
-function saveResult(requestId, data) {
-  const results = readResults();
-  results[requestId] = {
-    ...data,
-    receivedAt: Date.now()
-  };
-  writeResults(results);
-  console.log(`[Server] Saved result for request: ${requestId}`);
-}
-
-// Get a proof result
-function getResult(requestId) {
-  const results = readResults();
-  return results[requestId] || null;
-}
-
-// Parse request body
-function parseBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        resolve(body ? JSON.parse(body) : {});
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-}
-
-// CORS headers
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
-// Create server
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
-
-  // Set CORS headers for all responses
-  setCorsHeaders(res);
-
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  // GET / - Serve demo HTML
-  if (req.method === 'GET' && url.pathname === '/') {
-    const htmlPath = path.join(__dirname, 'index.html');
-    try {
-      const html = fs.readFileSync(htmlPath, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
-    } catch (e) {
-      res.writeHead(500);
-      res.end('Error loading index.html');
-    }
-    return;
-  }
-
-  // GET /shieldswap - Serve ShieldSwap DEX demo
-  if (req.method === 'GET' && url.pathname === '/shieldswap') {
-    const htmlPath = path.join(__dirname, 'shieldswap.html');
-    try {
-      const html = fs.readFileSync(htmlPath, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
-    } catch (e) {
-      res.writeHead(500);
-      res.end('Error loading shieldswap.html');
-    }
-    return;
-  }
-
-  // POST /callback - Receive proof results from ProofPortApp
-  if (req.method === 'POST' && url.pathname === '/callback') {
-    try {
-      const data = await parseBody(req);
-      console.log('[Server] Received callback:', JSON.stringify(data, null, 2));
-
-      if (!data.requestId) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing requestId' }));
-        return;
-      }
-
-      saveResult(data.requestId, data);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, requestId: data.requestId }));
-    } catch (e) {
-      console.error('[Server] Callback error:', e);
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    }
-    return;
-  }
-
-  // GET /status/:requestId - Poll for request status
-  if (req.method === 'GET' && url.pathname.startsWith('/status/')) {
-    const requestId = url.pathname.replace('/status/', '');
-
-    if (!requestId) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing requestId' }));
+  // CORS headers for callback endpoint
+  if (pathname === '/api/callback') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
       return;
     }
-
-    const result = getResult(requestId);
-
-    if (result) {
-      console.log(`[Server] Found result for ${requestId}: status=${result.status}`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ found: true, data: result }));
-    } else {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ found: false }));
-    }
-    return;
   }
 
-  // 404 for other paths
-  res.writeHead(404);
-  res.end('Not Found');
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/landing')) {
+    const filePath = path.join(__dirname, 'landing.html');
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading demo page');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+  } else if (req.method === 'GET' && pathname.startsWith('/dist/')) {
+    const filePath = path.join(__dirname, '..', pathname);
+    const ext = path.extname(filePath);
+    const contentTypes = {
+      '.js': 'application/javascript',
+      '.mjs': 'application/javascript',
+      '.json': 'application/json',
+      '.ts': 'application/typescript',
+    };
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+    });
+  } else if (req.method === 'GET' && pathname === '/api/events') {
+    // SSE endpoint for real-time callback push
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write('data: {"type":"connected"}\n\n');
+    sseClients.add(res);
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
+  } else if (req.method === 'POST' && pathname === '/api/callback') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      console.log('\n=== Proof Response Received ===');
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('URL:', req.url);
+
+      let parsedBody = null;
+      try {
+        parsedBody = JSON.parse(body);
+        console.log('Body:', JSON.stringify(parsedBody, null, 2));
+      } catch {
+        console.log('Body:', body);
+      }
+      console.log('==============================\n');
+
+      // Push to all SSE clients
+      broadcastSSE({
+        type: 'proof-callback',
+        timestamp: new Date().toISOString(),
+        data: parsedBody || body,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    });
+  } else if (req.method === 'GET' && pathname === '/api/callback') {
+    console.log('\n=== Proof Response Received (GET) ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Query:', parsedUrl.query);
+    console.log('======================================\n');
+
+    // Push to all SSE clients
+    broadcastSSE({
+      type: 'proof-callback',
+      timestamp: new Date().toISOString(),
+      data: parsedUrl.query,
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, received: parsedUrl.query }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+  }
 });
 
-// Initialize and start server
-initResultsFile();
 server.listen(PORT, () => {
-  console.log(`\n🚀 ProofPort SDK Demo Server`);
-  console.log(`   http://localhost:${PORT}\n`);
-  console.log(`Endpoints:`);
-  console.log(`   GET  /              - SDK demo page`);
-  console.log(`   GET  /shieldswap    - ShieldSwap DEX demo`);
-  console.log(`   POST /callback      - Receive proof from app`);
-  console.log(`   GET  /status/:id    - Poll for result\n`);
+  console.log('ProofPort SDK Demo Server');
+  console.log('========================');
+  console.log(`Demo:     http://localhost:${PORT}`);
+  console.log(`Callback: http://localhost:${PORT}/api/callback`);
+  console.log(`Events:   http://localhost:${PORT}/api/events`);
+  console.log('\nPress Ctrl+C to stop\n');
 });

@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy SDK package.json and install deps
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy SDK source + config
+COPY src ./src
+COPY tsconfig.json rollup.config.js ./
+
+# Build SDK (generates dist/)
+RUN npm run build || echo "SDK build skipped - demo will serve HTML only"
+
+# Copy demo files
+COPY demo ./demo
+
+EXPOSE 3300
+
+CMD ["node", "demo/server.js"]
