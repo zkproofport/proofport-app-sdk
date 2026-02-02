@@ -40,10 +40,10 @@ import {
   DEFAULT_REQUEST_EXPIRY_MS,
   CIRCUIT_METADATA,
 } from './constants';
-import { ethers } from 'ethers';
+
 
 /**
- * ProofPort SDK for requesting and verifying ZK proofs
+ * ZKProofPort SDK for requesting and verifying ZK proofs
  */
 export class ProofPortSDK {
   private config: Required<ProofPortConfig>;
@@ -72,6 +72,10 @@ export class ProofPortSDK {
       expiresInMs?: number;
     } = {}
   ): ProofRequest {
+    if (!inputs.scope) {
+      throw new Error('scope is required for coinbase_attestation circuit');
+    }
+
     const request: ProofRequest = {
       requestId: generateRequestId(),
       circuit: 'coinbase_attestation',
@@ -101,6 +105,10 @@ export class ProofPortSDK {
       expiresInMs?: number;
     } = {}
   ): ProofRequest {
+    if (!inputs.scope) {
+      throw new Error('scope is required for coinbase_country_attestation circuit');
+    }
+
     const request: ProofRequest = {
       requestId: generateRequestId(),
       circuit: 'coinbase_country_attestation',
@@ -148,7 +156,7 @@ export class ProofPortSDK {
   }
 
   /**
-   * Open ProofPort app with a proof request (browser)
+   * Open ZKProofPort app with a proof request (browser)
    */
   openProofRequest(request: ProofRequest): void {
     const url = this.getDeepLinkUrl(request);
@@ -226,7 +234,7 @@ export class ProofPortSDK {
   }
 
   /**
-   * Check if a URL is a ProofPort response
+   * Check if a URL is a ZKProofPort response
    */
   isProofPortResponse(url: string): boolean {
     try {
@@ -260,7 +268,7 @@ export class ProofPortSDK {
     circuit: CircuitType,
     proof: string,
     publicInputs: string[],
-    providerOrSigner?: ethers.providers.Provider | ethers.Signer
+    providerOrSigner?: any
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -277,7 +285,7 @@ export class ProofPortSDK {
    */
   async verifyResponseOnChain(
     response: ProofResponse,
-    providerOrSigner?: ethers.providers.Provider | ethers.Signer
+    providerOrSigner?: any
   ): Promise<{ valid: boolean; error?: string }> {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
@@ -337,7 +345,7 @@ export class ProofPortSDK {
   }
 
   /**
-   * Check if URL is a ProofPort deep link
+   * Check if URL is a ZKProofPort deep link
    */
   isProofPortDeepLink(url: string): boolean {
     return isProofPortDeepLink(url, this.config.scheme);

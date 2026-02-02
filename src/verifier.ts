@@ -1,10 +1,31 @@
 /**
- * On-chain verification utilities for ProofPort SDK
+ * On-chain verification utilities for ZKProofPort SDK
+ *
+ * Compatible with both ethers v5 and v6.
  */
 
 import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
 import { VERIFIER_ABI, RPC_ENDPOINTS } from './constants';
+
+// ethers v5/v6 compatibility shims
+const _ethers = ethers as any;
+
+function hexZeroPad(value: string, length: number): string {
+  // v6: ethers.zeroPadValue, v5: ethers.utils.hexZeroPad
+  if (typeof _ethers.zeroPadValue === 'function') return _ethers.zeroPadValue(value, length);
+  if (_ethers.utils?.hexZeroPad) return _ethers.utils.hexZeroPad(value, length);
+  // manual fallback
+  const hex = value.startsWith('0x') ? value.slice(2) : value;
+  return '0x' + hex.padStart(length * 2, '0');
+}
+
+function createJsonRpcProvider(url: string) {
+  // v6: ethers.JsonRpcProvider, v5: ethers.providers.JsonRpcProvider
+  if (typeof _ethers.JsonRpcProvider === 'function') return new _ethers.JsonRpcProvider(url);
+  if (_ethers.providers?.JsonRpcProvider) return new _ethers.providers.JsonRpcProvider(url);
+  throw new Error('No JsonRpcProvider found in ethers');
+}
 
 /**
  * Resolve verifier from SDK config or proof response.
@@ -29,7 +50,7 @@ function resolveVerifier(
  * Get verifier contract instance
  */
 export function getVerifierContract(
-  providerOrSigner: ethers.providers.Provider | ethers.Signer,
+  providerOrSigner: any,
   verifier: VerifierContract
 ): ethers.Contract {
   return new ethers.Contract(
@@ -42,12 +63,12 @@ export function getVerifierContract(
 /**
  * Get default provider for a chain
  */
-export function getDefaultProvider(chainId: number): ethers.providers.JsonRpcProvider {
+export function getDefaultProvider(chainId: number) {
   const rpcUrl = RPC_ENDPOINTS[chainId];
   if (!rpcUrl) {
     throw new Error(`No RPC endpoint configured for chain ${chainId}`);
   }
-  return new ethers.providers.JsonRpcProvider(rpcUrl);
+  return createJsonRpcProvider(rpcUrl);
 }
 
 /**
@@ -56,7 +77,7 @@ export function getDefaultProvider(chainId: number): ethers.providers.JsonRpcPro
 export async function verifyProofOnChain(
   circuit: CircuitType,
   parsedProof: ParsedProof,
-  providerOrSigner?: ethers.providers.Provider | ethers.Signer,
+  providerOrSigner?: any,
   customVerifier?: VerifierContract,
   responseVerifier?: { verifierAddress?: string; chainId?: number }
 ): Promise<{ valid: boolean; error?: string }> {
@@ -110,7 +131,7 @@ export function parseProofForOnChain(
   const proofHex = ensureHexPrefix(proof);
 
   const publicInputsHex = publicInputs.map((input) => {
-    return ethers.utils.hexZeroPad(ensureHexPrefix(input), 32);
+    return hexZeroPad(ensureHexPrefix(input), 32);
   });
 
   return {
@@ -148,4 +169,45 @@ export function getVerifierChainId(
   customVerifier?: VerifierContract
 ): number {
   return requireVerifier(circuit, customVerifier).chainId;
+}
+
+export function extractScopeFromPublicInputs(
+  publicInputsHex: string[],
+  circuit?: string,
+): string | null {
+  let start: number, end: number;
+  if (circuit === 'coinbase_country_attestation') {
+    start = 86; end = 117;
+  } else {
+    start = 64; end = 95;
+  }
+  if (publicInputsHex.length <= end) return null;
+  const scopeFields = publicInputsHex.slice(start, end + 1);
+  return reconstructBytes32FromFields(scopeFields);
+}
+
+export function extractNullifierFromPublicInputs(
+  publicInputsHex: string[],
+  circuit?: string,
+): string | null {
+  let start: number, end: number;
+  if (circuit === 'coinbase_country_attestation') {
+    start = 118; end = 149;
+  } else {
+    start = 96; end = 127;
+  }
+  if (publicInputsHex.length <= end) return null;
+  const nullifierFields = publicInputsHex.slice(start, end + 1);
+  return reconstructBytes32FromFields(nullifierFields);
+}
+
+function reconstructBytes32FromFields(fields: string[]): string {
+  if (fields.length !== 32) {
+    throw new Error(`Expected 32 fields, got ${fields.length}`);
+  }
+  const bytes = fields.map(f => {
+    const byte = BigInt(f) & 0xFFn;
+    return byte.toString(16).padStart(2, '0');
+  }).join('');
+  return '0x' + bytes;
 }
