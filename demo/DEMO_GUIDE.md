@@ -2,7 +2,7 @@
 
 ## Overview
 
-ShieldSwap is a fictional compliant decentralized exchange demonstrating ProofPort SDK integration. It enforces privacy-preserving KYC verification for swaps exceeding $10,000 USD using zero-knowledge proofs, without requiring users to share personal identity data.
+ShieldSwap is a fictional compliant decentralized exchange demonstrating ZKProofPort SDK integration. It enforces privacy-preserving KYC verification for swaps exceeding $10,000 USD using zero-knowledge proofs, without requiring users to share personal identity data.
 
 The demo showcases:
 - Real-time KYC threshold enforcement
@@ -67,26 +67,26 @@ Click "Verify & Swap" to open the KYC verification modal. The modal displays:
 - **Title:** "Privacy-Preserving KYC"
 - **Description:** Explains verification without personal data revelation
 - **Swap Summary:** Shows the transaction details
-- **QR Code:** For scanning with ProofPort mobile app
-- **Open ProofPort App Button:** Direct deep link to app
+- **QR Code:** For scanning with ZKProofPort mobile app
+- **Open ZKProofPort App Button:** Direct deep link to app
 - **Status Line:** Real-time verification progress with animated dots
 - **4-Step Explainer:** How the verification works:
-  1. ProofPort connects to your wallet
+  1. ZKProofPort connects to your wallet
   2. Finds your Coinbase attestation
   3. Generates a zero-knowledge proof
   4. ShieldSwap verifies without seeing your identity
 
-### Step 5: Proof Generation (ProofPort App)
+### Step 5: Proof Generation (ZKProofPort App)
 
-To simulate proof generation, use the ProofPort mobile app:
+To simulate proof generation, use the ZKProofPort mobile app:
 
 **Option A: Scan QR Code**
-- Use ProofPort app to scan the QR code displayed in the modal
+- Use ZKProofPort app to scan the QR code displayed in the modal
 - App automatically initiates proof generation
 
 **Option B: Direct Deep Link**
-- Click "Open ProofPort App" button
-- Opens ProofPort app with deep link: `zkproofport://proof-request?data=...`
+- Click "Open ZKProofPort App" button
+- Opens ZKProofPort app with deep link: `zkproofport://proof-request?data=...`
 - App parses request and begins proof generation
 
 **What the App Does:**
@@ -202,14 +202,14 @@ Static configuration for the demo:
 - **Verification:** SNARK proof verification on-chain
 
 ### Verifier Contract
-- **Address:** Provided dynamically via proof response from the ProofPort app
+- **Address:** Provided dynamically via proof response from the ZKProofPort app
 - **Network:** Determined by chainId in proof response
 - **Function Signature:** `verify(bytes calldata _proof, bytes32[] calldata _publicInputs) public view returns (bool)`
 
 ### Deep Link Scheme
 - **Protocol:** zkproofport://
 - **Format:** `zkproofport://proof-request?data={urlEncodedRequestJSON}`
-- **Used By:** ProofPort mobile app to receive proof requests from dApps
+- **Used By:** ZKProofPort mobile app to receive proof requests from dApps
 
 ### KYC Threshold
 - **Amount:** $10,000 USD equivalent
@@ -219,7 +219,7 @@ Static configuration for the demo:
 ### Server Endpoints
 
 **POST /callback**
-- Receives proof results from ProofPort app
+- Receives proof results from ZKProofPort app
 - Request body includes requestId, proof, public inputs, status
 - Stores results in `results.json`
 
@@ -276,7 +276,7 @@ Browser (ShieldSwap)
     |              |
     |        [User Scans / Opens App]
     |              |
-    |    Mobile App (ProofPort)
+    |    Mobile App (ZKProofPort)
     |         |
     |      [Connect Wallet]
     |      [Get Attestation]

@@ -67,7 +67,7 @@ Proves the user is above a certain age without revealing their birth year.
 Proves Coinbase KYC identity verification without revealing the user's identity.
 
 - **Verifier Address**: Provided by the ProofPort app in the proof response
-- **Public Inputs**: `signal_hash`, `signer_list_merkle_root`
+- **Public Inputs**: `signal_hash`, `signer_list_merkle_root`, `scope`, `nullifier`
 - **Status**: Production-ready
 
 **Inputs:**
@@ -77,6 +77,14 @@ Proves Coinbase KYC identity verification without revealing the user's identity.
   rawTransaction?: string;   // Optional - app can fetch from Etherscan
 }
 ```
+
+### coinbase_country_attestation
+
+Proves Coinbase country attestation without revealing the country.
+
+- **Verifier Address**: Provided by the ProofPort app in the proof response
+- **Public Inputs**: `signal_hash`, `signer_list_merkle_root`, `scope`, `nullifier`
+- **Status**: Production-ready
 
 ## API Reference
 
@@ -454,7 +462,7 @@ app.post('/api/proof-callback', (req, res) => {
 // Use ethers.js provider
 import { ethers } from 'ethers';
 
-const provider = new ethers.providers.JsonRpcProvider(
+const provider = new ethers.JsonRpcProvider(
   'https://sepolia.infura.io/v3/...'
 );
 
@@ -528,6 +536,9 @@ This SDK is part of the `proofport-app-dev` ecosystem:
 - **circuits/** - Noir ZK circuit implementations
 - **proofport-app/** - React Native mobile app
 - **proofport-app-sdk/** - This SDK (TypeScript)
+- **proofport-relay/** - Express + Socket.IO relay server
+- **proofport-api/** - Fastify + PostgreSQL backend
+- **proofport-dashboard/** - Next.js admin dashboard
 - **mopro/** - Rust mobile ZK library
 
 See the root README for the complete architecture.
