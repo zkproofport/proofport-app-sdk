@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProofPort SDK Demo</title>
+  <title>ZKProofPort SDK Demo</title>
   <style>
     * {
       box-sizing: border-box;
@@ -225,8 +225,8 @@
 </head>
 <body>
   <div class="container">
-    <h1>ProofPort SDK Demo</h1>
-    <p class="subtitle">Generate ZK proof requests using the ProofPort SDK</p>
+    <h1>ZKProofPort SDK Demo</h1>
+    <p class="subtitle">Generate ZK proof requests using the ZKProofPort SDK</p>
 
     <div class="card">
       <div class="tabs">
@@ -268,7 +268,7 @@
 
           <div class="button-group">
             <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="kyc-open" class="secondary">Open in ProofPort</button>
+            <button type="button" id="kyc-open" class="secondary">Open in ZKProofPort</button>
           </div>
         </form>
       </div>
@@ -332,7 +332,7 @@
 
           <div class="button-group">
             <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="country-open" class="secondary">Open in ProofPort</button>
+            <button type="button" id="country-open" class="secondary">Open in ZKProofPort</button>
           </div>
         </form>
       </div>
@@ -403,7 +403,7 @@
       const message = document.getElementById('kyc-message').value;
 
       currentRequest = sdk.createCoinbaseKycRequest(
-        {},
+        { scope: 'zkproofport:demo' },
         {
           callbackUrl,
           dappName: dappName || undefined,
@@ -446,7 +446,8 @@
       currentRequest = sdk.createCoinbaseCountryRequest(
         {
           countryList,
-          isIncluded: isIncludedCountry
+          isIncluded: isIncludedCountry,
+          scope: 'zkproofport:demo'
         },
         {
           callbackUrl,

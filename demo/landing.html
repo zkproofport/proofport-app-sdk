@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProofPort - Privacy-First Identity Verification</title>
+  <title>ZKProofPort - Privacy-First Identity Verification</title>
   <style>
     /* Reset & Base */
     * {
@@ -745,7 +745,7 @@
 <body>
   <header>
     <div class="container">
-      <div class="logo">ProofPort</div>
+      <div class="logo">ZKProofPort</div>
     </div>
   </header>
 
@@ -768,7 +768,7 @@
         <div class="step">
           <div class="step-number">1</div>
           <h3>Request</h3>
-          <p>Your dApp creates a proof request via the ProofPort SDK with specific verification requirements.</p>
+          <p>Your dApp creates a proof request via the ZKProofPort SDK with specific verification requirements.</p>
         </div>
         <div class="step">
           <div class="step-number">2</div>
@@ -820,7 +820,7 @@
             <div class="deep-link" id="kyc-deep-link"></div>
             <div class="callback-status waiting" id="kyc-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
-              <p class="status-hint">Scan the QR code with ProofPort app to generate a proof</p>
+              <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
             </div>
             <div class="callback-status received" id="kyc-received">
               <h4>Proof Received</h4>
@@ -878,7 +878,7 @@
             <div class="deep-link" id="country-deep-link"></div>
             <div class="callback-status waiting" id="country-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
-              <p class="status-hint">Scan the QR code with ProofPort app to generate a proof</p>
+              <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
             </div>
             <div class="callback-status received" id="country-received">
               <h4>Proof Received</h4>
@@ -898,7 +898,7 @@
 
   <section class="features">
     <div class="container">
-      <h2 class="section-title">Why ProofPort?</h2>
+      <h2 class="section-title">Why ZKProofPort?</h2>
       <div class="features-grid">
         <div class="feature">
           <div class="feature-icon">🔒</div>
@@ -937,7 +937,7 @@
 });
 
 <span class="code-comment">// Create a proof request</span>
-<span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({});
+<span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({ scope: <span class="code-string">'your-dapp:action'</span> });
 
 <span class="code-comment">// Generate QR code</span>
 <span class="code-keyword">const</span> qrDataUrl = <span class="code-keyword">await</span> sdk.<span class="code-function">generateQRCode</span>(request);
@@ -957,7 +957,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
 
   <footer>
     <div class="container">
-      <p>Built with zero-knowledge proofs by ProofPort</p>
+      <p>Built with zero-knowledge proofs by ZKProofPort</p>
       <a href="https://github.com/zkproofport" target="_blank">GitHub</a>
     </div>
   </footer>
@@ -1135,9 +1135,9 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       document.getElementById('kyc-received').classList.remove('show');
       document.getElementById('kyc-waiting').classList.remove('show');
 
-      const request = sdk.createCoinbaseKycRequest({}, {
+      const request = sdk.createCoinbaseKycRequest({ scope: 'zkproofport:demo' }, {
         callbackUrl,
-        dappName: 'ProofPort Demo',
+        dappName: 'ZKProofPort Demo',
         message: 'Verify your Coinbase KYC status'
       });
 
@@ -1164,10 +1164,11 @@ sdk.<span class="code-function">openProofRequest</span>(request);
 
       const request = sdk.createCoinbaseCountryRequest({
         countryList,
-        isIncluded
+        isIncluded,
+        scope: 'zkproofport:demo'
       }, {
         callbackUrl,
-        dappName: 'ProofPort Demo',
+        dappName: 'ZKProofPort Demo',
         message: `Verify country ${isIncluded ? 'inclusion' : 'exclusion'}`
       });
 
