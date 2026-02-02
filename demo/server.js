@@ -8,6 +8,10 @@ const PORT = process.env.PORT || 3300;
 // SSE clients for real-time callback push
 const sseClients = new Set();
 
+// Store recent callback results (5-min TTL) for mobile page reload recovery
+const recentResults = new Map();
+const RESULT_TTL = 5 * 60 * 1000;
+
 function broadcastSSE(data) {
   const message = `data: ${JSON.stringify(data)}\n\n`;
   for (const client of sseClients) {
@@ -19,8 +23,8 @@ const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
 
-  // CORS headers for callback endpoint
-  if (pathname === '/api/callback') {
+  // CORS headers for API endpoints
+  if (pathname.startsWith('/api/')) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -94,6 +98,12 @@ const server = http.createServer((req, res) => {
       }
       console.log('==============================\n');
 
+      // Store result for mobile page reload recovery
+      if (parsedBody && parsedBody.requestId) {
+        recentResults.set(parsedBody.requestId, parsedBody);
+        setTimeout(() => recentResults.delete(parsedBody.requestId), RESULT_TTL);
+      }
+
       // Push to all SSE clients
       broadcastSSE({
         type: 'proof-callback',
@@ -104,6 +114,12 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     });
+  } else if (req.method === 'GET' && pathname.startsWith('/api/results/')) {
+    // Retrieve stored result by requestId (for mobile page reload recovery)
+    const requestId = pathname.replace('/api/results/', '');
+    const result = recentResults.get(requestId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ found: !!result, data: result || null }));
   } else if (req.method === 'GET' && pathname === '/api/callback') {
     console.log('\n=== Proof Response Received (GET) ===');
     console.log('Timestamp:', new Date().toISOString());
@@ -126,7 +142,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log('ProofPort SDK Demo Server');
+  console.log('ZKProofPort SDK Demo Server');
   console.log('========================');
   console.log(`Demo:     http://localhost:${PORT}`);
   console.log(`Callback: http://localhost:${PORT}/api/callback`);

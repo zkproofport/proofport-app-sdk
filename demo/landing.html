@@ -993,6 +993,40 @@ sdk.<span class="code-function">openProofRequest</span>(request);
     const proofDataStore = {};
     const proofObjectStore = {};
 
+    // Session persistence for mobile page reload recovery
+    function savePendingRequest(prefix, requestId) {
+      sessionStorage.setItem('zkproofport_pending', JSON.stringify({ prefix, requestId }));
+    }
+    function clearPendingRequest() {
+      sessionStorage.removeItem('zkproofport_pending');
+    }
+
+    // Recover pending request after mobile page reload
+    async function recoverPendingRequest() {
+      const raw = sessionStorage.getItem('zkproofport_pending');
+      if (!raw) return;
+      try {
+        const { prefix, requestId } = JSON.parse(raw);
+        if (!requestId) return;
+
+        // Restore active tracking
+        if (prefix === 'kyc') activeKycRequestId = requestId;
+        else activeCountryRequestId = requestId;
+
+        // Show waiting UI
+        document.getElementById(`${prefix}-result`).classList.add('show');
+        document.getElementById(`${prefix}-waiting`).classList.add('show');
+
+        // Poll server for result that may have arrived while page was gone
+        const res = await fetch(`${baseUrl}/api/results/${requestId}`);
+        const json = await res.json();
+        if (json.found && json.data) {
+          showProofReceived(prefix, json.data);
+        }
+      } catch {}
+    }
+    recoverPendingRequest();
+
     // SSE connection for real-time callback
     const eventsUrl = `${baseUrl}/api/events`;
     const eventSource = new EventSource(eventsUrl);
@@ -1017,6 +1051,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
     function showProofReceived(prefix, proof) {
       document.getElementById(`${prefix}-waiting`).classList.remove('show');
       document.getElementById(`${prefix}-verify-result`).classList.remove('show');
+      document.getElementById(`${prefix}-result`).classList.add('show');
       const receivedEl = document.getElementById(`${prefix}-received`);
       const dataEl = document.getElementById(`${prefix}-proof-data`);
       dataEl.textContent = JSON.stringify(proof, null, 2);
@@ -1025,6 +1060,8 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       receivedEl.classList.add('show');
       if (prefix === 'kyc') activeKycRequestId = null;
       else activeCountryRequestId = null;
+      clearPendingRequest();
+      if (proof.status === 'completed') launchConfetti();
     }
 
     // Clipboard copy with fallback for non-HTTPS contexts
@@ -1142,6 +1179,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       });
 
       activeKycRequestId = request.requestId;
+      savePendingRequest('kyc', request.requestId);
       const result = await sdk.requestProof(request, { width: 200, margin: 1 });
 
       if (!result.mobile) {
@@ -1173,6 +1211,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       });
 
       activeCountryRequestId = request.requestId;
+      savePendingRequest('country', request.requestId);
       const result = await sdk.requestProof(request, { width: 200, margin: 1 });
 
       if (!result.mobile) {
