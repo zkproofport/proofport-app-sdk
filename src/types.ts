@@ -1,5 +1,5 @@
 /**
- * ProofPort SDK Types
+ * ZKProofPort SDK Types
  */
 
 /**
@@ -19,6 +19,7 @@ export type ProofRequestStatus = 'pending' | 'completed' | 'error' | 'cancelled'
 export interface CoinbaseKycInputs {
   userAddress?: string; // Optional - app will connect wallet if not provided
   rawTransaction?: string; // Optional - app can fetch from Etherscan
+  scope: string;
 }
 
 /**
@@ -29,6 +30,7 @@ export interface CoinbaseCountryInputs {
   rawTransaction?: string;
   countryList?: string[]; // ISO 3166-1 alpha-2 codes (e.g., ['US', 'KR'])
   isIncluded?: boolean; // true = inclusion check, false = exclusion check
+  scope: string;
 }
 
 /**
@@ -89,6 +91,8 @@ export interface ProofResponse {
   verifierAddress?: string;
   /** Chain ID where verifier is deployed (provided by app) */
   chainId?: number;
+  /** Nullifier (if applicable) */
+  nullifier?: string;
 }
 
 /**

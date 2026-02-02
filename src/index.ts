@@ -1,7 +1,7 @@
 /**
- * ProofPort SDK
+ * ZKProofPort SDK
  *
- * SDK for requesting ZK proofs from the ProofPort mobile app
+ * SDK for requesting ZK proofs from the ZKProofPort mobile app
  *
  * @example
  * ```typescript
@@ -71,6 +71,8 @@ export {
   getDefaultProvider,
   getVerifierAddress,
   getVerifierChainId,
+  extractNullifierFromPublicInputs,
+  extractScopeFromPublicInputs,
 } from './verifier';
 
 // Constants
@@ -82,4 +84,7 @@ export {
   RPC_ENDPOINTS,
   DEFAULT_REQUEST_EXPIRY_MS,
   MAX_QR_DATA_SIZE,
+  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  NULLIFIER_REGISTRY_ABI,
 } from './constants';
