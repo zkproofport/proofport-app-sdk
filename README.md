@@ -6,7 +6,7 @@ ProofPort SDK for requesting zero-knowledge proofs from the ProofPort mobile app
 
 The ProofPort SDK enables web applications to:
 
-1. Create proof requests for ZK circuits (age verification, Coinbase KYC)
+1. Create proof requests for ZK circuits (Coinbase KYC attestations)
 2. Generate deep links or QR codes for users to complete proofs on mobile
 3. Handle proof responses and verify them on-chain via Ethereum smart contracts
 
@@ -26,11 +26,9 @@ const sdk = new ProofPortSDK({
   defaultCallbackUrl: 'https://myapp.com/verify'
 });
 
-// Create age verification request
-const request = sdk.createAgeVerificationRequest({
-  birthYear: 2000,
-  currentYear: 2026,
-  minAge: 18
+// Create Coinbase KYC request
+const request = sdk.createCoinbaseKycRequest({
+  // No inputs required - app handles wallet connection
 });
 
 // Generate deep link URL
@@ -44,23 +42,6 @@ sdk.openProofRequest(request);
 ```
 
 ## Supported Circuits
-
-### age_verifier
-
-Proves the user is above a certain age without revealing their birth year.
-
-- **Verifier Address**: Provided by the ProofPort app in the proof response
-- **Public Inputs**: `current_year`, `min_age`
-- **Status**: Production-ready
-
-**Inputs:**
-```typescript
-{
-  birthYear: number;      // User's birth year (private)
-  currentYear: number;    // Current year
-  minAge: number;         // Minimum age requirement
-}
-```
 
 ### coinbase_attestation
 
@@ -105,27 +86,6 @@ interface ProofPortConfig {
 
 ### Create Proof Requests
 
-#### createAgeVerificationRequest(inputs, options?)
-
-Creates an age verification proof request.
-
-```typescript
-const request = sdk.createAgeVerificationRequest(
-  {
-    birthYear: 2000,
-    currentYear: 2026,
-    minAge: 18
-  },
-  {
-    callbackUrl: 'https://myapp.com/callback',  // Optional
-    message: 'Please verify your age',           // Optional
-    dappName: 'My App',                          // Optional
-    dappIcon: 'https://myapp.com/icon.png',      // Optional
-    expiresInMs: 600000                          // Optional: 10 minutes default
-  }
-);
-```
-
 #### createCoinbaseKycRequest(inputs, options?)
 
 Creates a Coinbase KYC verification request.
@@ -150,7 +110,7 @@ const request = sdk.createCoinbaseKycRequest(
 Generic proof request creation.
 
 ```typescript
-const request = sdk.createProofRequest('age_verifier', inputs, options);
+const request = sdk.createProofRequest('coinbase_attestation', inputs, options);
 ```
 
 ### Deep Link Generation
@@ -219,7 +179,7 @@ const response = sdk.parseResponse(callbackUrl);
 
 interface ProofResponse {
   requestId: string;
-  circuit: 'age_verifier' | 'coinbase_attestation';
+  circuit: 'coinbase_attestation' | 'coinbase_country_attestation';
   status: 'completed' | 'error' | 'cancelled' | 'pending';
   proof?: string;              // Hex string with 0x prefix
   publicInputs?: string[];     // Array of hex strings
@@ -247,7 +207,7 @@ Verifies a proof on-chain via smart contract.
 
 ```typescript
 const result = await sdk.verifyOnChain(
-  'age_verifier',
+  'coinbase_attestation',
   '0x...',  // proof hex string
   ['0x...', '0x...'],  // public inputs as hex strings
   provider  // Optional: ethers.Provider or ethers.Signer
@@ -272,7 +232,7 @@ const result = await sdk.verifyResponseOnChain(response, provider);
 Gets the verifier contract address for a circuit (requires verifier configuration in SDK config).
 
 ```typescript
-const address = sdk.getVerifierAddress('age_verifier');
+const address = sdk.getVerifierAddress('coinbase_attestation');
 // Returns the address configured via SDK verifiers option
 ```
 
@@ -281,7 +241,7 @@ const address = sdk.getVerifierAddress('age_verifier');
 Gets the chain ID where the verifier is deployed (requires verifier configuration in SDK config).
 
 ```typescript
-const chainId = sdk.getVerifierChainId('age_verifier');
+const chainId = sdk.getVerifierChainId('coinbase_attestation');
 // Returns the chainId configured via SDK verifiers option
 ```
 
@@ -290,7 +250,7 @@ const chainId = sdk.getVerifierChainId('age_verifier');
 Gets metadata about a circuit.
 
 ```typescript
-const metadata = sdk.getCircuitMetadata('age_verifier');
+const metadata = sdk.getCircuitMetadata('coinbase_attestation');
 // Returns: { name, description, publicInputsCount, publicInputNames }
 ```
 
@@ -300,7 +260,7 @@ Gets all supported circuit types.
 
 ```typescript
 const circuits = sdk.getSupportedCircuits();
-// Returns: ['age_verifier', 'coinbase_attestation']
+// Returns: ['coinbase_attestation', 'coinbase_country_attestation']
 ```
 
 #### validateRequest(request)
@@ -325,10 +285,10 @@ zkproofport://proof-request?data=<base64url_encoded_request>
 ```json
 {
   "requestId": "req-...",
-  "circuit": "age_verifier",
+  "circuit": "coinbase_attestation",
   "inputs": { ... },
   "callbackUrl": "https://myapp.com/callback",
-  "message": "Please verify your age",
+  "message": "Please verify with Coinbase",
   "dappName": "My App",
   "dappIcon": "https://myapp.com/icon.png",
   "createdAt": 1234567890,
@@ -352,7 +312,6 @@ npm run demo
 Visit `http://localhost:3333` in your browser.
 
 **Demo Features:**
-- Create age verification requests
 - Create Coinbase KYC requests
 - Generate QR codes and deep links
 - Poll for proof results from the mobile app
@@ -406,14 +365,12 @@ const sdk = new ProofPortSDK({
 ### 2. Create Proof Request
 
 ```typescript
-const request = sdk.createAgeVerificationRequest(
+const request = sdk.createCoinbaseKycRequest(
   {
-    birthYear: userBirthYear,
-    currentYear: new Date().getFullYear(),
-    minAge: 18
+    // No inputs required - app handles wallet connection
   },
   {
-    message: 'Please verify your age to continue'
+    message: 'Please verify with Coinbase to continue'
   }
 );
 ```
@@ -442,7 +399,7 @@ app.post('/api/proof-callback', (req, res) => {
     // Verify on-chain when needed
 
     const result = await sdk.verifyOnChain(
-      'age_verifier',
+      'coinbase_attestation',
       proof,
       publicInputs.split(',')
     );
@@ -467,7 +424,7 @@ const provider = new ethers.JsonRpcProvider(
 );
 
 const result = await sdk.verifyOnChain(
-  'age_verifier',
+  'coinbase_attestation',
   proof,
   publicInputs,
   provider
@@ -489,7 +446,6 @@ import type {
   CircuitType,
   ProofRequest,
   ProofResponse,
-  AgeVerifierInputs,
   CoinbaseKycInputs,
   QRCodeOptions,
   VerifierContract,
@@ -518,7 +474,7 @@ The SDK supports multiple networks via configuration:
 ```typescript
 const sdk = new ProofPortSDK({
   verifiers: {
-    age_verifier: {
+    coinbase_attestation: {
       address: '0x...',
       chainId: 1,  // Mainnet
       abi: [...]
