@@ -20,11 +20,11 @@ cd /Users/nhn/Workspace/proofport-app-dev/proofport-app-sdk/demo
 node server.js
 ```
 
-Open your browser to: `http://localhost:3333/shieldswap`
+Open your browser to: `http://<your-host>:3300/shieldswap`
 
 For mobile testing with QR codes, use your machine's local IP instead of localhost:
 ```
-http://192.168.x.x:3333/shieldswap
+http://<your-ip>:3300/shieldswap
 ```
 
 ## Demo Scenario (Step-by-Step)
@@ -160,7 +160,7 @@ Raw JSON of the current proof request:
   "requestId": "req_1234567890",
   "circuit": "coinbase_attestation",
   "inputs": {},
-  "callbackUrl": "http://localhost:3333/callback",
+  "callbackUrl": "http://<your-host>:3300/callback",
   "dappName": "ShieldSwap",
   "message": "Identity verification required for this swap",
   "createdAt": 1234567890000,
@@ -181,7 +181,7 @@ Static configuration for the demo:
 - **Chain:** Determined by proof response chainId
 - **Circuit:** coinbase_attestation
 - **KYC Threshold:** $10,000 USD
-- **Callback URL:** http://localhost:3333/callback
+- **Callback URL:** http://<your-host>:3300/callback
 
 ## Key Talking Points
 
@@ -231,7 +231,7 @@ Static configuration for the demo:
 ## Tips for Live Demo
 
 ### Setup
-- If demoing from mobile, use local IP instead of localhost: `http://192.168.x.x:3333`
+- If demoing from mobile, use local IP instead of localhost: `http://<your-ip>:3300`
 - Ensure both desktop and mobile are on the same network
 - Keep browser developer tools open for developer panel access
 

@@ -1414,6 +1414,7 @@
       </div>
     </div>
     <div class="header-right">
+      <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-right: 8px;">ZKProofPort</a>
       <div id="kycBadge" class="kyc-badge">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.85 2.55 7.45 6 8 3.45-.55 6-4.15 6-8V4L8 1z" fill="currentColor"/><path d="M6.5 8l1.5 1.5 2.5-2.5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Verified
@@ -1679,7 +1680,7 @@
     // ========== CONSTANTS ==========
     const DEFAULT_SCHEME = 'zkproofport';
     const SERVER_URL = window.location.origin;
-    const CALLBACK_URL = `${SERVER_URL}/callback`;
+    const CALLBACK_URL = `${SERVER_URL}/api/callback`;
     const POLL_INTERVAL = 2000;
     const KYC_THRESHOLD = 10000;
     // Verifier address comes from proof response (no hardcoded fallback)
@@ -2177,7 +2178,7 @@
       const request = {
         requestId: generateRequestId(),
         circuit: 'coinbase_attestation',
-        inputs: {},
+        inputs: { scope: 'shieldswap:kyc' },
         callbackUrl: CALLBACK_URL,
         dappName: 'ShieldSwap',
         message: 'Identity verification required for this swap',
@@ -2235,7 +2236,7 @@
 
       pollingTimer = setInterval(async () => {
         try {
-          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
+          const response = await fetch(`${SERVER_URL}/api/results/${requestId}`);
           const data = await response.json();
           if (data.found) {
             devLog('POLL', `Result found for ${requestId}`);
@@ -2250,7 +2251,7 @@
       // Immediate check
       (async () => {
         try {
-          const response = await fetch(`${SERVER_URL}/status/${requestId}`);
+          const response = await fetch(`${SERVER_URL}/api/results/${requestId}`);
           const data = await response.json();
           if (data.found) {
             stopPolling();

@@ -241,8 +241,7 @@
             <input
               type="url"
               id="kyc-callback"
-              placeholder="http://localhost:3300/api/callback"
-              value="http://localhost:3300/api/callback"
+              placeholder="auto-detected from current origin"
               required
             >
             <div class="help-text">URL where the proof will be sent after completion</div>
@@ -280,8 +279,7 @@
             <input
               type="url"
               id="country-callback"
-              placeholder="http://localhost:3300/api/callback"
-              value="http://localhost:3300/api/callback"
+              placeholder="auto-detected from current origin"
               required
             >
             <div class="help-text">URL where the proof will be sent after completion</div>
@@ -363,9 +361,15 @@
   <script type="module">
     import { ProofPortSDK } from '../dist/index.mjs';
 
+    const baseUrl = window.location.origin;
+
     const sdk = new ProofPortSDK({
-      defaultCallbackUrl: 'http://localhost:3300/api/callback'
+      defaultCallbackUrl: `${baseUrl}/api/callback`
     });
+
+    // Set callback input values dynamically from current origin
+    document.getElementById('kyc-callback').value = `${baseUrl}/api/callback`;
+    document.getElementById('country-callback').value = `${baseUrl}/api/callback`;
 
     let currentRequest = null;
     let isIncludedCountry = true;

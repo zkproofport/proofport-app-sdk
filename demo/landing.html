@@ -405,6 +405,25 @@
       color: var(--gray-300);
     }
 
+    .open-app-btn {
+      display: inline-block;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+      transition: opacity 0.2s;
+    }
+
+    .open-app-btn:hover {
+      opacity: 0.9;
+    }
+
     .callback-status {
       margin-top: 16px;
       padding: 16px;
@@ -427,6 +446,20 @@
       border: 1px solid rgba(34, 197, 94, 0.3);
     }
 
+    .callback-status.failed {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .callback-status.duplicate {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+
+    .callback-status.duplicate h4 {
+      color: #eab308;
+    }
+
     .callback-status h4 {
       font-size: 14px;
       margin-bottom: 8px;
@@ -438,6 +471,10 @@
 
     .callback-status.received h4 {
       color: #22c55e;
+    }
+
+    .callback-status.failed h4 {
+      color: #ef4444;
     }
 
     .callback-status .status-hint {
@@ -565,6 +602,7 @@
       border: 1px solid rgba(239, 68, 68, 0.4);
       color: #ef4444;
     }
+
 
     /* Confetti */
     .confetti-container {
@@ -740,12 +778,66 @@
         grid-template-columns: 1fr;
       }
     }
+
+    .plan-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .plan-selector label {
+      font-size: 12px;
+      color: var(--gray-400);
+    }
+
+    .plan-selector select {
+      background: var(--navy-light);
+      color: var(--white);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .plan-selector select:focus {
+      border-color: var(--blue);
+    }
+
+    .plan-selector .current-plan {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .plan-selector .plan-free { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .plan-selector .plan-credit { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .plan-selector .plan-plan1 { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .plan-selector .plan-plan2 { background: rgba(234,179,8,0.15); color: #eab308; }
   </style>
 </head>
 <body>
   <header>
-    <div class="container">
+    <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
       <div class="logo">ZKProofPort</div>
+      <div class="plan-selector">
+        <label>Test Account:</label>
+        <select id="plan-select" onchange="switchPlan(this.value)">
+          <option value="demo_proofport" data-tier="free">Free</option>
+          <option value="credit_test_client" data-tier="credit">Credit</option>
+          <option value="plan1_test_client" data-tier="plan1">Plan 1</option>
+          <option value="plan2_test_client" data-tier="plan2">Plan 2 (On-Chain)</option>
+        </select>
+        <span id="plan-badge" class="current-plan plan-free">FREE</span>
+      </div>
+      <nav style="display:flex;gap:1rem;align-items:center;">
+        <a href="#demo-kyc" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Callback Demo</a>
+        <a href="/relay-demo" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Relay Demo</a>
+        <a href="/shieldswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ShieldSwap</a>
+        <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:var(--cyan);text-decoration:none;font-size:0.9rem;border:1px solid var(--cyan);padding:0.3rem 0.8rem;border-radius:6px;">Dashboard</a>
+      </nav>
     </div>
   </header>
 
@@ -757,7 +849,12 @@
       <div class="cta-buttons">
         <a href="#demo-kyc" class="btn btn-primary">Try KYC Demo</a>
         <a href="#demo-country" class="btn btn-secondary">Try Country Demo</a>
+        <a href="/relay-demo" class="btn btn-secondary">Relay Demo</a>
+        <a href="/shieldswap" class="btn btn-secondary">ShieldSwap</a>
       </div>
+      <p style="color:var(--gray-400);font-size:0.95rem;margin-top:1.5rem;">
+        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/shieldswap" style="color:var(--cyan);text-decoration:underline;">ShieldSwap</a> demonstrates a compliant DEX using ZK proofs.
+      </p>
     </div>
   </section>
 
@@ -807,10 +904,6 @@
               Personal identity
             </div>
           </div>
-          <div class="form-group">
-            <label>Callback URL</label>
-            <input type="text" id="kyc-callback" placeholder="https://yourapp.com/api/callback">
-          </div>
           <div class="button-group">
             <button class="btn btn-primary btn-small" onclick="requestKycProof()">Request Proof</button>
           </div>
@@ -821,6 +914,10 @@
             <div class="callback-status waiting" id="kyc-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
               <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
+            </div>
+            <div class="callback-status failed" id="kyc-failed">
+              <h4>Proof Failed</h4>
+              <p class="status-hint" id="kyc-failed-reason">The proof request timed out. Please try again.</p>
             </div>
             <div class="callback-status received" id="kyc-received">
               <h4>Proof Received</h4>
@@ -855,10 +952,6 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Callback URL</label>
-            <input type="text" id="country-callback" placeholder="https://yourapp.com/api/callback">
-          </div>
-          <div class="form-group">
             <label>Country List (comma-separated ISO codes)</label>
             <input type="text" id="country-list" value="US,KR,JP" placeholder="US,KR,JP,GB,FR">
           </div>
@@ -879,6 +972,10 @@
             <div class="callback-status waiting" id="country-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
               <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
+            </div>
+            <div class="callback-status failed" id="country-failed">
+              <h4>Proof Failed</h4>
+              <p class="status-hint" id="country-failed-reason">The proof request timed out. Please try again.</p>
             </div>
             <div class="callback-status received" id="country-received">
               <h4>Proof Received</h4>
@@ -918,7 +1015,7 @@
         <div class="feature">
           <div class="feature-icon">🌐</div>
           <h3>Open Source</h3>
-          <p>Fully auditable SDK and circuits built with Noir and Rust.</p>
+          <p>Fully auditable SDK and circuits built with cutting-edge cryptographic technology.</p>
         </div>
       </div>
     </div>
@@ -971,105 +1068,176 @@ sdk.<span class="code-function">openProofRequest</span>(request);
   </script>
   <script type="module">
     import { ProofPortSDK } from '../dist/index.mjs';
+    import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
 
-    // Derive callback URL from current host (works with localhost, private IP, or public domain)
-    const baseUrl = window.location.origin;
-    const callbackUrl = `${baseUrl}/api/callback`;
+    // Use demo server proxy instead of direct relay access (works from any device)
+    const RELAY_PROXY = '';
+    const urlParams = new URLSearchParams(window.location.search);
+    let DEMO_CLIENT_ID = urlParams.get('clientId') || 'demo_proofport';
 
-    // Initialize SDK
-    const sdk = new ProofPortSDK({
-      defaultCallbackUrl: callbackUrl
+    const PLAN_TIERS = {
+      'demo_proofport': 'free',
+      'credit_test_client': 'credit',
+      'plan1_test_client': 'plan1',
+      'plan2_test_client': 'plan2',
+    };
+
+    // Initialize plan selector and dashboard link from URL param
+    window.addEventListener('DOMContentLoaded', () => {
+      const select = document.getElementById('plan-select');
+      if (select) {
+        select.value = DEMO_CLIENT_ID;
+        updatePlanBadge(PLAN_TIERS[DEMO_CLIENT_ID] || 'free');
+      }
     });
 
-    // Set callback URL inputs
-    document.getElementById('kyc-callback').value = callbackUrl;
-    document.getElementById('country-callback').value = callbackUrl;
+    window.switchPlan = function(clientId) {
+      DEMO_CLIENT_ID = clientId;
+      const tier = PLAN_TIERS[clientId] || 'free';
+      updatePlanBadge(tier);
+      // Update URL without reload
+      const url = new URL(window.location);
+      url.searchParams.set('clientId', clientId);
+      history.replaceState({}, '', url);
+    };
+
+    function updatePlanBadge(tier) {
+      const badge = document.getElementById('plan-badge');
+      if (!badge) return;
+      badge.className = `current-plan plan-${tier}`;
+      const labels = { free: 'FREE', credit: 'CREDIT', plan1: 'PLAN 1', plan2: 'PLAN 2' };
+      badge.textContent = labels[tier] || tier.toUpperCase();
+    }
+
+    // Initialize SDK (still used for verification)
+    const sdk = new ProofPortSDK({});
 
     let isIncluded = true;
-    // Track active request IDs per card
     let activeKycRequestId = null;
     let activeCountryRequestId = null;
-    // Store received proof data (raw object) and formatted string
     const proofDataStore = {};
     const proofObjectStore = {};
+    let pollIntervals = {};
+    const pollStartTimes = {};
+    const PROOF_TIMEOUT_MS = 180_000; // 3 minutes
 
-    // Session persistence for mobile page reload recovery
-    function savePendingRequest(prefix, requestId) {
-      sessionStorage.setItem('zkproofport_pending', JSON.stringify({ prefix, requestId }));
-    }
-    function clearPendingRequest() {
-      sessionStorage.removeItem('zkproofport_pending');
-    }
 
-    // Recover pending request after mobile page reload
-    async function recoverPendingRequest() {
-      const raw = sessionStorage.getItem('zkproofport_pending');
-      if (!raw) return;
+    // Request proof via relay API
+    async function requestProofViaRelay(circuitId, inputs, callbackUrl, prefix) {
       try {
-        const { prefix, requestId } = JSON.parse(raw);
-        if (!requestId) return;
+        const res = await fetch(`${RELAY_PROXY}/api/relay/proof/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: DEMO_CLIENT_ID,
+            circuitId,
+            scope: 'zkproofport:demo',
+            inputs,
+            callbackUrl: callbackUrl || undefined,
+          }),
+        });
 
-        // Restore active tracking
-        if (prefix === 'kyc') activeKycRequestId = requestId;
-        else activeCountryRequestId = requestId;
-
-        // Show waiting UI
-        document.getElementById(`${prefix}-result`).classList.add('show');
-        document.getElementById(`${prefix}-waiting`).classList.add('show');
-
-        // Poll server for result that may have arrived while page was gone
-        const res = await fetch(`${baseUrl}/api/results/${requestId}`);
-        const json = await res.json();
-        if (json.found && json.data) {
-          showProofReceived(prefix, json.data);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Request failed' }));
+          alert(err.error || `Request failed (${res.status})`);
+          return null;
         }
-      } catch {}
-    }
-    recoverPendingRequest();
 
-    // SSE connection for real-time callback
-    const eventsUrl = `${baseUrl}/api/events`;
-    const eventSource = new EventSource(eventsUrl);
-    eventSource.onmessage = function(event) {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'proof-callback' && msg.data) {
-          const proof = msg.data;
-          const requestId = proof.requestId;
-          if (requestId && requestId === activeKycRequestId) {
-            showProofReceived('kyc', proof);
-          } else if (requestId && requestId === activeCountryRequestId) {
-            showProofReceived('country', proof);
-          } else {
-            if (activeKycRequestId) showProofReceived('kyc', proof);
-            else if (activeCountryRequestId) showProofReceived('country', proof);
+        return await res.json();
+      } catch (err) {
+        alert(`Failed to connect to relay: ${err.message}`);
+        return null;
+      }
+    }
+
+    // Poll relay for proof status
+    function startPolling(requestId, prefix) {
+      if (pollIntervals[prefix]) clearInterval(pollIntervals[prefix]);
+      pollStartTimes[prefix] = Date.now();
+
+      pollIntervals[prefix] = setInterval(async () => {
+        // Check timeout
+        if (Date.now() - pollStartTimes[prefix] > PROOF_TIMEOUT_MS) {
+          clearInterval(pollIntervals[prefix]);
+          delete pollIntervals[prefix];
+          showProofTimeout(prefix);
+          return;
+        }
+
+        try {
+          const res = await fetch(`${RELAY_PROXY}/api/relay/proof/${requestId}`);
+          if (!res.ok) return;
+          const status = await res.json();
+
+          if (status.status === 'completed') {
+            clearInterval(pollIntervals[prefix]);
+            delete pollIntervals[prefix];
+            showProofReceived(prefix, status);
+          } else if (status.status === 'failed') {
+            clearInterval(pollIntervals[prefix]);
+            delete pollIntervals[prefix];
+            showProofFailed(prefix, status.error || 'Proof generation failed');
           }
-        }
-      } catch {}
-    };
+        } catch {}
+      }, 2000);
+    }
 
     function showProofReceived(prefix, proof) {
       document.getElementById(`${prefix}-waiting`).classList.remove('show');
       document.getElementById(`${prefix}-verify-result`).classList.remove('show');
       document.getElementById(`${prefix}-result`).classList.add('show');
       const receivedEl = document.getElementById(`${prefix}-received`);
+      const headerEl = receivedEl.querySelector('h4');
       const dataEl = document.getElementById(`${prefix}-proof-data`);
+
+      const isAlreadyRegistered = proof.onChainStatus === 'already_registered';
+
+      if (isAlreadyRegistered) {
+        receivedEl.className = 'callback-status duplicate show';
+        headerEl.textContent = '⚠️ Already Registered';
+      } else {
+        receivedEl.className = 'callback-status received show';
+        headerEl.textContent = proof.onChainStatus === 'verified_and_registered'
+          ? '✅ Verified & Registered On-Chain'
+          : '✅ Proof Received';
+      }
+
       dataEl.textContent = JSON.stringify(proof, null, 2);
       proofDataStore[prefix] = JSON.stringify(proof, null, 2);
       proofObjectStore[prefix] = proof;
+
       receivedEl.classList.add('show');
       if (prefix === 'kyc') activeKycRequestId = null;
       else activeCountryRequestId = null;
-      clearPendingRequest();
-      if (proof.status === 'completed') launchConfetti();
+      if (proof.status === 'completed' && !isAlreadyRegistered) launchConfetti();
     }
 
-    // Clipboard copy with fallback for non-HTTPS contexts
+    function showProofTimeout(prefix) {
+      document.getElementById(`${prefix}-waiting`).classList.remove('show');
+      document.getElementById(`${prefix}-received`).classList.remove('show');
+      const failedEl = document.getElementById(`${prefix}-failed`);
+      document.getElementById(`${prefix}-failed-reason`).textContent =
+        'The proof request timed out after 3 minutes. Please try again.';
+      failedEl.classList.add('show');
+      if (prefix === 'kyc') activeKycRequestId = null;
+      else activeCountryRequestId = null;
+    }
+
+    function showProofFailed(prefix, reason) {
+      document.getElementById(`${prefix}-waiting`).classList.remove('show');
+      document.getElementById(`${prefix}-received`).classList.remove('show');
+      const failedEl = document.getElementById(`${prefix}-failed`);
+      document.getElementById(`${prefix}-failed-reason`).textContent = reason;
+      failedEl.classList.add('show');
+      if (prefix === 'kyc') activeKycRequestId = null;
+      else activeCountryRequestId = null;
+    }
+
+    // Clipboard copy with fallback
     function copyToClipboard(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         return navigator.clipboard.writeText(text);
       }
-      // Fallback for HTTP (e.g. private IP)
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
@@ -1093,28 +1261,23 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       }
     };
 
-    // Confetti celebration
+    // Confetti
     function launchConfetti() {
       const container = document.createElement('div');
       container.className = 'confetti-container';
       document.body.appendChild(container);
       const colors = ['#22c55e', '#3b82f6', '#a855f7', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
-      const shapes = ['circle', 'rect'];
       for (let i = 0; i < 80; i++) {
         const confetti = document.createElement('div');
         confetti.className = 'confetti';
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        const shape = shapes[Math.floor(Math.random() * shapes.length)];
         confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.background = color;
+        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
         confetti.style.animationDelay = Math.random() * 1.5 + 's';
         confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
-        if (shape === 'circle') {
-          confetti.style.borderRadius = '50%';
-        } else {
+        if (Math.random() > 0.5) confetti.style.borderRadius = '50%';
+        else {
           confetti.style.width = (6 + Math.random() * 8) + 'px';
           confetti.style.height = (6 + Math.random() * 8) + 'px';
-          confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
         }
         container.appendChild(confetti);
       }
@@ -1134,14 +1297,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       resultEl.innerHTML = `<span class="spinner"></span> ${type === 'onchain' ? 'On-Chain' : 'Off-Chain'} verification in progress...`;
 
       try {
-        let result;
-        if (type === 'onchain') {
-          result = await sdk.verifyResponseOnChain(proof);
-        } else {
-          // Off-chain: call verifyOnChain with the proof data (same contract call, labeled differently)
-          result = await sdk.verifyResponseOnChain(proof);
-        }
-
+        const result = await sdk.verifyResponseOnChain(proof);
         resultEl.className = `verify-result show ${result.valid ? 'success' : 'failure'}`;
         resultEl.style = '';
         if (result.valid) {
@@ -1157,69 +1313,83 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       }
     };
 
-    // Toggle list type
+    // Toggle
     window.toggleListType = function(include) {
       isIncluded = include;
       document.getElementById('toggle-include').classList.toggle('active', include);
       document.getElementById('toggle-exclude').classList.toggle('active', !include);
     };
 
-    // KYC Demo
-    window.requestKycProof = async function() {
-      const callbackUrl = document.getElementById('kyc-callback').value;
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
 
-      // Reset previous state
+    async function showProofResult(deepLink, qrContainerId, deepLinkId) {
+      const qrContainer = document.getElementById(qrContainerId);
+      const deepLinkEl = document.getElementById(deepLinkId);
+
+      if (isMobileDevice()) {
+        qrContainer.innerHTML = `<a href="${deepLink}" class="open-app-btn">Open ZKProofPort App</a>`;
+        deepLinkEl.style.display = 'none';
+      } else {
+        const qrDataUrl = await QRCode.toDataURL(deepLink, { width: 200, margin: 1 });
+        qrContainer.innerHTML = `<img src="${qrDataUrl}" alt="QR Code">`;
+        deepLinkEl.textContent = deepLink;
+        deepLinkEl.style.display = '';
+      }
+    }
+
+    // KYC Demo - via relay
+    window.requestKycProof = async function() {
       document.getElementById('kyc-received').classList.remove('show');
       document.getElementById('kyc-waiting').classList.remove('show');
+      document.getElementById('kyc-failed').classList.remove('show');
+      document.getElementById('kyc-verify-result').classList.remove('show');
 
-      const request = sdk.createCoinbaseKycRequest({ scope: 'zkproofport:demo' }, {
-        callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: 'Verify your Coinbase KYC status'
-      });
+      const result = await requestProofViaRelay(
+        'coinbase_attestation',
+        {},
+        window.location.origin + '/api/callback',
+        'kyc'
+      );
 
-      activeKycRequestId = request.requestId;
-      savePendingRequest('kyc', request.requestId);
-      const result = await sdk.requestProof(request, { width: 200, margin: 1 });
+      if (!result) return;
 
-      if (!result.mobile) {
-        document.getElementById('kyc-qr-container').innerHTML = `<img src="${result.qrDataUrl}" alt="QR Code">`;
-        document.getElementById('kyc-deep-link').textContent = result.deepLink;
-        document.getElementById('kyc-result').classList.add('show');
-        document.getElementById('kyc-waiting').classList.add('show');
-      }
+      activeKycRequestId = result.requestId;
+
+      await showProofResult(result.deepLink, 'kyc-qr-container', 'kyc-deep-link');
+      document.getElementById('kyc-result').classList.add('show');
+      document.getElementById('kyc-waiting').classList.add('show');
+
+      startPolling(result.requestId, 'kyc');
     };
 
-    // Country Demo
+    // Country Demo - via relay
     window.requestCountryProof = async function() {
-      const callbackUrl = document.getElementById('country-callback').value;
       const countryListInput = document.getElementById('country-list').value;
       const countryList = countryListInput.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
 
-      // Reset previous state
       document.getElementById('country-received').classList.remove('show');
       document.getElementById('country-waiting').classList.remove('show');
+      document.getElementById('country-failed').classList.remove('show');
+      document.getElementById('country-verify-result').classList.remove('show');
 
-      const request = sdk.createCoinbaseCountryRequest({
-        countryList,
-        isIncluded,
-        scope: 'zkproofport:demo'
-      }, {
-        callbackUrl,
-        dappName: 'ZKProofPort Demo',
-        message: `Verify country ${isIncluded ? 'inclusion' : 'exclusion'}`
-      });
+      const result = await requestProofViaRelay(
+        'coinbase_country_attestation',
+        { countryList, isIncluded },
+        window.location.origin + '/api/callback',
+        'country'
+      );
 
-      activeCountryRequestId = request.requestId;
-      savePendingRequest('country', request.requestId);
-      const result = await sdk.requestProof(request, { width: 200, margin: 1 });
+      if (!result) return;
 
-      if (!result.mobile) {
-        document.getElementById('country-qr-container').innerHTML = `<img src="${result.qrDataUrl}" alt="QR Code">`;
-        document.getElementById('country-deep-link').textContent = result.deepLink;
-        document.getElementById('country-result').classList.add('show');
-        document.getElementById('country-waiting').classList.add('show');
-      }
+      activeCountryRequestId = result.requestId;
+
+      await showProofResult(result.deepLink, 'country-qr-container', 'country-deep-link');
+      document.getElementById('country-result').classList.add('show');
+      document.getElementById('country-waiting').classList.add('show');
+
+      startPolling(result.requestId, 'country');
     };
 
     // Smooth scroll
