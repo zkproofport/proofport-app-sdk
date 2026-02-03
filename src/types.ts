@@ -156,3 +156,31 @@ export interface DeepLinkComponents {
   path: string;
   params: Record<string, string>;
 }
+
+/**
+ * Nullifier verification status (mirrors contract enum)
+ */
+export type NullifierVerifyStatus =
+  | 'verified_and_registered'
+  | 'already_registered'
+  | 'expired_and_reregistered'
+  | 'verification_failed'
+  | 'circuit_not_found';
+
+/**
+ * On-chain nullifier record
+ */
+export interface NullifierRecord {
+  registeredAt: number;
+  scope: string;
+  circuitId: string;
+}
+
+/**
+ * ZKProofPortNullifierRegistry contract config
+ */
+export interface NullifierRegistryConfig {
+  address: string;
+  chainId: number;
+  abi: string[];
+}

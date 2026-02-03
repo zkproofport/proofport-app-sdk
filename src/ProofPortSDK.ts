@@ -190,20 +190,20 @@ export class ProofPortSDK {
    * Generate QR code as data URL
    */
   async generateQRCode(
-    request: ProofRequest,
+    requestOrUrl: ProofRequest | string,
     options?: QRCodeOptions
   ): Promise<string> {
-    return generateQRCodeDataUrl(request, options, this.config.scheme);
+    return generateQRCodeDataUrl(requestOrUrl, options, this.config.scheme);
   }
 
   /**
    * Generate QR code as SVG string
    */
   async generateQRCodeSVG(
-    request: ProofRequest,
+    requestOrUrl: ProofRequest | string,
     options?: QRCodeOptions
   ): Promise<string> {
-    return generateQRCodeSVG(request, options, this.config.scheme);
+    return generateQRCodeSVG(requestOrUrl, options, this.config.scheme);
   }
 
   /**
@@ -211,17 +211,17 @@ export class ProofPortSDK {
    */
   async renderQRCodeToCanvas(
     canvas: HTMLCanvasElement,
-    request: ProofRequest,
+    requestOrUrl: ProofRequest | string,
     options?: QRCodeOptions
   ): Promise<void> {
-    return generateQRCodeToCanvas(canvas, request, options, this.config.scheme);
+    return generateQRCodeToCanvas(canvas, requestOrUrl, options, this.config.scheme);
   }
 
   /**
    * Check if request data fits in QR code
    */
-  checkQRCodeSize(request: ProofRequest): { size: number; withinLimit: boolean } {
-    return estimateQRDataSize(request, this.config.scheme);
+  checkQRCodeSize(requestOrUrl: ProofRequest | string): { size: number; withinLimit: boolean } {
+    return estimateQRDataSize(requestOrUrl, this.config.scheme);
   }
 
   // ============ Response Handling ============

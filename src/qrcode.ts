@@ -22,11 +22,13 @@ const DEFAULT_QR_OPTIONS: QRCodeOptions = {
  * Generate QR code as data URL (base64 PNG)
  */
 export async function generateQRCodeDataUrl(
-  request: ProofRequest,
+  requestOrUrl: ProofRequest | string,
   options: QRCodeOptions = {},
   scheme: string = DEFAULT_SCHEME
 ): Promise<string> {
-  const url = buildProofRequestUrl(request, scheme);
+  const url = typeof requestOrUrl === 'string'
+    ? requestOrUrl
+    : buildProofRequestUrl(requestOrUrl, scheme);
 
   // Check data size
   if (url.length > MAX_QR_DATA_SIZE) {
@@ -52,11 +54,13 @@ export async function generateQRCodeDataUrl(
  * Generate QR code as SVG string
  */
 export async function generateQRCodeSVG(
-  request: ProofRequest,
+  requestOrUrl: ProofRequest | string,
   options: QRCodeOptions = {},
   scheme: string = DEFAULT_SCHEME
 ): Promise<string> {
-  const url = buildProofRequestUrl(request, scheme);
+  const url = typeof requestOrUrl === 'string'
+    ? requestOrUrl
+    : buildProofRequestUrl(requestOrUrl, scheme);
 
   if (url.length > MAX_QR_DATA_SIZE) {
     throw new Error(
@@ -83,11 +87,13 @@ export async function generateQRCodeSVG(
  */
 export async function generateQRCodeToCanvas(
   canvas: HTMLCanvasElement,
-  request: ProofRequest,
+  requestOrUrl: ProofRequest | string,
   options: QRCodeOptions = {},
   scheme: string = DEFAULT_SCHEME
 ): Promise<void> {
-  const url = buildProofRequestUrl(request, scheme);
+  const url = typeof requestOrUrl === 'string'
+    ? requestOrUrl
+    : buildProofRequestUrl(requestOrUrl, scheme);
 
   if (url.length > MAX_QR_DATA_SIZE) {
     throw new Error(
@@ -112,10 +118,12 @@ export async function generateQRCodeToCanvas(
  * Estimate QR code data size for a request
  */
 export function estimateQRDataSize(
-  request: ProofRequest,
+  requestOrUrl: ProofRequest | string,
   scheme: string = DEFAULT_SCHEME
 ): { size: number; withinLimit: boolean } {
-  const url = buildProofRequestUrl(request, scheme);
+  const url = typeof requestOrUrl === 'string'
+    ? requestOrUrl
+    : buildProofRequestUrl(requestOrUrl, scheme);
   return {
     size: url.length,
     withinLimit: url.length <= MAX_QR_DATA_SIZE,

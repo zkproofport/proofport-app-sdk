@@ -39,6 +39,9 @@ export type {
   VerifierContract,
   ProofPortConfig,
   DeepLinkComponents,
+  NullifierVerifyStatus,
+  NullifierRecord,
+  NullifierRegistryConfig,
 } from './types';
 
 // Deep link utilities
@@ -73,6 +76,8 @@ export {
   getVerifierChainId,
   extractNullifierFromPublicInputs,
   extractScopeFromPublicInputs,
+  isNullifierRegistered,
+  getNullifierInfo,
 } from './verifier';
 
 // Constants
@@ -87,4 +92,5 @@ export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   NULLIFIER_REGISTRY_ABI,
+  ZKPROOFPORT_NULLIFIER_REGISTRY_ABI,
 } from './constants';

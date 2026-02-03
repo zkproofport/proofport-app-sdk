@@ -211,3 +211,43 @@ function reconstructBytes32FromFields(fields: string[]): string {
   }).join('');
   return '0x' + bytes;
 }
+
+/**
+ * Check if a nullifier is registered on-chain (Plan 2)
+ */
+export async function isNullifierRegistered(
+  nullifier: string,
+  registryAddress: string,
+  provider: any
+): Promise<boolean> {
+  const { ZKPROOFPORT_NULLIFIER_REGISTRY_ABI } = await import('./constants');
+  const contract = new ethers.Contract(registryAddress, ZKPROOFPORT_NULLIFIER_REGISTRY_ABI, provider);
+  try {
+    return await contract.isNullifierRegistered(nullifier);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get nullifier info from on-chain registry (Plan 2)
+ */
+export async function getNullifierInfo(
+  nullifier: string,
+  registryAddress: string,
+  provider: any
+): Promise<{ registeredAt: number; scope: string; circuitId: string } | null> {
+  const { ZKPROOFPORT_NULLIFIER_REGISTRY_ABI } = await import('./constants');
+  const contract = new ethers.Contract(registryAddress, ZKPROOFPORT_NULLIFIER_REGISTRY_ABI, provider);
+  try {
+    const [registeredAt, scope, circuitId] = await contract.getNullifierInfo(nullifier);
+    if (BigInt(registeredAt) === 0n) return null;
+    return {
+      registeredAt: Number(registeredAt),
+      scope: scope as string,
+      circuitId: circuitId as string,
+    };
+  } catch {
+    return null;
+  }
+}

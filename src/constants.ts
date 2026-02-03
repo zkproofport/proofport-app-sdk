@@ -91,6 +91,9 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   NULLIFIER_END: 149,
 } as const;
 
+/**
+ * @deprecated Use ZKPROOFPORT_NULLIFIER_REGISTRY_ABI instead. This is the V1 NullifierRegistry ABI.
+ */
 export const NULLIFIER_REGISTRY_ABI = [
   'function registerCircuit(bytes32 _circuitId, address _verifier, uint256 _scopeIndex, uint256 _nullifierIndex) external',
   'function updateCircuit(bytes32 _circuitId, address _newVerifier, uint256 _scopeIndex, uint256 _nullifierIndex) external',
@@ -101,5 +104,15 @@ export const NULLIFIER_REGISTRY_ABI = [
   'function verifyOnly(bytes32 _circuitId, bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
   'event CircuitRegistered(bytes32 indexed circuitId, address verifier)',
   'event CircuitUpdated(bytes32 indexed circuitId, address newVerifier)',
+  'event NullifierRegistered(bytes32 indexed nullifier, bytes32 indexed scope, bytes32 indexed circuitId)',
+];
+
+/**
+ * ZKProofPortNullifierRegistry ABI (public view functions only — registration is relayer-only)
+ */
+export const ZKPROOFPORT_NULLIFIER_REGISTRY_ABI = [
+  'function isNullifierRegistered(bytes32 _nullifier) external view returns (bool)',
+  'function getNullifierInfo(bytes32 _nullifier) external view returns (uint64 registeredAt, bytes32 scope, bytes32 circuitId)',
+  'function verifyOnly(bytes32 _circuitId, bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool)',
   'event NullifierRegistered(bytes32 indexed nullifier, bytes32 indexed scope, bytes32 indexed circuitId)',
 ];
