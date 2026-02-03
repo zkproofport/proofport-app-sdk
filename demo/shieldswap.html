@@ -179,6 +179,31 @@
       height: 14px;
     }
 
+    .kyc-reset-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      background: var(--error-dim);
+      color: var(--error);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      font-size: 12px;
+      padding: 0;
+    }
+
+    .kyc-reset-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+
+    .kyc-reset-btn.visible {
+      display: flex;
+    }
+
     .connect-btn {
       display: flex;
       align-items: center;
@@ -1419,6 +1444,9 @@
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.85 2.55 7.45 6 8 3.45-.55 6-4.15 6-8V4L8 1z" fill="currentColor"/><path d="M6.5 8l1.5 1.5 2.5-2.5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Verified
       </div>
+      <button id="kycResetBtn" class="kyc-reset-btn" onclick="resetKycVerification()" title="Reset KYC verification">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
       <button id="connectBtn" class="connect-btn" onclick="handleConnectWallet()">
         Connect Wallet
       </button>
@@ -1506,7 +1534,7 @@
       <!-- KYC warning -->
       <div id="kycWarning" class="kyc-warning">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6v3M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>Swaps over $10,000 require identity verification</span>
+        <span>Swaps over $5 require identity verification</span>
       </div>
 
       <!-- Swap button -->
@@ -1659,7 +1687,7 @@
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">KYC threshold</span>
-            <span class="dev-config-value">$10,000</span>
+            <span class="dev-config-value">$5</span>
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">Callback URL</span>
@@ -1682,7 +1710,7 @@
     const SERVER_URL = window.location.origin;
     const CALLBACK_URL = `${SERVER_URL}/api/callback`;
     const POLL_INTERVAL = 2000;
-    const KYC_THRESHOLD = 10000;
+    const KYC_THRESHOLD = 5;
     // Verifier address comes from proof response (no hardcoded fallback)
 
     // ========== TOKEN DATA ==========
@@ -1863,7 +1891,9 @@
 
     function updateKycBadge() {
       const badge = document.getElementById('kycBadge');
+      const resetBtn = document.getElementById('kycResetBtn');
       badge.classList.toggle('visible', kycVerified);
+      resetBtn.classList.toggle('visible', kycVerified);
     }
 
     function updateTokenDisplay() {
@@ -1966,6 +1996,16 @@
     }
 
     // ========== EVENT HANDLERS ==========
+
+    window.resetKycVerification = function() {
+      kycVerified = false;
+      kycVerifiedAt = null;
+      sessionStorage.removeItem('kycVerified');
+      sessionStorage.removeItem('kycVerifiedAt');
+      devLog('UI', 'KYC verification reset');
+      updateKycBadge();
+      updateSwapOutput();
+    };
 
     window.handleConnectWallet = function() {
       if (walletConnected) {
