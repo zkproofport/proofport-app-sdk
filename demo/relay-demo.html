@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZKProofPort - Relay Demo</title>
+  <style>
+    /* Reset & Base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --navy-deep: #0a0f1e;
+      --navy-mid: #131a2f;
+      --navy-light: #1a2440;
+      --blue: #2563eb;
+      --purple: #7c3aed;
+      --cyan: #06b6d4;
+      --green: #22c55e;
+      --white: #ffffff;
+      --gray-100: #f3f4f6;
+      --gray-300: #cbd5e1;
+      --gray-400: #94a3b8;
+      --gray-600: #64748b;
+      --yellow: #eab308;
+      --red: #ef4444;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: var(--navy-deep);
+      color: var(--gray-100);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(124, 58, 237, 0.15) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 32px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    nav {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    nav a {
+      color: var(--gray-400);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--white);
+    }
+
+    nav a.active {
+      color: var(--blue);
+      font-weight: 600;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 60px 0 40px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--white), var(--gray-300));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .subtitle {
+      font-size: 18px;
+      color: var(--gray-400);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Section */
+    .section {
+      padding: 40px 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .section-icon {
+      font-size: 32px;
+      filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.4));
+    }
+
+    .section-title {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    /* Card */
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .badge {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge.free {
+      background: rgba(100, 116, 139, 0.2);
+      color: var(--gray-400);
+    }
+
+    .badge.credit {
+      background: rgba(234, 179, 8, 0.2);
+      color: var(--yellow);
+    }
+
+    .badge.plan1 {
+      background: rgba(37, 99, 235, 0.2);
+      color: var(--blue);
+    }
+
+    .badge.plan2 {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--green);
+    }
+
+    /* Setup Steps */
+    .setup-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .setup-step {
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .setup-step .step-num {
+      display: inline-block;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: var(--white);
+      font-weight: 700;
+      font-size: 18px;
+      line-height: 36px;
+      margin-bottom: 12px;
+    }
+
+    .setup-step h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .setup-step .btn {
+      width: 100%;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-300);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: var(--white);
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .form-group input:read-only {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .form-group .note {
+      font-size: 12px;
+      color: var(--gray-400);
+      margin-top: 6px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: var(--white);
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--white);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .btn-small {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Grid */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 24px;
+    }
+
+    /* Panel */
+    .panel {
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      border: 2px solid;
+    }
+
+    .panel.plan1 {
+      border-color: rgba(37, 99, 235, 0.4);
+    }
+
+    .panel.plan2 {
+      border-color: rgba(34, 197, 94, 0.4);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .panel-desc {
+      font-size: 13px;
+      color: var(--gray-400);
+      line-height: 1.5;
+    }
+
+    .panel-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .panel-badge.blue {
+      background: rgba(37, 99, 235, 0.2);
+      color: var(--blue);
+    }
+
+    .panel-badge.green {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--green);
+    }
+
+    .nullifier-display {
+      margin: 16px 0;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      word-break: break-all;
+      color: var(--gray-300);
+    }
+
+    .nullifier-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+
+    .nullifier-item {
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .nullifier-item .hash {
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      color: var(--cyan);
+      word-break: break-all;
+      margin-bottom: 4px;
+    }
+
+    .nullifier-item .time {
+      color: var(--gray-400);
+      font-size: 11px;
+    }
+
+    .onchain-info {
+      padding: 12px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+
+    .onchain-info .label {
+      font-size: 11px;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .onchain-info .value {
+      font-size: 13px;
+      color: var(--gray-300);
+      margin-bottom: 8px;
+    }
+
+    .onchain-info a {
+      color: var(--green);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .onchain-info a:hover {
+      text-decoration: underline;
+    }
+
+    /* QR Code */
+    .qr-container {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .qr-container img {
+      max-width: 200px;
+      border-radius: 12px;
+      background: white;
+      padding: 8px;
+    }
+
+    .deep-link {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      word-break: break-all;
+      color: var(--gray-400);
+    }
+
+    /* Status */
+    .status-box {
+      padding: 16px;
+      border-radius: 12px;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+
+    .status-box.pending {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      color: var(--yellow);
+    }
+
+    .status-box.success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: var(--green);
+    }
+
+    .status-box.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--red);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(234, 179, 8, 0.3);
+      border-top-color: var(--yellow);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Proof Result */
+    .proof-result {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      border-radius: 12px;
+    }
+
+    .proof-result h4 {
+      font-size: 16px;
+      color: var(--cyan);
+      margin-bottom: 12px;
+    }
+
+    .proof-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .proof-meta-item {
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
+
+    .proof-meta-item .label {
+      font-size: 11px;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .proof-meta-item .value {
+      font-size: 14px;
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .proof-hex {
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--gray-300);
+      max-height: 150px;
+      overflow-y: auto;
+      word-break: break-all;
+      position: relative;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: var(--white);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .copy-btn.copied {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .copy-inline-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      color: var(--gray-400);
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .copy-inline-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--white);
+    }
+    .copy-inline-btn.copied {
+      background: var(--green);
+      border-color: var(--green);
+      color: var(--white);
+    }
+
+    /* Log Viewer */
+    .log-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .log-tab {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-400);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .log-tab.active {
+      color: var(--blue);
+      border-bottom-color: var(--blue);
+    }
+
+    .log-content {
+      display: none;
+    }
+
+    .log-content.active {
+      display: block;
+    }
+
+    .log-viewer {
+      max-height: 800px;
+      overflow-y: auto;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    .log-entry {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .log-time {
+      color: var(--gray-600);
+      margin-right: 8px;
+    }
+
+    .log-method {
+      color: var(--purple);
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .log-path {
+      color: var(--cyan);
+    }
+
+    .log-status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-left: 8px;
+    }
+
+    .log-status.success {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--green);
+    }
+
+    .log-status.error {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--red);
+    }
+
+    .log-body {
+      margin-top: 4px;
+      padding-left: 16px;
+      color: var(--gray-400);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-event-type {
+      color: var(--yellow);
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    /* Alert */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .alert.warning {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      color: var(--yellow);
+    }
+
+    .alert.info {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--cyan);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 32px;
+      }
+
+      .setup-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .header-content {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      nav {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .plan-selector {
+        width: 100%;
+      }
+
+      .logo {
+        font-size: 24px;
+      }
+
+      nav a {
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-content {
+        gap: 12px;
+      }
+
+      .logo {
+        font-size: 20px;
+      }
+
+      nav {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      nav a {
+        font-size: 12px;
+      }
+
+      .plan-selector select {
+        font-size: 12px;
+      }
+    }
+
+    .plan-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .plan-selector label {
+      font-size: 12px;
+      color: var(--gray-400);
+    }
+
+    .plan-selector select {
+      background: var(--navy-light);
+      color: var(--white);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .plan-selector select:focus {
+      border-color: var(--blue);
+    }
+
+    .open-app-btn {
+      display: inline-block;
+      padding: 16px 32px;
+      font-size: 18px;
+      text-decoration: none;
+      text-align: center;
+      color: var(--white);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-content">
+        <a href="/landing" class="logo" style="text-decoration:none;">ZKProofPort</a>
+        <div class="plan-selector">
+          <label>Test Account:</label>
+          <select id="plan-select" onchange="switchPlan(this.value)">
+            <option value="demo_proofport" data-tier="free">Free</option>
+            <option value="credit_test_client" data-tier="credit">Credit</option>
+            <option value="plan1_test_client" data-tier="plan1">Plan 1</option>
+            <option value="plan2_test_client" data-tier="plan2">Plan 2 (On-Chain)</option>
+          </select>
+        </div>
+        <nav>
+          <a href="/landing#demo-kyc">Callback Demo</a>
+          <a href="/relay-demo" class="active">Relay Demo</a>
+          <a href="/shieldswap">ShieldSwap</a>
+          <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:#06b6d4;border:1px solid #06b6d4;padding:0.25rem 0.75rem;border-radius:6px;">Dashboard</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Relay Demo</h1>
+      <p class="subtitle">Test relay-based proof requests with verification and nullifier management</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-icon">⚙️</span>
+        <h2 class="section-title">Quick Setup</h2>
+      </div>
+
+      <div class="card">
+        <div style="text-align: center; padding: 20px;">
+          <p style="color: var(--gray-400); margin-bottom: 16px;">Demo account is ready to use. Click below to start.</p>
+          <button class="btn btn-primary" onclick="initDemo()" id="btn-init-demo">Initialize Demo</button>
+          <div id="demo-status" style="margin-top: 16px; display: none;"></div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label>Current Tier <span class="badge" id="tier-badge">free</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-icon">🔐</span>
+        <h2 class="section-title">Proof Request</h2>
+      </div>
+
+      <div class="card">
+        <div class="form-group">
+          <label>Circuit</label>
+          <select id="circuit-select">
+            <option value="coinbase_attestation">Coinbase KYC</option>
+            <option value="coinbase_country_attestation">Coinbase Country</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Scope</label>
+          <input type="text" id="scope-input" value="proofport:demo:relay" placeholder="proofport:demo:relay">
+          <p class="note" id="scope-note" style="display: none;">Note: Free tier will replace scope with noop</p>
+        </div>
+        <button class="btn btn-primary" onclick="requestProof()" id="btn-request-proof" disabled>Request Proof</button>
+
+        <div id="proof-request-result" style="display: none;">
+          <div class="qr-container" id="qr-container"></div>
+          <div class="deep-link" id="deep-link"></div>
+          <div class="status-box pending" id="status-pending">
+            <span class="spinner"></span>Waiting for proof...
+            <div style="font-size: 12px; margin-top: 8px; color: var(--gray-400);">Request ID: <span id="request-id"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="proof-result-section" style="display: none;">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-icon">✅</span>
+        <h2 class="section-title">Proof Result</h2>
+      </div>
+
+      <div class="card">
+        <div class="proof-result">
+          <h4>Proof Received</h4>
+          <div class="proof-meta">
+            <div class="proof-meta-item">
+              <div class="label">Status</div>
+              <div class="value" id="proof-status">-</div>
+            </div>
+            <div class="proof-meta-item">
+              <div class="label">Public Inputs</div>
+              <div class="value" id="proof-inputs-count">-</div>
+            </div>
+            <div class="proof-meta-item">
+              <div class="label">Nullifier Hash</div>
+              <div class="value" id="proof-nullifier" style="font-size: 11px; word-break: break-all;">-<button class="copy-inline-btn" onclick="copyElementText('proof-nullifier', this)" style="display:none;" id="copy-proof-nullifier">Copy</button></div>
+            </div>
+            <div class="proof-meta-item">
+              <div class="label">Scope</div>
+              <div class="value" id="proof-scope" style="font-size: 11px; word-break: break-all;">-<button class="copy-inline-btn" onclick="copyElementText('proof-scope', this)" style="display:none;" id="copy-proof-scope">Copy</button></div>
+            </div>
+          </div>
+          <div style="position: relative;">
+            <div class="proof-hex" id="proof-hex">-</div>
+            <button class="copy-btn" onclick="copyProofHex()">Copy</button>
+          </div>
+        </div>
+
+        <div class="alert info" id="credit-alert" style="display: none;">
+          1 credit deducted
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="nullifier-section" style="display: none;">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-icon">🔑</span>
+        <h2 class="section-title">Nullifier Management</h2>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel plan1">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Plan 1 — dApp Manages (Off-Chain)</div>
+              <div class="panel-desc">Your dApp receives the nullifier hash. Store it in your database and check duplicates yourself.</div>
+            </div>
+            <div class="panel-badge blue">No gas fees</div>
+          </div>
+
+          <div style="position: relative;">
+            <div class="nullifier-display" id="plan1-nullifier">-</div>
+            <button class="copy-btn" onclick="copyElementText('plan1-nullifier', this)" style="display:none;" id="copy-plan1-nullifier">Copy</button>
+          </div>
+
+          <button class="btn btn-secondary btn-small" onclick="saveToLocalStorage()" style="margin-right: 8px;">Save to Local Storage</button>
+          <button class="btn btn-secondary btn-small" onclick="checkDuplicate()">Check Duplicate</button>
+
+          <div id="duplicate-result" style="margin-top: 12px;"></div>
+
+          <div class="nullifier-list" id="local-nullifier-list"></div>
+
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="panel-badge blue">Your responsibility</div>
+          </div>
+        </div>
+
+        <div class="panel plan2">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Plan 2 — ZKProofPort Manages (On-Chain)</div>
+              <div class="panel-desc">ZKProofPort automatically verifies and registers nullifiers on-chain. Relay pays gas.</div>
+            </div>
+            <div class="panel-badge green">Relay pays gas</div>
+          </div>
+
+          <div class="onchain-info" id="onchain-info" style="display: none;">
+            <div class="label">Status</div>
+            <div class="value"><span class="badge" id="onchain-status">-</span></div>
+            <div class="label">Transaction</div>
+            <div class="value"><a href="#" target="_blank" id="onchain-tx-link">View on BaseScan</a> <button class="copy-inline-btn" onclick="copyTxHash(this)" style="display:none;" id="copy-onchain-tx">Copy Hash</button></div>
+            <div class="label">Registered At</div>
+            <div class="value" id="onchain-registered-at">-</div>
+            <div class="label">Scope</div>
+            <div class="value" id="onchain-scope" style="word-break: break-all;">-<button class="copy-inline-btn" onclick="copyElementText('onchain-scope', this)" style="display:none;" id="copy-onchain-scope">Copy</button></div>
+            <div class="label">Circuit ID</div>
+            <div class="value" id="onchain-circuit">-</div>
+          </div>
+
+          <div id="onchain-placeholder" style="padding: 20px; text-align: center; color: var(--gray-400); font-size: 14px;">
+            On-chain verification data will appear here after proof submission
+          </div>
+
+          <button class="btn btn-secondary btn-small" onclick="checkOnChain()" id="btn-check-onchain" style="margin-top: 16px;">Check On-Chain</button>
+
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="panel-badge green">On-chain verification</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-icon">📊</span>
+        <h2 class="section-title">Developer Log</h2>
+      </div>
+
+      <div class="card">
+        <div class="log-tabs">
+          <button class="log-tab active" onclick="switchLogTab('api')">API Calls</button>
+          <button class="log-tab" onclick="switchLogTab('events')">Events</button>
+          <button class="log-tab" onclick="switchLogTab('nullifier')">Nullifier</button>
+        </div>
+
+        <div class="log-content active" id="log-api">
+          <div class="log-viewer" id="log-api-viewer">
+            <div style="color: var(--gray-600); text-align: center;">No API calls yet</div>
+          </div>
+        </div>
+
+        <div class="log-content" id="log-events">
+          <div class="log-viewer" id="log-events-viewer">
+            <div style="color: var(--gray-600); text-align: center;">No events yet</div>
+          </div>
+        </div>
+
+        <div class="log-content" id="log-nullifier">
+          <div class="log-viewer" id="log-nullifier-viewer">
+            <div style="color: var(--gray-600); text-align: center;">No nullifier operations yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "ethers": "https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import { ProofPortSDK } from '../dist/index.mjs';
+
+    const baseUrl = window.location.origin;
+
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    const PLAN_TIERS = {
+      'demo_proofport': 'free',
+      'credit_test_client': 'credit',
+      'plan1_test_client': 'plan1',
+      'plan2_test_client': 'plan2',
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialClientId = urlParams.get('clientId') || 'demo_proofport';
+
+    const state = {
+      clientId: initialClientId,
+      apiKey: '',
+      customerId: '',
+      dappId: '',
+      tier: PLAN_TIERS[initialClientId] || 'free',
+      currentRequestId: null,
+      pollInterval: null,
+      localNullifiers: JSON.parse(localStorage.getItem('relay_nullifiers') || '[]'),
+      currentProof: null,
+      jwtToken: '',
+    };
+
+    const sdk = new ProofPortSDK({
+      defaultCallbackUrl: `${baseUrl}/api/callback`
+    });
+
+    // Initialize UI
+    function initUI() {
+      console.log('[initUI] baseUrl:', baseUrl);
+      console.log('[initUI] state:', JSON.stringify(state, null, 2));
+      console.log('[initUI] SDK defaultCallbackUrl:', `${baseUrl}/api/callback`);
+
+      updateTierBadge();
+      renderLocalNullifiers();
+      if (state.tier === 'free') {
+        document.getElementById('scope-note').style.display = 'block';
+      }
+      // Enable proof button since demo account is always ready
+      document.getElementById('btn-request-proof').disabled = false;
+      // Sync selector with initial state
+      const sel = document.getElementById('plan-select');
+      if (sel) sel.value = state.clientId;
+      // Dashboard link URL is injected server-side via __DASHBOARD_URL__ placeholder
+    }
+
+    function updateTierBadge() {
+      const badge = document.getElementById('tier-badge');
+      badge.className = `badge ${state.tier}`;
+      badge.textContent = state.tier;
+    }
+
+
+    // Logging — FULL verbose, no truncation
+    function logApi(method, path, body, status) {
+      const time = new Date().toLocaleTimeString();
+      const viewer = document.getElementById('log-api-viewer');
+      if (viewer.innerHTML.includes('No API calls yet')) {
+        viewer.innerHTML = '';
+      }
+
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+
+      let statusBadge = '';
+      if (status) {
+        const statusClass = status >= 200 && status < 300 ? 'success' : 'error';
+        statusBadge = `<span class="log-status ${statusClass}">${status}</span>`;
+      }
+
+      // FULL body — no truncation
+      const bodyStr = body ? JSON.stringify(body, null, 2) : '';
+
+      entry.innerHTML = `
+        <div>
+          <span class="log-time">${time}</span>
+          <span class="log-method">${method}</span>
+          <span class="log-path">${path}</span>
+          ${statusBadge}
+        </div>
+        ${bodyStr ? `<div class="log-body">${bodyStr}</div>` : ''}
+      `;
+
+      viewer.insertBefore(entry, viewer.firstChild);
+
+      // Also to browser console
+      console.log(`[API ${method}] ${path}`, status || '', body || '');
+    }
+
+    function logEvent(type, message) {
+      const time = new Date().toLocaleTimeString();
+      const viewer = document.getElementById('log-events-viewer');
+      if (viewer.innerHTML.includes('No events yet')) {
+        viewer.innerHTML = '';
+      }
+
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <div>
+          <span class="log-time">${time}</span>
+          <span class="log-event-type">${type}</span>
+          <span style="white-space:pre-wrap;word-break:break-all;">${message}</span>
+        </div>
+      `;
+
+      viewer.insertBefore(entry, viewer.firstChild);
+
+      // Also to browser console
+      console.log(`[EVENT ${type}]`, message);
+    }
+
+    function logNullifier(operation, details) {
+      const time = new Date().toLocaleTimeString();
+      const viewer = document.getElementById('log-nullifier-viewer');
+      if (viewer.innerHTML.includes('No nullifier operations yet')) {
+        viewer.innerHTML = '';
+      }
+
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <div>
+          <span class="log-time">${time}</span>
+          <span class="log-event-type">${operation}</span>
+          <span style="white-space:pre-wrap;word-break:break-all;">${details}</span>
+        </div>
+      `;
+
+      viewer.insertBefore(entry, viewer.firstChild);
+
+      // Also to browser console
+      console.log(`[NULLIFIER ${operation}]`, details);
+    }
+
+    // API helper
+    async function api(method, path, body) {
+      const url = baseUrl + path;
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+
+      if (body) options.body = JSON.stringify(body);
+
+      console.log(`[api] >>> ${method} ${url}`, body || '');
+      logApi(method, path, body);
+
+      try {
+        const res = await fetch(url, options);
+        const data = await res.json();
+        console.log(`[api] <<< ${method} ${path} [${res.status}]`, JSON.stringify(data, null, 2));
+        logApi('RESPONSE', path, data, res.status);
+
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        return data;
+      } catch (err) {
+        console.error(`[api] ERROR ${method} ${path}:`, err.message);
+        logApi('ERROR', path, { error: err.message }, 0);
+        throw err;
+      }
+    }
+
+    // Setup functions
+    window.initDemo = async function() {
+      try {
+        document.getElementById('btn-init-demo').disabled = true;
+        const statusEl = document.getElementById('demo-status');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '<span class="spinner"></span> Setting up demo...';
+
+        // Use the selected plan's client ID
+        document.getElementById('btn-request-proof').disabled = false;
+
+        statusEl.innerHTML = '<div class="status-box success">Demo ready! You can now request proofs.</div>';
+        logEvent('INIT', 'Demo account initialized');
+      } catch (err) {
+        const statusEl = document.getElementById('demo-status');
+        statusEl.innerHTML = '<div class="status-box error">Setup failed: ' + err.message + '</div>';
+        document.getElementById('btn-init-demo').disabled = false;
+      }
+    };
+
+    // Proof request
+    window.requestProof = async function() {
+      try {
+        const circuit = document.getElementById('circuit-select').value;
+        const scope = document.getElementById('scope-input').value;
+        const dappCallbackUrl = `${baseUrl}/api/callback`;
+
+        console.log('[requestProof] START', { clientId: state.clientId, circuit, scope, baseUrl, dappCallbackUrl });
+
+        const requestBody = {
+          clientId: state.clientId,
+          circuitId: circuit,
+          scope,
+          inputs: { scope },
+          callbackUrl: dappCallbackUrl
+        };
+
+        console.log('[requestProof] Sending to relay:', JSON.stringify(requestBody, null, 2));
+
+        const data = await api('POST', '/api/relay/proof/request', requestBody);
+
+        console.log('[requestProof] Relay response (FULL):', JSON.stringify(data, null, 2));
+        console.log('[requestProof] requestId:', data.requestId);
+        console.log('[requestProof] deepLink:', data.deepLink);
+        console.log('[requestProof] deepLink length:', data.deepLink?.length);
+
+        state.currentRequestId = data.requestId;
+        logEvent('REQUEST_PROOF', `Request created: ${data.requestId}`);
+
+        // Decode deep link and log to BOTH API tab and Events tab
+        try {
+          const dlUrl = new URL(data.deepLink);
+          const b64 = dlUrl.searchParams.get('data');
+          console.log('[requestProof] Deep link base64 data param:', b64);
+          if (b64) {
+            let padded = b64.replace(/-/g, '+').replace(/_/g, '/');
+            while (padded.length % 4) padded += '=';
+            const decoded = JSON.parse(atob(padded));
+            const decodedStr = JSON.stringify(decoded, null, 2);
+
+            console.log('[requestProof] DECODED deep link data:', decodedStr);
+            console.log('[requestProof] Deep link callbackUrl:', decoded.callbackUrl || 'MISSING!');
+            console.log('[requestProof] Deep link fields:', Object.keys(decoded).join(', '));
+
+            // Log to API Calls tab (full, no truncation)
+            logApi('DEEP_LINK_DECODED', 'deep link → app data', decoded);
+            logApi('DEEP_LINK_CALLBACK', `callbackUrl = ${decoded.callbackUrl || 'MISSING!'}`, { callbackUrl: decoded.callbackUrl, fields: Object.keys(decoded) });
+
+            // Also log to Events tab
+            logEvent('DEEP_LINK_DATA', `<pre>${decodedStr}</pre>`);
+            logEvent('DEEP_LINK_CALLBACK', `callbackUrl in deep link: ${decoded.callbackUrl || 'MISSING!'}`);
+            logEvent('DEEP_LINK_FIELDS', `Fields: ${Object.keys(decoded).join(', ')}`);
+          } else {
+            console.warn('[requestProof] No "data" param in deep link URL!');
+            logApi('DEEP_LINK_WARNING', 'No data param in deep link', { deepLink: data.deepLink });
+          }
+        } catch (e) {
+          console.error('[requestProof] Deep link decode error:', e);
+          logEvent('DEEP_LINK_DECODE_ERR', e.message);
+        }
+
+        // Show deep link button on mobile, QR on desktop
+        const isMobile = isMobileDevice();
+        console.log('[requestProof] isMobile:', isMobile, 'userAgent:', navigator.userAgent.substring(0, 80));
+
+        if (isMobile) {
+          document.getElementById('qr-container').innerHTML = `<a href="${data.deepLink}" class="btn btn-primary open-app-btn">Open ZKProofPort App</a>`;
+          document.getElementById('deep-link').style.display = 'none';
+        } else {
+          const qrData = await sdk.generateQRCode(data.deepLink, { width: 200, margin: 1 });
+          document.getElementById('qr-container').innerHTML = `<img src="${qrData}" alt="QR Code">`;
+          document.getElementById('deep-link').textContent = data.deepLink;
+          document.getElementById('deep-link').style.display = '';
+        }
+        document.getElementById('request-id').textContent = data.requestId;
+
+        document.getElementById('proof-request-result').style.display = 'block';
+
+        // Start polling
+        console.log('[requestProof] Starting polling for:', data.requestId);
+        startPolling(data.requestId);
+      } catch (err) {
+        console.error('[requestProof] FAILED:', err);
+        alert('Proof request failed: ' + err.message);
+      }
+    };
+
+    function startPolling(requestId) {
+      if (state.pollInterval) clearInterval(state.pollInterval);
+      let pollCount = 0;
+
+      state.pollInterval = setInterval(async () => {
+        pollCount++;
+        try {
+          const data = await api('GET', `/api/relay/proof/${requestId}`);
+
+          console.log(`[polling #${pollCount}] requestId=${requestId} status=${data.status}`, JSON.stringify(data, null, 2));
+          logEvent('POLL', `#${pollCount} Status: ${data.status}`);
+
+          if (data.status === 'completed') {
+            clearInterval(state.pollInterval);
+            console.log('[polling] COMPLETED! Full data:', JSON.stringify(data, null, 2));
+            logApi('PROOF_COMPLETED', `/api/relay/proof/${requestId}`, data, 200);
+            showProofResult(data);
+          } else if (data.status === 'failed') {
+            clearInterval(state.pollInterval);
+            console.error('[polling] FAILED!', data.error);
+            document.getElementById('status-pending').className = 'status-box error';
+            document.getElementById('status-pending').innerHTML = `Proof generation failed: ${data.error || 'Unknown error'}`;
+            logEvent('PROOF_FAILED', data.error || 'Unknown error');
+          }
+        } catch (err) {
+          console.error(`[polling #${pollCount}] Error:`, err);
+        }
+      }, 3000);
+    }
+
+    function showProofResult(data) {
+      console.log('[showProofResult] Full data:', JSON.stringify(data, null, 2));
+      console.log('[showProofResult] nullifier:', data.nullifier);
+      console.log('[showProofResult] publicInputs:', data.publicInputs);
+      console.log('[showProofResult] scope:', data.scope);
+      console.log('[showProofResult] onChainStatus:', data.onChainStatus);
+      console.log('[showProofResult] proof length:', data.proof?.length);
+
+      document.getElementById('status-pending').className = 'status-box success';
+      document.getElementById('status-pending').innerHTML = `Proof completed`;
+
+      state.currentProof = data;
+
+      // Extract nullifier from callback payload (preferred) or fall back to public inputs
+      const nullifierHash = data.nullifier || (data.publicInputs && data.publicInputs.length > 0 ? data.publicInputs[0] : 'N/A');
+
+      document.getElementById('proof-status').textContent = data.status;
+      document.getElementById('proof-inputs-count').textContent = data.publicInputs ? data.publicInputs.length : 0;
+      document.getElementById('proof-nullifier').textContent = nullifierHash;
+      document.getElementById('proof-scope').textContent = data.scope || 'N/A';
+      document.getElementById('proof-hex').textContent = data.proof;
+
+      // Show copy buttons for proof result
+      if (nullifierHash && nullifierHash !== '-' && nullifierHash !== 'N/A') {
+        const copyNullBtn = document.getElementById('copy-proof-nullifier');
+        if (copyNullBtn) copyNullBtn.style.display = '';
+      }
+      if (data.scope && data.scope !== '-' && data.scope !== 'N/A') {
+        const copyScopeBtn = document.getElementById('copy-proof-scope');
+        if (copyScopeBtn) copyScopeBtn.style.display = '';
+      }
+
+      document.getElementById('proof-result-section').style.display = 'block';
+      document.getElementById('nullifier-section').style.display = 'block';
+
+      document.getElementById('plan1-nullifier').textContent = nullifierHash;
+
+      // Show copy button for plan1 nullifier
+      if (nullifierHash && nullifierHash !== '-' && nullifierHash !== 'N/A') {
+        const copyPlan1Btn = document.getElementById('copy-plan1-nullifier');
+        if (copyPlan1Btn) copyPlan1Btn.style.display = '';
+      }
+
+      if (state.tier === 'credit') {
+        document.getElementById('credit-alert').style.display = 'block';
+      }
+
+      // Check on-chain status
+      if (data.onChainStatus) {
+        showOnChainInfo(data);
+      } else {
+        document.getElementById('onchain-placeholder').style.display = 'block';
+        document.getElementById('onchain-info').style.display = 'none';
+      }
+
+      logEvent('PROOF_COMPLETED', `Proof received`);
+      logNullifier('EXTRACTED', `Nullifier: ${nullifierHash}`);
+    }
+
+    function showOnChainInfo(data) {
+      document.getElementById('onchain-placeholder').style.display = 'none';
+      document.getElementById('onchain-info').style.display = 'block';
+
+      const statusBadge = document.getElementById('onchain-status');
+      statusBadge.className = 'badge plan2';
+      statusBadge.textContent = data.onChainStatus || 'unknown';
+
+      if (data.txHash) {
+        const link = document.getElementById('onchain-tx-link');
+        link.href = `https://sepolia.basescan.org/tx/${data.txHash}`;
+        link.style.display = 'block';
+        // Show copy button for transaction hash
+        const copyTxBtn = document.getElementById('copy-onchain-tx');
+        if (copyTxBtn) copyTxBtn.style.display = '';
+      }
+
+      if (data.registeredAt) {
+        const date = new Date(data.registeredAt * 1000);
+        document.getElementById('onchain-registered-at').textContent = date.toLocaleString();
+      }
+
+      document.getElementById('onchain-scope').textContent = data.scope || 'N/A';
+      document.getElementById('onchain-circuit').textContent = data.circuitId || 'N/A';
+
+      // Show copy button for on-chain scope
+      if (data.scope && data.scope !== '-' && data.scope !== 'N/A') {
+        const copyScopeOnchain = document.getElementById('copy-onchain-scope');
+        if (copyScopeOnchain) copyScopeOnchain.style.display = '';
+      }
+
+      logNullifier('ON_CHAIN', `Status: ${data.onChainStatus}, Tx: ${data.txHash}`);
+    }
+
+    window.copyProofHex = function() {
+      const hex = document.getElementById('proof-hex').textContent;
+      navigator.clipboard.writeText(hex).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    };
+
+    window.copyElementText = function(elementId, btn) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      // Get text content but exclude the button text itself
+      let text = '';
+      el.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          text += node.textContent;
+        } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('copy-inline-btn')) {
+          text += node.textContent;
+        }
+      });
+      text = text.trim();
+      if (!text || text === '-') return;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    };
+
+    window.copyTxHash = function(btn) {
+      const link = document.getElementById('onchain-tx-link');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      if (!href || href === '#') return;
+      // Extract tx hash from BaseScan URL
+      const txHash = href.split('/tx/').pop() || href;
+      navigator.clipboard.writeText(txHash).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy Hash';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    };
+
+    // Plan 1: Local storage
+    window.saveToLocalStorage = function() {
+      if (!state.currentProof) return;
+
+      const nullifierHash = document.getElementById('proof-nullifier').textContent;
+      const entry = {
+        hash: nullifierHash,
+        timestamp: Date.now(),
+        scope: state.currentProof.scope
+      };
+
+      state.localNullifiers.push(entry);
+      localStorage.setItem('relay_nullifiers', JSON.stringify(state.localNullifiers));
+
+      renderLocalNullifiers();
+      logNullifier('SAVED', `Saved to localStorage: ${nullifierHash}`);
+    };
+
+    window.checkDuplicate = function() {
+      if (!state.currentProof) return;
+
+      const nullifierHash = document.getElementById('proof-nullifier').textContent;
+      const exists = state.localNullifiers.some(n => n.hash === nullifierHash);
+
+      const resultDiv = document.getElementById('duplicate-result');
+      if (exists) {
+        resultDiv.innerHTML = '<div class="status-box error">Duplicate detected!</div>';
+        logNullifier('DUPLICATE', `Nullifier already exists: ${nullifierHash}`);
+      } else {
+        resultDiv.innerHTML = '<div class="status-box success">No duplicate found</div>';
+        logNullifier('CHECK', `Nullifier is unique: ${nullifierHash}`);
+      }
+    };
+
+    function renderLocalNullifiers() {
+      const list = document.getElementById('local-nullifier-list');
+      if (state.localNullifiers.length === 0) {
+        list.innerHTML = '<div style="color: var(--gray-600); text-align: center; padding: 20px;">No nullifiers saved yet</div>';
+        return;
+      }
+
+      list.innerHTML = state.localNullifiers.map(n => `
+        <div class="nullifier-item">
+          <div class="hash">${n.hash}</div>
+          <div class="time">${new Date(n.timestamp).toLocaleString()} • ${n.scope || 'N/A'}</div>
+        </div>
+      `).join('');
+    }
+
+    // Plan 2: On-chain
+    window.checkOnChain = async function() {
+      if (!state.currentProof) return;
+
+      try {
+        const nullifierHash = document.getElementById('proof-nullifier').textContent;
+        const data = await api('GET', `/api/relay/nullifier/${nullifierHash}`);
+
+        if (data.found) {
+          showOnChainInfo({
+            onChainStatus: 'verified_and_registered',
+            txHash: data.txHash,
+            registeredAt: data.registeredAt,
+            scope: data.scope,
+            circuitId: data.circuitId
+          });
+          logNullifier('ON_CHAIN_CHECK', `Found: ${nullifierHash}`);
+        } else {
+          document.getElementById('onchain-placeholder').textContent = 'Nullifier not found on-chain';
+          logNullifier('ON_CHAIN_CHECK', `Not found: ${nullifierHash}`);
+        }
+      } catch (err) {
+        alert('On-chain check failed: ' + err.message);
+      }
+    };
+
+    // Log tabs
+    window.switchLogTab = function(tab) {
+      document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.log-content').forEach(c => c.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById(`log-${tab}`).classList.add('active');
+    };
+
+    // Initialize
+    initUI();
+
+    // Plan selector
+    window.switchPlan = function(clientId) {
+      console.log('[switchPlan]', clientId, '→ tier:', PLAN_TIERS[clientId]);
+      state.clientId = clientId;
+      state.tier = PLAN_TIERS[clientId] || 'free';
+      state.currentProof = null;
+      updateTierBadge();
+
+      // Show/hide scope note
+      document.getElementById('scope-note').style.display = state.tier === 'free' ? 'block' : 'none';
+
+      // Reset proof UI for new request
+      document.getElementById('qr-container').innerHTML = '';
+      document.getElementById('deep-link').textContent = '';
+      document.getElementById('status-pending').className = 'status-box';
+      document.getElementById('status-pending').innerHTML = '<span class="spinner"></span>Waiting for proof...<div style="font-size: 12px; margin-top: 8px; color: var(--gray-400);">Request ID: <span id="request-id"></span></div>';
+      document.getElementById('proof-request-result').style.display = 'none';
+      document.getElementById('proof-result-section').style.display = 'none';
+      document.getElementById('nullifier-section').style.display = 'none';
+      const creditAlert = document.getElementById('credit-alert');
+      if (creditAlert) creditAlert.style.display = 'none';
+      const onchainPlaceholder = document.getElementById('onchain-placeholder');
+      if (onchainPlaceholder) onchainPlaceholder.style.display = 'none';
+      const onchainInfo = document.getElementById('onchain-info');
+      if (onchainInfo) onchainInfo.style.display = 'none';
+
+      // Hide all copy buttons
+      ['copy-proof-nullifier', 'copy-proof-scope', 'copy-plan1-nullifier', 'copy-onchain-tx', 'copy-onchain-scope'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.display = 'none';
+      });
+
+      // Stop any active polling
+      if (state.pollInterval) {
+        clearInterval(state.pollInterval);
+        state.pollInterval = null;
+      }
+
+      // Update URL without reload
+      const url = new URL(window.location);
+      url.searchParams.set('clientId', clientId);
+      history.replaceState({}, '', url);
+
+      logEvent('PLAN_SWITCH', `Switched to ${state.tier} (${clientId}) — UI reset for new request`);
+    };
+
+    // Initialize selector from URL param
+    const selectEl = document.getElementById('plan-select');
+    if (selectEl) {
+      selectEl.value = state.clientId;
+    }
+  </script>
+</body>
+</html>

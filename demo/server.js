@@ -4,6 +4,9 @@ const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 3300;
+const API_URL = process.env.API_URL || 'http://localhost:4000';
+const RELAY_URL = process.env.RELAY_URL || 'http://localhost:4001';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3000';
 
 // SSE clients for real-time callback push
 const sseClients = new Set();
@@ -19,6 +22,28 @@ function broadcastSSE(data) {
   }
 }
 
+function proxyRequest(req, res, targetBase, pathRewrite) {
+  const targetUrl = new URL(pathRewrite || req.url, targetBase);
+  const options = {
+    hostname: targetUrl.hostname,
+    port: targetUrl.port,
+    path: targetUrl.pathname + targetUrl.search,
+    method: req.method,
+    headers: { ...req.headers, host: targetUrl.host },
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+  proxyReq.on('error', (err) => {
+    console.error('[Proxy Error]', err.message);
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error', details: err.message }));
+  });
+  req.pipe(proxyReq);
+}
+
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
@@ -27,7 +52,7 @@ const server = http.createServer((req, res) => {
   if (pathname.startsWith('/api/')) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
@@ -35,16 +60,48 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  if (req.method === 'GET' && (pathname === '/' || pathname === '/landing')) {
+  if (req.method === 'GET' && pathname === '/relay-demo') {
+    const filePath = path.join(__dirname, 'relay-demo.html');
+    fs.readFile(filePath, 'utf8', (err, data) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading relay demo page');
+        return;
+      }
+      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    });
+  } else if (req.method === 'GET' && pathname === '/shieldswap') {
+    const filePath = path.join(__dirname, 'shieldswap.html');
+    fs.readFile(filePath, 'utf8', (err, data) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading ShieldSwap demo page');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+  } else if (pathname.startsWith('/api/proxy/auth')) {
+    proxyRequest(req, res, API_URL, '/api/auth' + pathname.replace('/api/proxy/auth', ''));
+  } else if (pathname.startsWith('/api/proxy/dapps')) {
+    proxyRequest(req, res, API_URL, '/api/dapps' + pathname.replace('/api/proxy/dapps', ''));
+  } else if (pathname.startsWith('/api/relay/proof')) {
+    proxyRequest(req, res, RELAY_URL, '/api/v1/proof' + pathname.replace('/api/relay/proof', ''));
+  } else if (pathname.startsWith('/api/relay/nullifier')) {
+    proxyRequest(req, res, RELAY_URL, '/api/v1/nullifier' + pathname.replace('/api/relay/nullifier', ''));
+  } else if (req.method === 'GET' && (pathname === '/' || pathname === '/landing')) {
     const filePath = path.join(__dirname, 'landing.html');
-    fs.readFile(filePath, (err, data) => {
+    fs.readFile(filePath, 'utf8', (err, data) => {
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('Error loading demo page');
         return;
       }
+      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL);
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
+      res.end(html);
     });
   } else if (req.method === 'GET' && pathname.startsWith('/dist/')) {
     const filePath = path.join(__dirname, '..', pathname);
@@ -135,17 +192,25 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, received: parsedUrl.query }));
+  } else if (req.method === 'GET' && pathname === '/api/demo/config') {
+    // Return demo configuration (no credentials exposed)
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ready: true, tier: 'free' }));
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
+  const os = require('os');
+  const nets = os.networkInterfaces();
+  const ips = Object.values(nets).flat().filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
+  const host = ips[0] || 'localhost';
   console.log('ZKProofPort SDK Demo Server');
   console.log('========================');
-  console.log(`Demo:     http://localhost:${PORT}`);
-  console.log(`Callback: http://localhost:${PORT}/api/callback`);
-  console.log(`Events:   http://localhost:${PORT}/api/events`);
+  console.log(`Demo:     http://${host}:${PORT}`);
+  console.log(`Callback: http://${host}:${PORT}/api/callback`);
+  console.log(`Events:   http://${host}:${PORT}/api/events`);
   console.log('\nPress Ctrl+C to stop\n');
 });
