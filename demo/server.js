@@ -68,7 +68,9 @@ const server = http.createServer((req, res) => {
         res.end('Error loading relay demo page');
         return;
       }
-      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL);
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      const demoBaseUrl = `${proto}://${req.headers.host}`;
+      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL).replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
@@ -80,8 +82,11 @@ const server = http.createServer((req, res) => {
         res.end('Error loading ShieldSwap demo page');
         return;
       }
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      const demoBaseUrl = `${proto}://${req.headers.host}`;
+      const html = data.replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
+      res.end(html);
     });
   } else if (pathname.startsWith('/api/proxy/auth')) {
     proxyRequest(req, res, API_URL, '/api/auth' + pathname.replace('/api/proxy/auth', ''));
@@ -99,7 +104,9 @@ const server = http.createServer((req, res) => {
         res.end('Error loading demo page');
         return;
       }
-      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL);
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      const demoBaseUrl = `${proto}://${req.headers.host}`;
+      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL).replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
