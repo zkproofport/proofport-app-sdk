@@ -103,8 +103,8 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
-  } else if (req.method === 'GET' && pathname === '/og-image.svg') {
-    const filePath = path.join(__dirname, 'og-image.svg');
+  } else if (req.method === 'GET' && pathname === '/og-image.png') {
+    const filePath = path.join(__dirname, 'og-image.png');
     fs.readFile(filePath, (err, data) => {
       if (err) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -112,7 +112,7 @@ const server = http.createServer((req, res) => {
         return;
       }
       res.writeHead(200, {
-        'Content-Type': 'image/svg+xml',
+        'Content-Type': 'image/png',
         'Cache-Control': 'public, max-age=86400',
       });
       res.end(data);
