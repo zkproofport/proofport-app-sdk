@@ -4,6 +4,9 @@
     ".": {
       "release-type": "node",
       "npm-publish": false,
+      "include-component-in-tag": false,
+      "draft": false,
+      "prerelease": false,
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bug Fixes" },

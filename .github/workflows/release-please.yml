@@ -1,5 +1,5 @@
 # ZKProofPort SDK - Release Please Workflow
-# Automatically create release PR and publish GitHub Release when pushed to main branch
+# Automatically creates release PR and GitHub Release based on conventional commits
 
 name: Release Please
 
@@ -18,8 +18,8 @@ jobs:
     steps:
       - name: Run Release Please
         uses: googleapis/release-please-action@v4
+        id: release
         with:
-          # PAT required: org policy blocks GITHUB_TOKEN from creating PRs
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

@@ -1,197 +1,272 @@
-# @proofport/sdk
+# @zkproofport-app/sdk
 
-ProofPort SDK for requesting zero-knowledge proofs from the ProofPort mobile app and verifying them on-chain.
+> **Beta** — Currently deployed on **Base Sepolia (testnet)** only. APIs may change before the stable release.
 
-## Overview
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofPort](https://zkproofport.com) mobile app and verifying them on-chain.
 
-The ProofPort SDK enables web applications to:
+## How It Works
 
-1. Create proof requests for ZK circuits (Coinbase KYC attestations)
-2. Generate deep links or QR codes for users to complete proofs on mobile
-3. Handle proof responses and verify them on-chain via Ethereum smart contracts
+```
+┌──────────────┐     ┌─────────┐     ┌──────────────┐     ┌──────────────────┐
+│ Your Web App │────>│   SDK   │────>│ QR Code /    │────>│ ZKProofPort App  │
+│              │     │         │     │ Deep Link    │     │                  │
+│              │     │ creates │     │              │     │ - Connects wallet│
+│              │     │ request │     │ User scans / │     │ - Fetches data   │
+│              │     │         │     │ taps link    │     │ - Generates proof│
+└──────┬───────┘     └─────────┘     └──────────────┘     └────────┬─────────┘
+       │                                                           │
+       │  ┌─────────────────────────────────────────────────┐      │
+       │  │              Callback URL                       │<─────┘
+       │  │  (proof, publicInputs, nullifier, status)       │
+       │  └─────────────────────┬───────────────────────────┘
+       │                        │
+       v                        v
+┌──────────────┐     ┌──────────────────┐     ┌───────────────────┐
+│  SDK parses  │────>│  On-chain verify  │────>│  Access granted   │
+│  response    │     │  (Base Sepolia)   │     │  or denied        │
+└──────────────┘     └──────────────────┘     └───────────────────┘
+```
+
+1. Your app uses the SDK to create a proof request
+2. The SDK generates a QR code (desktop) or deep link (mobile) for the user
+3. The user opens the ZKProofPort app, which connects their wallet, fetches attestation data, and generates the ZK proof
+4. The app redirects to your callback URL with the proof result
+5. Your app uses the SDK to parse the response and verify the proof on-chain
 
 ## Installation
 
 ```bash
-npm install @proofport/sdk
+npm install @zkproofport-app/sdk@beta
+```
+
+> This package is published under the `beta` dist-tag. Use `@beta` to install.
+
+**Peer dependency:**
+
+```bash
+npm install ethers
+# Supports ethers >=5.7.0 || >=6.0.0
 ```
 
 ## Quick Start
 
 ```typescript
-import { ProofPortSDK } from '@proofport/sdk';
+import { ProofPortSDK } from '@zkproofport-app/sdk';
 
-// Create SDK instance
+// 1. Initialize SDK
 const sdk = new ProofPortSDK({
-  defaultCallbackUrl: 'https://myapp.com/verify'
+  defaultCallbackUrl: 'https://myapp.com/callback',
 });
 
-// Create Coinbase KYC request
+// 2. Create a proof request
 const request = sdk.createCoinbaseKycRequest({
-  // No inputs required - app handles wallet connection
+  scope: 'myapp.com',
 });
 
-// Generate deep link URL
-const deepLink = sdk.getDeepLinkUrl(request);
+// 3. Generate QR code (desktop) or deep link (mobile)
+const result = await sdk.requestProof(request);
 
-// Or generate QR code
-const qrDataUrl = await sdk.generateQRCode(request);
+if (result.mobile) {
+  // App opened directly on mobile
+} else {
+  // Show QR code for desktop users to scan
+  document.getElementById('qr').src = result.qrDataUrl;
+}
 
-// Open ProofPort app (browser only)
-sdk.openProofRequest(request);
+// 4. Parse the proof response from your callback endpoint
+const response = sdk.parseResponse(callbackUrl);
+
+if (response?.status === 'completed') {
+  console.log('Proof:', response.proof);
+  console.log('Nullifier:', response.nullifier);
+
+  // 5. Verify the proof on-chain
+  const verification = await sdk.verifyResponseOnChain(response);
+  console.log('Valid:', verification.valid);
+}
 ```
 
 ## Supported Circuits
 
-### coinbase_attestation
+### `coinbase_attestation`
 
-Proves Coinbase KYC identity verification without revealing the user's identity.
+Proves that a user has completed Coinbase KYC identity verification without revealing any personal information.
 
-- **Verifier Address**: Provided by the ProofPort app in the proof response
-- **Public Inputs**: `signal_hash`, `signer_list_merkle_root`, `scope`, `nullifier`
-- **Status**: Production-ready
+**Your inputs:**
 
-**Inputs:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier (e.g., your domain name). Used to generate a unique nullifier per app, preventing cross-app tracking. |
+
+> The ZKProofPort app handles wallet connection and attestation data retrieval automatically. You only need to provide the `scope`.
+
 ```typescript
-{
-  userAddress?: string;      // Optional - app will connect wallet if not provided
-  rawTransaction?: string;   // Optional - app can fetch from Etherscan
-}
+const request = sdk.createCoinbaseKycRequest({
+  scope: 'myapp.com',
+});
 ```
 
-### coinbase_country_attestation
+### `coinbase_country_attestation`
 
-Proves Coinbase country attestation without revealing the country.
+Proves a user's country based on Coinbase verification, supporting both inclusion and exclusion checks, without revealing the actual country.
 
-- **Verifier Address**: Provided by the ProofPort app in the proof response
-- **Public Inputs**: `signal_hash`, `signer_list_merkle_root`, `scope`, `nullifier`
-- **Status**: Production-ready
+**Your inputs:**
 
-## API Reference
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier (e.g., your domain name) |
+| `countryList` | `string[]` | Yes | ISO 3166-1 alpha-2 country codes (e.g., `['US', 'KR']`) |
+| `isIncluded` | `boolean` | Yes | `true` = prove user IS from listed countries; `false` = prove user is NOT |
 
-### ProofPortSDK Constructor
+> The ZKProofPort app handles wallet connection and attestation data retrieval automatically.
 
 ```typescript
-const sdk = new ProofPortSDK(config?: ProofPortConfig);
+// Prove the user is from the US or South Korea
+const request = sdk.createCoinbaseCountryRequest({
+  scope: 'myapp.com',
+  countryList: ['US', 'KR'],
+  isIncluded: true,
+});
+```
+
+## Integration Guide
+
+### Step 1: Initialize the SDK
+
+```typescript
+import { ProofPortSDK } from '@zkproofport-app/sdk';
+
+const sdk = new ProofPortSDK({
+  defaultCallbackUrl: 'https://myapp.com/callback',
+});
 ```
 
 **Configuration:**
-```typescript
-interface ProofPortConfig {
-  scheme?: string;                                    // Default: 'zkproofport'
-  defaultCallbackUrl?: string;                        // Default callback URL for all requests
-  verifiers?: Partial<Record<CircuitType, VerifierContract>>;  // Custom verifier contracts
-}
-```
 
-### Create Proof Requests
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `defaultCallbackUrl` | `string` | No | Default callback URL for receiving proof responses. Can be overridden per request. |
+| `verifiers` | `object` | No | Custom verifier contract addresses per circuit. See [Custom Verifier Contracts](#custom-verifier-contracts). |
+| `scheme` | `string` | No | Custom deep link URL scheme (default: `'zkproofport'`). For advanced use only. |
 
-#### createCoinbaseKycRequest(inputs, options?)
+### Step 2: Create a Proof Request
 
-Creates a Coinbase KYC verification request.
+Use circuit-specific methods to create a request:
 
 ```typescript
-const request = sdk.createCoinbaseKycRequest(
+// Coinbase KYC
+const kycRequest = sdk.createCoinbaseKycRequest(
+  { scope: 'myapp.com' },
   {
-    // No inputs required - app handles wallet connection
-  },
-  {
-    callbackUrl: 'https://myapp.com/callback',  // Optional
-    message: 'Please verify with Coinbase',      // Optional
-    dappName: 'My App',                          // Optional
-    dappIcon: 'https://myapp.com/icon.png',      // Optional
-    expiresInMs: 600000                          // Optional: 10 minutes default
+    callbackUrl: 'https://myapp.com/callback',
+    message: 'Please verify your identity',
+    dappName: 'My DApp',
+    dappIcon: 'https://myapp.com/icon.png',
+    expiresInMs: 600000,  // 10 minutes (default)
   }
+);
+
+// Coinbase Country
+const countryRequest = sdk.createCoinbaseCountryRequest(
+  {
+    scope: 'myapp.com',
+    countryList: ['US', 'KR'],
+    isIncluded: true,
+  },
+  { dappName: 'My DApp' }
 );
 ```
 
-#### createProofRequest(circuit, inputs, options?)
-
-Generic proof request creation.
+For dynamic circuit selection at runtime, use the generic method:
 
 ```typescript
-const request = sdk.createProofRequest('coinbase_attestation', inputs, options);
+const request = sdk.createProofRequest('coinbase_attestation', { scope: 'myapp.com' });
 ```
 
-### Deep Link Generation
+**Request options** (second argument, shared across all creation methods):
 
-#### getDeepLinkUrl(request)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `callbackUrl` | `string` | No | URL to redirect after proof generation. Overrides `defaultCallbackUrl`. |
+| `message` | `string` | No | Custom message displayed to the user in the ZKProofPort app |
+| `dappName` | `string` | No | Your app name shown in the ZKProofPort app |
+| `dappIcon` | `string` | No | Your app icon URL shown in the ZKProofPort app |
+| `expiresInMs` | `number` | No | Request expiration in milliseconds (default: `600000` = 10 minutes) |
 
-Generates a deep link URL for a proof request.
+### Step 3: Display QR Code or Open App
+
+#### `requestProof(request, qrOptions?)` -- recommended
+
+Automatically detects the platform: opens the app on mobile, generates a QR code on desktop.
 
 ```typescript
-const deepLink = sdk.getDeepLinkUrl(request);
-// Returns: zkproofport://proof-request?data=<encoded_request>
+const result = await sdk.requestProof(request, { width: 400 });
 ```
 
-#### openProofRequest(request)
+**Return fields:**
 
-Opens the ProofPort app with a proof request (browser only).
+| Field | Type | Description |
+|-------|------|-------------|
+| `deepLink` | `string` | The `zkproofport://` deep link URL |
+| `qrDataUrl` | `string \| undefined` | PNG data URL of the QR code. Only present on desktop (`mobile === false`). |
+| `mobile` | `boolean` | `true` if the app was opened directly on mobile |
+
+#### `generateQRCode(requestOrUrl, options?)`
+
+Generates a QR code as a PNG data URL. Accepts a `ProofRequest` or a deep link URL string.
 
 ```typescript
-sdk.openProofRequest(request);
+const dataUrl = await sdk.generateQRCode(request, { width: 300 });
+document.getElementById('qr').src = dataUrl;
 ```
 
-### QR Code Generation
+**QR code options:**
 
-#### generateQRCode(request, options?)
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `width` | `number` | `300` | Width in pixels |
+| `errorCorrectionLevel` | `'L'\|'M'\|'Q'\|'H'` | `'M'` | Error correction level |
+| `margin` | `number` | `4` | Quiet zone margin |
+| `darkColor` | `string` | `'#000000'` | Foreground color |
+| `lightColor` | `string` | `'#ffffff'` | Background color |
 
-Generates QR code as data URL.
+**Other QR methods:**
 
-```typescript
-const qrDataUrl = await sdk.generateQRCode(request, {
-  width: 300,
-  errorCorrectionLevel: 'M',
-  margin: 2,
-  darkColor: '#000000',
-  lightColor: '#ffffff'
-});
+- **`generateQRCodeSVG(requestOrUrl, options?)`** -- Returns an SVG string instead of a PNG data URL.
+- **`renderQRCodeToCanvas(canvas, requestOrUrl, options?)`** -- Renders directly onto an `HTMLCanvasElement`.
+- **`checkQRCodeSize(requestOrUrl)`** -- Checks whether the encoded request fits within QR code data limits. Returns `{ size, withinLimit }`.
 
-// Use in HTML
-document.getElementById('qr').src = qrDataUrl;
-```
+### Step 4: Handle the Callback
 
-#### generateQRCodeSVG(request, options?)
+When the user completes proof generation, the ZKProofPort app redirects to your callback URL with query parameters containing the result.
 
-Generates QR code as SVG string.
+#### `parseResponse(url)`
 
-```typescript
-const svgString = await sdk.generateQRCodeSVG(request);
-```
-
-#### renderQRCodeToCanvas(canvas, request, options?)
-
-Renders QR code directly to canvas element.
+Parses the callback URL into a structured response object.
 
 ```typescript
-const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
-await sdk.renderQRCodeToCanvas(canvas, request);
-```
-
-### Response Handling
-
-#### parseResponse(url)
-
-Parses proof response from callback URL.
-
-```typescript
+// In your callback endpoint
 const response = sdk.parseResponse(callbackUrl);
-
-interface ProofResponse {
-  requestId: string;
-  circuit: 'coinbase_attestation' | 'coinbase_country_attestation';
-  status: 'completed' | 'error' | 'cancelled' | 'pending';
-  proof?: string;              // Hex string with 0x prefix
-  publicInputs?: string[];     // Array of hex strings
-  numPublicInputs?: number;
-  error?: string;              // Error message if status is 'error'
-  timestamp?: number;
-}
 ```
 
-#### isProofPortResponse(url)
+Returns `ProofResponse | null`.
 
-Checks if a URL is a ProofPort response.
+**ProofResponse fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `requestId` | `string` | Matches the original request ID |
+| `circuit` | `CircuitType` | Circuit used for proof generation |
+| `status` | `'completed' \| 'error' \| 'cancelled'` | Result status |
+| `proof` | `string` | Hex-encoded proof (when status is `'completed'`) |
+| `publicInputs` | `string[]` | Public inputs array (when status is `'completed'`) |
+| `nullifier` | `string` | Unique nullifier for duplicate detection |
+| `timestamp` | `number` | Unix timestamp (ms) when the proof was generated |
+| `error` | `string` | Error message (when status is `'error'`) |
+
+#### `isProofPortResponse(url)`
+
+Checks if a URL contains ZKProofPort response parameters. Useful for filtering incoming requests.
 
 ```typescript
 if (sdk.isProofPortResponse(url)) {
@@ -199,305 +274,180 @@ if (sdk.isProofPortResponse(url)) {
 }
 ```
 
-### Proof Verification
+#### Request tracking
 
-#### verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)
+The SDK caches created requests in memory so you can match responses to requests:
 
-Verifies a proof on-chain via smart contract.
+- **`getPendingRequest(requestId)`** -- Retrieves the original `ProofRequest` by ID.
+- **`clearPendingRequest(requestId)`** -- Removes a request from the cache after processing.
+
+```typescript
+const original = sdk.getPendingRequest(response.requestId);
+// ... process ...
+sdk.clearPendingRequest(response.requestId);
+```
+
+### Step 5: Verify On-Chain
+
+#### `verifyResponseOnChain(response, providerOrSigner?)` -- recommended
+
+The simplest way to verify a proof. Pass the entire `ProofResponse` object and the SDK handles everything.
+
+```typescript
+if (response?.status === 'completed') {
+  const result = await sdk.verifyResponseOnChain(response);
+
+  if (result.valid) {
+    console.log('Proof verified on-chain!');
+  } else {
+    console.error('Verification failed:', result.error);
+  }
+}
+```
+
+Returns `Promise<{ valid: boolean; error?: string }>`.
+
+If no `providerOrSigner` is provided, the SDK uses a default public RPC endpoint based on the chain ID in the response.
+
+#### `verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` -- lower-level
+
+For cases where you need more control over the verification parameters:
 
 ```typescript
 const result = await sdk.verifyOnChain(
-  'coinbase_attestation',
-  '0x...',  // proof hex string
-  ['0x...', '0x...'],  // public inputs as hex strings
-  provider  // Optional: ethers.Provider or ethers.Signer
+  response.circuit,
+  response.proof,
+  response.publicInputs,
+  provider  // optional ethers Provider or Signer
 );
-
-// Returns: { valid: boolean; error?: string }
 ```
 
-#### verifyResponseOnChain(response, providerOrSigner?)
+Returns `Promise<{ valid: boolean; error?: string }>`.
 
-Verifies a complete proof response on-chain.
+## Advanced Usage
+
+### Custom Verifier Contracts
+
+By default, the SDK uses the verifier address returned by the ZKProofPort app in the proof response. To override with your own deployed verifier contracts:
 
 ```typescript
-const response = sdk.parseResponse(callbackUrl);
+import { ProofPortSDK, VERIFIER_ABI } from '@zkproofport-app/sdk';
+
+const sdk = new ProofPortSDK({
+  defaultCallbackUrl: 'https://myapp.com/callback',
+  verifiers: {
+    coinbase_attestation: {
+      address: '0xYourVerifierAddress',
+      chainId: 8453,
+      abi: VERIFIER_ABI,
+    },
+  },
+});
+```
+
+**VerifierContract fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `address` | `string` | Yes | Verifier contract address (checksummed) |
+| `chainId` | `number` | Yes | Chain ID where the contract is deployed |
+| `abi` | `string[]` | Yes | Contract ABI for the verify function |
+
+Custom verifier configuration takes priority over the verifier address returned in the proof response.
+
+### Nullifier Duplicate Detection
+
+Nullifiers prevent the same user from submitting duplicate proofs for the same scope. The SDK provides utilities for checking nullifier status on-chain:
+
+```typescript
+import { isNullifierRegistered, getNullifierInfo } from '@zkproofport-app/sdk';
+
+// Check if a nullifier has already been used
+const isUsed = await isNullifierRegistered(nullifier, registryAddress, provider);
+if (isUsed) {
+  console.log('Duplicate proof detected');
+}
+
+// Get detailed registration info
+const info = await getNullifierInfo(nullifier, registryAddress, provider);
+if (info) {
+  console.log('Registered at:', new Date(info.registeredAt * 1000));
+}
+```
+
+### ethers v5/v6 Compatibility
+
+The SDK works with both ethers v5 and v6. Provider/signer instances from either version can be passed to verification methods.
+
+**ethers v6:**
+
+```typescript
+import { ethers } from 'ethers';
+
+const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const result = await sdk.verifyResponseOnChain(response, provider);
 ```
 
-### Utility Methods
-
-#### getVerifierAddress(circuit)
-
-Gets the verifier contract address for a circuit (requires verifier configuration in SDK config).
+**ethers v5:**
 
 ```typescript
-const address = sdk.getVerifierAddress('coinbase_attestation');
-// Returns the address configured via SDK verifiers option
-```
-
-#### getVerifierChainId(circuit)
-
-Gets the chain ID where the verifier is deployed (requires verifier configuration in SDK config).
-
-```typescript
-const chainId = sdk.getVerifierChainId('coinbase_attestation');
-// Returns the chainId configured via SDK verifiers option
-```
-
-#### getCircuitMetadata(circuit)
-
-Gets metadata about a circuit.
-
-```typescript
-const metadata = sdk.getCircuitMetadata('coinbase_attestation');
-// Returns: { name, description, publicInputsCount, publicInputNames }
-```
-
-#### getSupportedCircuits()
-
-Gets all supported circuit types.
-
-```typescript
-const circuits = sdk.getSupportedCircuits();
-// Returns: ['coinbase_attestation', 'coinbase_country_attestation']
-```
-
-#### validateRequest(request)
-
-Validates a proof request structure.
-
-```typescript
-const validation = sdk.validateRequest(request);
-// Returns: { valid: boolean; error?: string }
-```
-
-## Deep Link Protocol
-
-The SDK uses the `zkproofport://` scheme for deep linking.
-
-**Format:**
-```
-zkproofport://proof-request?data=<base64url_encoded_request>
-```
-
-**Request structure (encoded):**
-```json
-{
-  "requestId": "req-...",
-  "circuit": "coinbase_attestation",
-  "inputs": { ... },
-  "callbackUrl": "https://myapp.com/callback",
-  "message": "Please verify with Coinbase",
-  "dappName": "My App",
-  "dappIcon": "https://myapp.com/icon.png",
-  "createdAt": 1234567890,
-  "expiresAt": 1234567890
-}
-```
-
-**Response (callback URL):**
-```
-https://myapp.com/callback?requestId=req-...&status=completed&proof=0x...&publicInputs=0x...,0x...
-```
-
-## Demo
-
-Run the included demo server to test the SDK:
-
-```bash
-npm run demo
-```
-
-Visit `http://localhost:3333` in your browser.
-
-**Demo Features:**
-- Create Coinbase KYC requests
-- Generate QR codes and deep links
-- Poll for proof results from the mobile app
-- Verify proofs on-chain (Sepolia testnet)
-
-**Endpoints:**
-- `GET /` - Demo page
-- `POST /callback` - Receive proof from app
-- `GET /status/:requestId` - Poll for result
-
-## Development
-
-**Install dependencies:**
-```bash
-npm install
-```
-
-**Build SDK:**
-```bash
-npm run build
-```
-
-Output is in `dist/` directory.
-
-**Watch mode:**
-```bash
-npm run dev
-```
-
-**Run tests:**
-```bash
-npm test
-```
-
-**Run demo:**
-```bash
-npm run demo
-```
-
-## Integration Guide
-
-### 1. Initialize SDK
-
-```typescript
-const sdk = new ProofPortSDK({
-  defaultCallbackUrl: 'https://myapp.com/api/proof-callback',
-  scheme: 'zkproofport'  // Optional: custom scheme
-});
-```
-
-### 2. Create Proof Request
-
-```typescript
-const request = sdk.createCoinbaseKycRequest(
-  {
-    // No inputs required - app handles wallet connection
-  },
-  {
-    message: 'Please verify with Coinbase to continue'
-  }
-);
-```
-
-### 3. Show User Options
-
-```typescript
-// Option A: Deep link
-const deepLink = sdk.getDeepLinkUrl(request);
-// Show button: <a href={deepLink}>Open ProofPort</a>
-
-// Option B: QR code
-const qrUrl = await sdk.generateQRCode(request);
-// Show QR code image: <img src={qrUrl} />
-```
-
-### 4. Handle Callback
-
-```typescript
-// In your callback endpoint
-app.post('/api/proof-callback', (req, res) => {
-  const { requestId, status, proof, publicInputs } = req.body;
-
-  if (status === 'completed') {
-    // Store proof and public inputs
-    // Verify on-chain when needed
-
-    const result = await sdk.verifyOnChain(
-      'coinbase_attestation',
-      proof,
-      publicInputs.split(',')
-    );
-
-    if (result.valid) {
-      // User is verified!
-    }
-  }
-
-  res.json({ success: true });
-});
-```
-
-### 5. Verify On-Chain (Optional)
-
-```typescript
-// Use ethers.js provider
 import { ethers } from 'ethers';
 
-const provider = new ethers.JsonRpcProvider(
-  'https://sepolia.infura.io/v3/...'
-);
-
-const result = await sdk.verifyOnChain(
-  'coinbase_attestation',
-  proof,
-  publicInputs,
-  provider
-);
-
-if (result.valid) {
-  console.log('Proof verified on Sepolia!');
-} else {
-  console.log('Proof verification failed:', result.error);
-}
+const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
+const result = await sdk.verifyResponseOnChain(response, provider);
 ```
+
+### Network Configuration
+
+The SDK includes pre-configured public RPC endpoints:
+
+| Network | Chain ID | RPC Endpoint | Status |
+|---------|----------|--------------|--------|
+| Base Sepolia (testnet) | 84532 | `https://sepolia.base.org` | Active (Beta) |
+| Base Mainnet | 8453 | `https://mainnet.base.org` | Coming soon |
+
+When no provider is passed to verification methods, the SDK automatically uses the appropriate RPC endpoint based on the chain ID from the proof response.
 
 ## Types
 
-All TypeScript types are exported from the SDK:
+All public types are exported from the package:
+
+| Type | Description |
+|------|-------------|
+| `CircuitType` | Supported circuit identifiers (`'coinbase_attestation' \| 'coinbase_country_attestation'`) |
+| `ProofRequest` | Proof request sent to the ZKProofPort app |
+| `ProofResponse` | Proof response received from the ZKProofPort app |
+| `ProofRequestStatus` | Request lifecycle status (`'pending' \| 'completed' \| 'error' \| 'cancelled'`) |
+| `ProofPortConfig` | SDK configuration options |
+| `QRCodeOptions` | QR code generation options |
+| `VerifierContract` | Custom verifier contract configuration |
+| `CoinbaseKycInputs` | Inputs for `coinbase_attestation` circuit |
+| `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation` circuit |
+| `NullifierRecord` | On-chain nullifier registration record |
 
 ```typescript
 import type {
   CircuitType,
   ProofRequest,
   ProofResponse,
-  CoinbaseKycInputs,
+  ProofRequestStatus,
+  ProofPortConfig,
   QRCodeOptions,
   VerifierContract,
-  ProofPortConfig
-} from '@proofport/sdk';
+  CoinbaseKycInputs,
+  CoinbaseCountryInputs,
+  NullifierRecord,
+} from '@zkproofport-app/sdk';
 ```
 
-## Error Handling
+## Development
 
-```typescript
-try {
-  const result = await sdk.verifyOnChain(circuit, proof, publicInputs);
-
-  if (!result.valid) {
-    console.error('Proof is invalid:', result.error);
-  }
-} catch (error) {
-  console.error('Verification error:', error.message);
-}
+```bash
+npm install       # Install dependencies
+npm run build     # Build SDK (output in dist/)
+npm run dev       # Watch mode
+npm test          # Run tests
 ```
-
-## Network Configuration
-
-The SDK supports multiple networks via configuration:
-
-```typescript
-const sdk = new ProofPortSDK({
-  verifiers: {
-    coinbase_attestation: {
-      address: '0x...',
-      chainId: 1,  // Mainnet
-      abi: [...]
-    }
-  }
-});
-```
-
-By default, it uses Sepolia testnet verifiers.
-
-## Monorepo Structure
-
-This SDK is part of the `proofport-app-dev` ecosystem:
-
-- **circuits/** - Noir ZK circuit implementations
-- **proofport-app/** - React Native mobile app
-- **proofport-app-sdk/** - This SDK (TypeScript)
-- **proofport-relay/** - Express + Socket.IO relay server
-- **proofport-api/** - Fastify + PostgreSQL backend
-- **proofport-dashboard/** - Next.js admin dashboard
-- **mopro/** - Rust mobile ZK library
-
-See the root README for the complete architecture.
 
 ## License
 
