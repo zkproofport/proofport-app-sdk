@@ -79,7 +79,7 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, 'utf8', (err, data) => {
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Error loading ShieldSwap demo page');
+        res.end('Error loading ZKPSwap demo page');
         return;
       }
       const proto = req.headers['x-forwarded-proto'] || 'http';

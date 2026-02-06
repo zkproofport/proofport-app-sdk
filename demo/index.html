@@ -440,7 +440,7 @@
         const message = document.getElementById('kyc-message').value;
 
         currentRequest = sdk.createCoinbaseKycRequest(
-          {},
+          { scope: 'zkproofport:demo' },
           {
             callbackUrl,
             dappName: dappName || undefined,

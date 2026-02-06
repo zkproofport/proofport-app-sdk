@@ -881,7 +881,7 @@
         <nav>
           <a href="/landing#demo-kyc">Callback Demo</a>
           <a href="/relay-demo" class="active">Relay Demo</a>
-          <a href="/shieldswap">ShieldSwap</a>
+          <a href="/shieldswap">ZKPSwap</a>
           <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:#06b6d4;border:1px solid #06b6d4;padding:0.25rem 0.75rem;border-radius:6px;">Dashboard</a>
         </nav>
       </div>
@@ -905,7 +905,7 @@
       <div class="card">
         <div style="text-align: center; padding: 20px;">
           <p style="color: var(--gray-400); margin-bottom: 16px;">Demo account is ready to use. Click below to start.</p>
-          <button class="btn btn-primary" onclick="initDemo()" id="btn-init-demo">Initialize Demo</button>
+          <button class="btn btn-primary" id="btn-init-demo">Initialize Demo</button>
           <div id="demo-status" style="margin-top: 16px; display: none;"></div>
         </div>
         <div class="form-group" style="margin-top: 16px;">
@@ -935,7 +935,21 @@
           <input type="text" id="scope-input" value="proofport:demo:relay" placeholder="proofport:demo:relay">
           <p class="note" id="scope-note" style="display: none;">Note: Free tier will replace scope with noop</p>
         </div>
-        <button class="btn btn-primary" onclick="requestProof()" id="btn-request-proof" disabled>Request Proof</button>
+        <div id="country-inputs" style="display: none;">
+          <div class="form-group">
+            <label>Country List</label>
+            <input type="text" id="country-list-input" placeholder="US, KR">
+            <p class="note">Comma-separated ISO 3166-1 alpha-2 codes. Press Tab to autocomplete placeholder.</p>
+          </div>
+          <div class="form-group">
+            <label>Is Included</label>
+            <select id="is-included-select">
+              <option value="true">true — prove user IS from listed countries</option>
+              <option value="false">false — prove user is NOT from listed countries</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-request-proof" disabled>Request Proof</button>
 
         <div id="proof-request-result" style="display: none;">
           <div class="qr-container" id="qr-container"></div>
@@ -1155,6 +1169,26 @@
       const sel = document.getElementById('plan-select');
       if (sel) sel.value = state.clientId;
       // Dashboard link URL is injected server-side via __DASHBOARD_URL__ placeholder
+
+      // Bind buttons (module scripts are deferred, so inline onclick may fire before module loads)
+      document.getElementById('btn-init-demo').addEventListener('click', () => window.initDemo());
+      document.getElementById('btn-request-proof').addEventListener('click', () => window.requestProof());
+
+      // Show/hide country inputs based on circuit selection
+      const circuitSelect = document.getElementById('circuit-select');
+      circuitSelect.addEventListener('change', function() {
+        document.getElementById('country-inputs').style.display =
+          this.value === 'coinbase_country_attestation' ? 'block' : 'none';
+      });
+
+      // Tab autocomplete: fill placeholder value when Tab is pressed on empty input
+      const countryInput = document.getElementById('country-list-input');
+      countryInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab' && !this.value && this.placeholder) {
+          e.preventDefault();
+          this.value = this.placeholder;
+        }
+      });
     }
 
     function updateTierBadge() {
@@ -1306,11 +1340,23 @@
 
         console.log('[requestProof] START', { clientId: state.clientId, circuit, scope, baseUrl, dappCallbackUrl });
 
+        const inputs = { scope };
+        if (circuit === 'coinbase_country_attestation') {
+          const countryListStr = document.getElementById('country-list-input').value;
+          const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+          if (countryList.length === 0) {
+            alert('Country List is required for country attestation');
+            return;
+          }
+          inputs.countryList = countryList;
+          inputs.isIncluded = document.getElementById('is-included-select').value === 'true';
+        }
+
         const requestBody = {
           clientId: state.clientId,
           circuitId: circuit,
           scope,
-          inputs: { scope },
+          inputs,
           callbackUrl: dappCallbackUrl
         };
 
@@ -1360,7 +1406,7 @@
 
         // Show deep link button on mobile, QR on desktop
         const isMobile = isMobileDevice();
-        console.log('[requestProof] isMobile:', isMobile, 'userAgent:', navigator.userAgent.substring(0, 80));
+        console.log('[requestProof] isMobile:', isMobile, 'userAgent:', navigator.userAgent);
 
         if (isMobile) {
           document.getElementById('qr-container').innerHTML = `<a href="${data.deepLink}" class="btn btn-primary open-app-btn">Open ZKProofPort App</a>`;
@@ -1401,12 +1447,12 @@
             console.log('[polling] COMPLETED! Full data:', JSON.stringify(data, null, 2));
             logApi('PROOF_COMPLETED', `/api/relay/proof/${requestId}`, data, 200);
             showProofResult(data);
-          } else if (data.status === 'failed') {
+          } else if (data.status === 'failed' || data.status === 'error') {
             clearInterval(state.pollInterval);
-            console.error('[polling] FAILED!', data.error);
+            console.error(`[polling] ${data.status.toUpperCase()}!`, JSON.stringify(data, null, 2));
             document.getElementById('status-pending').className = 'status-box error';
-            document.getElementById('status-pending').innerHTML = `Proof generation failed: ${data.error || 'Unknown error'}`;
-            logEvent('PROOF_FAILED', data.error || 'Unknown error');
+            document.getElementById('status-pending').innerHTML = `Proof ${data.status}: ${data.error || 'Unknown error'}`;
+            logEvent(`PROOF_${data.status.toUpperCase()}`, data.error || 'Unknown error');
           }
         } catch (err) {
           console.error(`[polling #${pollCount}] Error:`, err);

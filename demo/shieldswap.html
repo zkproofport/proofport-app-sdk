@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ShieldSwap - Compliant Decentralized Exchange</title>
+  <title>ZKPSwap - Compliant Decentralized Exchange</title>
   <!-- OpenGraph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ShieldSwap - Compliant Decentralized Exchange">
-  <meta property="og:description" content="Privacy-preserving DEX with KYC compliance powered by ZKProofPort zero-knowledge proofs.">
-  <meta property="og:site_name" content="ZKProofPort">
+  <meta property="og:title" content="ZKPSwap - Compliant Decentralized Exchange">
+  <meta property="og:description" content="Privacy-preserving DEX with KYC compliance powered by ZKProofport zero-knowledge proofs.">
+  <meta property="og:site_name" content="ZKProofport">
   <meta property="og:url" content="__DEMO_BASE_URL__/shieldswap">
   <meta property="og:image" content="__DEMO_BASE_URL__/og-image.png">
   <meta property="og:image:width" content="1200">
@@ -16,10 +16,10 @@
   <meta property="og:image:type" content="image/png">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ShieldSwap - Compliant Decentralized Exchange">
-  <meta name="twitter:description" content="Privacy-preserving DEX with KYC compliance powered by ZKProofPort zero-knowledge proofs.">
+  <meta name="twitter:title" content="ZKPSwap - Compliant Decentralized Exchange">
+  <meta name="twitter:description" content="Privacy-preserving DEX with KYC compliance powered by ZKProofport zero-knowledge proofs.">
   <meta name="twitter:image" content="__DEMO_BASE_URL__/og-image.png">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2L4 8v8c0 7.7 5.1 14.9 12 16 6.9-1.1 12-8.3 12-16V8L16 2z' fill='%2310b981'/><path d='M13 16l3 3 5-5' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="icon" href="https://avatars.githubusercontent.com/u/230663424?s=32&v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -271,20 +271,22 @@
     /* ========== SWAP CARD ========== */
     .swap-card {
       width: 100%;
-      max-width: 480px;
+      max-width: 520px;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: var(--radius-xl);
       padding: 16px;
       box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
 
     .swap-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      padding: 0 4px;
+      gap: 8px;
+      margin-bottom: 12px;
     }
 
     .swap-title {
@@ -352,7 +354,9 @@
 
     .slippage-options {
       display: flex;
-      gap: 6px;
+      gap: 10px;
+      flex: 1;
+      justify-content: flex-end;
     }
 
     .slippage-btn {
@@ -552,6 +556,7 @@
       justify-content: center;
       position: relative;
       height: 0;
+      margin: 6px 0;
       z-index: 2;
     }
 
@@ -613,7 +618,7 @@
       align-items: center;
       gap: 8px;
       padding: 10px 14px;
-      margin-top: 8px;
+      margin-top: 12px;
       background: var(--warning-dim);
       border: 1px solid rgba(245, 158, 11, 0.2);
       border-radius: var(--radius-md);
@@ -635,7 +640,7 @@
     .swap-btn {
       width: 100%;
       padding: 16px;
-      margin-top: 8px;
+      margin-top: 12px;
       background: var(--accent);
       border: none;
       border-radius: var(--radius-lg);
@@ -1436,17 +1441,8 @@
   <header class="header">
     <div class="header-left">
       <a href="#" class="logo">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M16 2L4 8v8c0 7.7 5.1 14.9 12 16 6.9-1.1 12-8.3 12-16V8L16 2z" fill="url(#shield-grad)"/>
-          <path d="M13 16l3 3 5-5" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <defs>
-            <linearGradient id="shield-grad" x1="4" y1="2" x2="28" y2="32">
-              <stop stop-color="#10b981"/>
-              <stop offset="1" stop-color="#059669"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <span class="logo-text">ShieldSwap</span>
+        <img src="https://avatars.githubusercontent.com/u/230663424?s=200&v=4" alt="ZKPSwap" style="width: 28px; height: 28px; border-radius: 6px;">
+        <span class="logo-text">ZKPSwap</span>
       </a>
       <div class="network-badge">
         <span class="network-dot"></span>
@@ -1454,7 +1450,7 @@
       </div>
     </div>
     <div class="header-right">
-      <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-right: 8px;">ZKProofPort</a>
+      <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-right: 8px;">ZKProofport</a>
       <div id="kycBadge" class="kyc-badge">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.85 2.55 7.45 6 8 3.45-.55 6-4.15 6-8V4L8 1z" fill="currentColor"/><path d="M6.5 8l1.5 1.5 2.5-2.5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Verified
@@ -1473,20 +1469,17 @@
     <div class="swap-card">
       <div class="swap-header">
         <span class="swap-title">Swap</span>
-        <button class="settings-btn" onclick="toggleSettings(event)" aria-label="Settings">
+        <div class="settings-btn" onclick="toggleSettings(event)" role="button" tabindex="0" aria-label="Settings">
           <svg viewBox="0 0 20 20" fill="none"><path d="M8.325 2.317a1 1 0 011.35 0l.675.62a1 1 0 00.88.26l.895-.18a1 1 0 011.16.672l.28.866a1 1 0 00.62.62l.866.28a1 1 0 01.672 1.16l-.18.895a1 1 0 00.26.88l.62.675a1 1 0 010 1.35l-.62.675a1 1 0 00-.26.88l.18.895a1 1 0 01-.672 1.16l-.866.28a1 1 0 00-.62.62l-.28.866a1 1 0 01-1.16.672l-.895-.18a1 1 0 00-.88.26l-.675.62a1 1 0 01-1.35 0l-.675-.62a1 1 0 00-.88-.26l-.895.18a1 1 0 01-1.16-.672l-.28-.866a1 1 0 00-.62-.62l-.866-.28a1 1 0 01-.672-1.16l.18-.895a1 1 0 00-.26-.88l-.62-.675a1 1 0 010-1.35l.62-.675a1 1 0 00.26-.88l-.18-.895a1 1 0 01.672-1.16l.866-.28a1 1 0 00.62-.62l.28-.866a1 1 0 011.16-.672l.895.18a1 1 0 00.88-.26l.675-.62z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-          <div id="settingsPopover" class="settings-popover">
-            <div class="settings-label">Slippage Tolerance</div>
-            <div class="slippage-options">
-              <button class="slippage-btn" data-slippage="0.1" onclick="setSlippage(0.1, event)">0.1%</button>
-              <button class="slippage-btn active" data-slippage="0.5" onclick="setSlippage(0.5, event)">0.5%</button>
-              <button class="slippage-btn" data-slippage="1.0" onclick="setSlippage(1.0, event)">1.0%</button>
-              <div class="slippage-custom">
-                <input type="text" id="slippageCustom" placeholder="Custom" oninput="handleCustomSlippage(event)" onclick="event.stopPropagation()">
-              </div>
-            </div>
+        </div>
+        <div class="slippage-options">
+          <button class="slippage-btn" data-slippage="0.1" onclick="setSlippage(0.1, event)">0.1%</button>
+          <button class="slippage-btn active" data-slippage="0.5" onclick="setSlippage(0.5, event)">0.5%</button>
+          <button class="slippage-btn" data-slippage="1.0" onclick="setSlippage(1.0, event)">1.0%</button>
+          <div class="slippage-custom">
+            <input type="text" id="slippageCustom" placeholder="Custom" oninput="handleCustomSlippage(event)" onclick="event.stopPropagation()">
           </div>
-        </button>
+        </div>
       </div>
 
       <!-- FROM token -->
@@ -1516,7 +1509,7 @@
       </div>
 
       <!-- TO token -->
-      <div class="token-input-wrapper" style="margin-top: -2px;">
+      <div class="token-input-wrapper">
         <div class="token-input-box">
           <div class="token-input-label">You receive</div>
           <div class="token-input-row">
@@ -1549,7 +1542,7 @@
       <!-- KYC warning -->
       <div id="kycWarning" class="kyc-warning">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6v3M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>Swaps over $5 require identity verification</span>
+        <span>Swaps over 5 ETH require identity verification</span>
       </div>
 
       <!-- Swap button -->
@@ -1607,14 +1600,14 @@
         <div id="kycQrSection" class="kyc-qr-section">
           <div class="kyc-qr-card">
             <img id="kycQrImage" alt="QR Code" src="">
-            <span class="kyc-qr-hint">Scan with ZKProofPort app</span>
+            <span class="kyc-qr-hint">Scan with ZKProofport app</span>
           </div>
 
           <div class="kyc-divider"><span>or</span></div>
 
           <button id="kycOpenBtn" class="kyc-open-btn" onclick="openProofPortApp()">
             <svg viewBox="0 0 18 18" fill="none"><path d="M6 3H4a2 2 0 00-2 2v2m0 4v2a2 2 0 002 2h2m4 0h2a2 2 0 002-2v-2m0-4V5a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Open ZKProofPort App
+            Open ZKProofport App
           </button>
         </div>
 
@@ -1626,7 +1619,7 @@
         <div class="kyc-steps">
           <div class="kyc-step">
             <div class="kyc-step-num">1</div>
-            <div class="kyc-step-text">ZKProofPort connects to your wallet</div>
+            <div class="kyc-step-text">ZKProofport connects to your wallet</div>
           </div>
           <div class="kyc-step">
             <div class="kyc-step-num">2</div>
@@ -1638,7 +1631,7 @@
           </div>
           <div class="kyc-step">
             <div class="kyc-step-num">4</div>
-            <div class="kyc-step-text">ShieldSwap verifies without seeing your identity</div>
+            <div class="kyc-step-text">ZKPSwap verifies without seeing your identity</div>
           </div>
         </div>
       </div>
@@ -1702,7 +1695,7 @@
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">KYC threshold</span>
-            <span class="dev-config-value">$5</span>
+            <span class="dev-config-value">5 ETH</span>
           </div>
           <div class="dev-config-row">
             <span class="dev-config-label">Callback URL</span>
@@ -1754,21 +1747,9 @@
     let lastProofData = null;
     let lastRequestData = null;
 
-    // Load token balances from session if previously swapped
-    // Only restore if saved balances are from the same default set (prevents stale cache)
-    const savedBalances = sessionStorage.getItem('tokenBalances');
-    const savedDefaults = sessionStorage.getItem('tokenDefaultBalances');
-    const currentDefaults = JSON.stringify(Object.fromEntries(Object.entries(TOKENS).map(([k,v]) => [k, v.balance])));
-    if (savedBalances && savedDefaults === currentDefaults) {
-      const parsed = JSON.parse(savedBalances);
-      Object.keys(parsed).forEach(k => {
-        if (TOKENS[k]) TOKENS[k].balance = parsed[k];
-      });
-    } else {
-      // Defaults changed — clear stale session data
-      sessionStorage.removeItem('tokenBalances');
-      sessionStorage.setItem('tokenDefaultBalances', currentDefaults);
-    }
+    // Always start with default balances on page load (reset on refresh)
+    sessionStorage.removeItem('tokenBalances');
+    sessionStorage.removeItem('tokenDefaultBalances');
 
     // ========== UTILITY FUNCTIONS ==========
 
@@ -1877,9 +1858,6 @@
         return;
       }
       const display = { ...lastProofData };
-      if (display.proof && display.proof.length > 100) {
-        display.proof = display.proof.substring(0, 100) + '...';
-      }
       el.innerHTML = syntaxHighlightJson(JSON.stringify(display, null, 2));
     }
 
@@ -1958,7 +1936,7 @@
       infoEl.style.display = 'flex';
 
       // KYC warning
-      const needsKyc = usdValue >= KYC_THRESHOLD && !kycVerified;
+      const needsKyc = amount >= KYC_THRESHOLD && !kycVerified;
       warningEl.classList.toggle('visible', needsKyc);
 
       updateSwapButton();
@@ -1995,7 +1973,7 @@
       const usdValue = amount * from.price;
 
       // Over threshold and not yet verified
-      if (usdValue >= KYC_THRESHOLD && !kycVerified) {
+      if (amount >= KYC_THRESHOLD && !kycVerified) {
         btn.disabled = false;
         btn.style.background = '';
         btn.style.color = '';
@@ -2173,7 +2151,7 @@
 
       const usdValue = amount * TOKENS[fromToken].price;
 
-      if (usdValue >= KYC_THRESHOLD && !kycVerified) {
+      if (amount >= KYC_THRESHOLD && !kycVerified) {
         openKycModal();
       } else {
         executeSwap(false);
@@ -2233,9 +2211,9 @@
       const request = {
         requestId: generateRequestId(),
         circuit: 'coinbase_attestation',
-        inputs: { scope: 'shieldswap:kyc' },
+        inputs: { scope: 'zkpswap:kyc' },
         callbackUrl: CALLBACK_URL,
-        dappName: 'ShieldSwap',
+        dappName: 'ZKPSwap',
         message: 'Identity verification required for this swap',
         createdAt: Date.now(),
         expiresAt: Date.now() + 600000
@@ -2278,7 +2256,7 @@
 
     window.openProofPortApp = function() {
       if (currentDeepLink) {
-        devLog('SDK', `Opening deep link: ${currentDeepLink.substring(0, 60)}...`);
+        devLog('SDK', `Opening deep link: ${currentDeepLink}`);
         window.location.href = currentDeepLink;
       }
     };
@@ -2345,7 +2323,7 @@
         devLog('VERIFY', 'Starting on-chain verification...');
 
         if (data.proof && data.publicInputs) {
-          devLog('PROOF', `Proof: ${data.proof.substring(0, 60)}...`);
+          devLog('PROOF', `Proof: ${data.proof}`);
           devLog('PROOF', `Public inputs: ${JSON.stringify(data.publicInputs)}`);
 
           // On-chain verification
@@ -2540,9 +2518,9 @@
       updateSwapButton();
       document.getElementById('devConfigCallback').textContent = CALLBACK_URL;
 
-      devLog('SDK', 'ShieldSwap initialized');
+      devLog('SDK', 'ZKPSwap initialized');
       devLog('SDK', `Server: ${SERVER_URL}`);
-      devLog('SDK', `KYC threshold: $${KYC_THRESHOLD.toLocaleString()}`);
+      devLog('SDK', `KYC threshold: ${KYC_THRESHOLD} ETH`);
 
       if (walletConnected) {
         devLog('UI', `Wallet restored: ${walletAddress}`);

@@ -1,8 +1,8 @@
-# ShieldSwap Demo Guide
+# ZKPSwap Demo Guide
 
 ## Overview
 
-ShieldSwap is a fictional compliant decentralized exchange demonstrating ZKProofPort SDK integration. It enforces privacy-preserving KYC verification for swaps exceeding $10,000 USD using zero-knowledge proofs, without requiring users to share personal identity data.
+ZKPSwap is a fictional compliant decentralized exchange demonstrating ZKProofPort SDK integration. It enforces privacy-preserving KYC verification for swaps exceeding $10,000 USD using zero-knowledge proofs, without requiring users to share personal identity data.
 
 The demo showcases:
 - Real-time KYC threshold enforcement
@@ -31,7 +31,7 @@ http://<your-ip>:3300/shieldswap
 
 ### Step 1: Connect Wallet
 
-1. Open ShieldSwap page
+1. Open ZKPSwap page
 2. Click "Connect Wallet" button in the top-right corner
 3. A simulated wallet address appears (format: 0x1234...5678)
 4. Address persists in browser session
@@ -74,7 +74,7 @@ Click "Verify & Swap" to open the KYC verification modal. The modal displays:
   1. ZKProofPort connects to your wallet
   2. Finds your Coinbase attestation
   3. Generates a zero-knowledge proof
-  4. ShieldSwap verifies without seeing your identity
+  4. ZKPSwap verifies without seeing your identity
 
 ### Step 5: Proof Generation (ZKProofPort App)
 
@@ -161,7 +161,7 @@ Raw JSON of the current proof request:
   "circuit": "coinbase_attestation",
   "inputs": {},
   "callbackUrl": "http://<your-host>:3300/callback",
-  "dappName": "ShieldSwap",
+  "dappName": "ZKPSwap",
   "message": "Identity verification required for this swap",
   "createdAt": 1234567890000,
   "deepLink": "zkproofport://proof-request?data=..."
@@ -192,7 +192,7 @@ Static configuration for the demo:
 | **User Experience** | One QR scan to verify. Verification cached in session. No repeated verification for multiple trades. |
 | **On-chain Verification** | Real proof verification against live Sepolia testnet contract. Not simulated. |
 | **Easy Integration** | Few lines of SDK code required to add KYC to any dApp. Callbacks handle proof results. |
-| **Zero-Knowledge** | ShieldSwap never sees user's identity, Coinbase attestation, or raw KYC data. Only receives "proof of compliance." |
+| **Zero-Knowledge** | ZKPSwap never sees user's identity, Coinbase attestation, or raw KYC data. Only receives "proof of compliance." |
 
 ## Technical Details
 
@@ -258,7 +258,7 @@ Static configuration for the demo:
 ## Architecture Overview
 
 ```
-Browser (ShieldSwap)
+Browser (ZKPSwap)
     |
     +-- [Connect Wallet] --> Session Storage
     |

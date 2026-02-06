@@ -236,9 +236,11 @@
     }
 
     .demo-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: 32px;
+      max-width: 700px;
+      margin: 0 auto;
     }
 
     .demo-card {
@@ -782,7 +784,7 @@
       }
 
       .demo-cards {
-        grid-template-columns: 1fr;
+        max-width: 100%;
       }
 
       .steps {
@@ -850,7 +852,7 @@
       <nav style="display:flex;gap:1rem;align-items:center;">
         <a href="#demo-kyc" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Callback Demo</a>
         <a href="/relay-demo" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Relay Demo</a>
-        <a href="/shieldswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ShieldSwap</a>
+        <a href="/shieldswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ZKPSwap</a>
         <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:var(--cyan);text-decoration:none;font-size:0.9rem;border:1px solid var(--cyan);padding:0.3rem 0.8rem;border-radius:6px;">Dashboard</a>
       </nav>
     </div>
@@ -865,10 +867,10 @@
         <a href="#demo-kyc" class="btn btn-primary">Try KYC Demo</a>
         <a href="#demo-country" class="btn btn-secondary">Try Country Demo</a>
         <a href="/relay-demo" class="btn btn-secondary">Relay Demo</a>
-        <a href="/shieldswap" class="btn btn-secondary">ShieldSwap</a>
+        <a href="/shieldswap" class="btn btn-secondary">ZKPSwap</a>
       </div>
       <p style="color:var(--gray-400);font-size:0.95rem;margin-top:1.5rem;">
-        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/shieldswap" style="color:var(--cyan);text-decoration:underline;">ShieldSwap</a> demonstrates a compliant DEX using ZK proofs.
+        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/shieldswap" style="color:var(--cyan);text-decoration:underline;">ZKPSwap</a> demonstrates a compliant DEX using ZK proofs.
       </p>
     </div>
   </section>
