@@ -14,7 +14,18 @@ import type {
 import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
 
 /**
- * Generate a unique request ID
+ * Generates a unique request ID for proof requests.
+ *
+ * Creates an ID by combining a base36-encoded timestamp with a random string,
+ * prefixed with "req-". This ensures uniqueness across concurrent requests.
+ *
+ * @returns A unique string identifier in the format "req-{timestamp}-{random}"
+ *
+ * @example
+ * ```typescript
+ * const id = generateRequestId();
+ * // "req-lh8k3f2g-a9b7c4d2"
+ * ```
  */
 export function generateRequestId(): string {
   const timestamp = Date.now().toString(36);
@@ -23,7 +34,20 @@ export function generateRequestId(): string {
 }
 
 /**
- * Encode data for URL transmission (base64url with UTF-8 support)
+ * Encodes an object into a URL-safe base64url string with UTF-8 support.
+ *
+ * Converts the input object to JSON, then encodes it using base64url format
+ * (RFC 4648 §5) which replaces '+' with '-', '/' with '_', and removes padding.
+ * Works in both browser and Node.js environments.
+ *
+ * @param data - The object to encode (will be JSON stringified)
+ * @returns Base64url-encoded string safe for URL parameters
+ *
+ * @example
+ * ```typescript
+ * const encoded = encodeData({ circuit: 'coinbase_attestation', requestId: 'req-123' });
+ * // "eyJjaXJjdWl0IjoiY29pbmJhc2VfYXR0ZXN0YXRpb24iLCJyZXF1ZXN0SWQiOiJyZXEtMTIzIn0"
+ * ```
  */
 export function encodeData(data: object): string {
   const json = JSON.stringify(data);
@@ -47,7 +71,23 @@ export function encodeData(data: object): string {
 }
 
 /**
- * Decode URL-transmitted data (base64url with UTF-8 support)
+ * Decodes a base64url-encoded string back into a typed object.
+ *
+ * Reverses the encoding process by converting base64url to standard base64,
+ * decoding it, and parsing the resulting JSON. Handles UTF-8 correctly in
+ * both browser and Node.js environments.
+ *
+ * @typeParam T - The expected type of the decoded object
+ * @param encoded - Base64url-encoded string (from encodeData)
+ * @returns Decoded and parsed object of type T
+ *
+ * @throws {SyntaxError} If the decoded string is not valid JSON
+ *
+ * @example
+ * ```typescript
+ * const request = decodeData<ProofRequest>(encodedString);
+ * console.log(request.circuit); // "coinbase_attestation"
+ * ```
  */
 export function decodeData<T>(encoded: string): T {
   // Restore base64 padding
@@ -71,7 +111,27 @@ export function decodeData<T>(encoded: string): T {
 }
 
 /**
- * Build a proof request deep link URL
+ * Builds a deep link URL for a proof request.
+ *
+ * Encodes the proof request and constructs a deep link URL that can be opened
+ * by the ZKProofPort mobile app. The URL format is:
+ * `{scheme}://proof-request?data={encodedRequest}`
+ *
+ * @param request - The proof request to encode in the deep link
+ * @param scheme - Custom URL scheme (defaults to "zkproofport")
+ * @returns Complete deep link URL ready to be opened or embedded in a QR code
+ *
+ * @example
+ * ```typescript
+ * const request: ProofRequest = {
+ *   requestId: generateRequestId(),
+ *   circuit: 'coinbase_attestation',
+ *   inputs: { userAddress: '0x123...' },
+ *   callbackUrl: 'https://example.com/callback'
+ * };
+ * const url = buildProofRequestUrl(request);
+ * // "zkproofport://proof-request?data=eyJyZXF1ZXN0SWQi..."
+ * ```
  */
 export function buildProofRequestUrl(
   request: ProofRequest,
@@ -82,7 +142,28 @@ export function buildProofRequestUrl(
 }
 
 /**
- * Build a callback URL with proof response
+ * Builds a callback URL with proof response data as query parameters.
+ *
+ * Appends proof response fields to the provided callback URL. For completed proofs,
+ * includes proof data, public inputs, and nullifier. For errors, includes error message.
+ *
+ * @param callbackUrl - Base callback URL (from the original proof request)
+ * @param response - Proof response containing status and optional proof data
+ * @returns Complete callback URL with proof response as query parameters
+ *
+ * @example
+ * ```typescript
+ * const response: ProofResponse = {
+ *   requestId: 'req-123',
+ *   circuit: 'coinbase_attestation',
+ *   status: 'completed',
+ *   proof: '0x...',
+ *   publicInputs: ['0x1', '0x2'],
+ *   nullifier: '0xabc...'
+ * };
+ * const url = buildCallbackUrl('https://example.com/callback', response);
+ * // "https://example.com/callback?requestId=req-123&status=completed&proof=0x...&publicInputs=0x1,0x2..."
+ * ```
  */
 export function buildCallbackUrl(
   callbackUrl: string,
@@ -114,7 +195,22 @@ export function buildCallbackUrl(
 }
 
 /**
- * Parse a proof request from deep link URL
+ * Parses a proof request from a deep link URL.
+ *
+ * Extracts and decodes the proof request data from a ZKProofPort deep link URL.
+ * Returns null if the URL is invalid or missing required parameters.
+ *
+ * @param url - Deep link URL (e.g., "zkproofport://proof-request?data=...")
+ * @returns Decoded ProofRequest object, or null if parsing fails
+ *
+ * @example
+ * ```typescript
+ * const url = "zkproofport://proof-request?data=eyJyZXF1ZXN0SWQi...";
+ * const request = parseProofRequestUrl(url);
+ * if (request) {
+ *   console.log(request.circuit); // "coinbase_attestation"
+ * }
+ * ```
  */
 export function parseProofRequestUrl(url: string): ProofRequest | null {
   try {
@@ -133,7 +229,23 @@ export function parseProofRequestUrl(url: string): ProofRequest | null {
 }
 
 /**
- * Parse a proof response from callback URL
+ * Parses a proof response from a callback URL.
+ *
+ * Extracts proof response data from query parameters in a callback URL.
+ * Handles both successful proof completions and error responses.
+ * Returns null if required parameters (requestId, status) are missing.
+ *
+ * @param url - Callback URL with proof response query parameters
+ * @returns Decoded ProofResponse object, or null if parsing fails
+ *
+ * @example
+ * ```typescript
+ * const callbackUrl = "https://example.com/callback?requestId=req-123&status=completed&proof=0x...";
+ * const response = parseProofResponseUrl(callbackUrl);
+ * if (response && response.status === 'completed') {
+ *   console.log(response.proof); // "0x..."
+ * }
+ * ```
  */
 export function parseProofResponseUrl(url: string): ProofResponse | null {
   try {
@@ -178,7 +290,25 @@ export function parseProofResponseUrl(url: string): ProofResponse | null {
 }
 
 /**
- * Parse deep link URL into components
+ * Parses a deep link URL into its component parts.
+ *
+ * Breaks down a custom scheme URL into scheme, host, path, and query parameters.
+ * Useful for routing and handling different types of deep links.
+ *
+ * @param url - Custom scheme URL to parse (e.g., "zkproofport://proof-request?data=...")
+ * @returns Object containing scheme, host, path, and params, or null if invalid
+ *
+ * @example
+ * ```typescript
+ * const url = "zkproofport://proof-request/verify?data=abc123";
+ * const components = parseDeepLink(url);
+ * // {
+ * //   scheme: "zkproofport",
+ * //   host: "proof-request",
+ * //   path: "/verify",
+ * //   params: { data: "abc123" }
+ * // }
+ * ```
  */
 export function parseDeepLink(url: string): DeepLinkComponents | null {
   try {
@@ -213,7 +343,21 @@ export function parseDeepLink(url: string): DeepLinkComponents | null {
 }
 
 /**
- * Check if URL is a ZKProofPort deep link
+ * Checks if a URL is a valid ZKProofPort deep link.
+ *
+ * Performs a case-insensitive check to see if the URL starts with the
+ * ZKProofPort scheme. Does not validate the URL structure beyond the scheme.
+ *
+ * @param url - URL to check
+ * @param scheme - Expected URL scheme (defaults to "zkproofport")
+ * @returns True if the URL starts with the specified scheme
+ *
+ * @example
+ * ```typescript
+ * isProofPortDeepLink("zkproofport://proof-request?data=..."); // true
+ * isProofPortDeepLink("https://example.com"); // false
+ * isProofPortDeepLink("ZKPROOFPORT://proof-request"); // true (case-insensitive)
+ * ```
  */
 export function isProofPortDeepLink(
   url: string,
@@ -223,7 +367,33 @@ export function isProofPortDeepLink(
 }
 
 /**
- * Validate proof request
+ * Validates a proof request for completeness and correctness.
+ *
+ * Performs comprehensive validation including:
+ * - Required fields (requestId, circuit, callbackUrl)
+ * - Circuit type validity (must be a supported circuit)
+ * - Circuit-specific input validation (e.g., userAddress format, countryList structure)
+ * - Expiration check (if expiresAt is provided)
+ *
+ * Note: userAddress is optional for both circuits - the mobile app will prompt
+ * for wallet connection if not provided.
+ *
+ * @param request - Proof request to validate
+ * @returns Validation result with `valid` flag and optional `error` message
+ *
+ * @example
+ * ```typescript
+ * const request: ProofRequest = {
+ *   requestId: 'req-123',
+ *   circuit: 'coinbase_attestation',
+ *   inputs: { userAddress: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1' },
+ *   callbackUrl: 'https://example.com/callback'
+ * };
+ * const result = validateProofRequest(request);
+ * if (!result.valid) {
+ *   console.error(result.error); // "Invalid userAddress format" / "Request has expired" / etc.
+ * }
+ * ```
  */
 export function validateProofRequest(request: ProofRequest): { valid: boolean; error?: string } {
   if (!request.requestId) {
@@ -255,11 +425,14 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
       return { valid: false, error: 'Invalid userAddress format' };
     }
-    if (inputs.countryList && !Array.isArray(inputs.countryList)) {
-      return { valid: false, error: 'countryList must be an array of strings' };
+    if (!inputs.countryList || !Array.isArray(inputs.countryList) || inputs.countryList.length === 0) {
+      return { valid: false, error: 'countryList is required and must be a non-empty array' };
     }
-    if (inputs.countryList && !inputs.countryList.every(c => typeof c === 'string')) {
+    if (!inputs.countryList.every(c => typeof c === 'string')) {
       return { valid: false, error: 'countryList must contain only strings' };
+    }
+    if (typeof inputs.isIncluded !== 'boolean') {
+      return { valid: false, error: 'isIncluded is required and must be a boolean' };
     }
   }
 

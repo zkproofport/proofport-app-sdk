@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { ProofPortSDK } from '@proofport/sdk';
+ * import { ProofPortSDK } from '@zkproofport-app/sdk';
  *
  * const sdk = new ProofPortSDK({
  *   defaultCallbackUrl: 'https://myapp.com/verify'

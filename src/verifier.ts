@@ -47,7 +47,21 @@ function resolveVerifier(
 }
 
 /**
- * Get verifier contract instance
+ * Get verifier contract instance for interacting with on-chain verifier contracts.
+ *
+ * @param providerOrSigner - ethers.js Provider or Signer instance (v5 or v6 compatible)
+ * @param verifier - Verifier contract configuration containing address and ABI
+ * @returns ethers.Contract instance connected to the verifier
+ *
+ * @example
+ * ```typescript
+ * const provider = new ethers.JsonRpcProvider(rpcUrl);
+ * const contract = getVerifierContract(provider, {
+ *   address: '0x...',
+ *   chainId: 11155111,
+ *   abi: VERIFIER_ABI
+ * });
+ * ```
  */
 export function getVerifierContract(
   providerOrSigner: any,
@@ -61,7 +75,16 @@ export function getVerifierContract(
 }
 
 /**
- * Get default provider for a chain
+ * Get default JSON-RPC provider for a chain using pre-configured RPC endpoints.
+ *
+ * @param chainId - The chain ID (e.g., 11155111 for Sepolia, 84532 for Base Sepolia)
+ * @returns ethers.JsonRpcProvider instance for the specified chain
+ * @throws Error if no RPC endpoint is configured for the chain
+ *
+ * @example
+ * ```typescript
+ * const provider = getDefaultProvider(11155111); // Sepolia
+ * ```
  */
 export function getDefaultProvider(chainId: number) {
   const rpcUrl = RPC_ENDPOINTS[chainId];
@@ -72,7 +95,34 @@ export function getDefaultProvider(chainId: number) {
 }
 
 /**
- * Verify proof on-chain
+ * Verify a zero-knowledge proof on-chain by calling the verifier smart contract.
+ *
+ * This function resolves the verifier contract from SDK config or proof response,
+ * connects to the blockchain, and calls the verify() method with the proof and public inputs.
+ *
+ * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param parsedProof - Parsed proof object containing proofHex and publicInputsHex
+ * @param providerOrSigner - Optional ethers.js Provider or Signer instance. If not provided, uses default RPC for the chain
+ * @param customVerifier - Optional custom verifier contract config (takes priority over responseVerifier)
+ * @param responseVerifier - Optional verifier info from proof generation response
+ * @returns Promise resolving to verification result with valid flag and optional error message
+ *
+ * @example
+ * ```typescript
+ * const parsed = parseProofForOnChain(proof, publicInputs, numPublicInputs);
+ * const result = await verifyProofOnChain(
+ *   'coinbase_attestation',
+ *   parsed,
+ *   provider,
+ *   { address: '0x...', chainId: 11155111, abi: VERIFIER_ABI }
+ * );
+ *
+ * if (result.valid) {
+ *   console.log('Proof is valid!');
+ * } else {
+ *   console.error('Verification failed:', result.error);
+ * }
+ * ```
  */
 export async function verifyProofOnChain(
   circuit: CircuitType,
@@ -121,7 +171,27 @@ function ensureHexPrefix(hex: string): string {
 
 /**
  * Parse proof response into format suitable for on-chain verification.
- * Public inputs are zero-padded to 32 bytes (bytes32).
+ *
+ * Converts proof and public inputs from relay response format to the format
+ * expected by Solidity verifier contracts. Public inputs are zero-padded to
+ * 32 bytes (bytes32) to match Solidity's bytes32[] type.
+ *
+ * @param proof - Proof bytes as hex string (with or without 0x prefix)
+ * @param publicInputs - Array of public input values as hex strings
+ * @param numPublicInputs - Number of public inputs (for validation)
+ * @returns Parsed proof object ready for on-chain verification
+ *
+ * @example
+ * ```typescript
+ * const parsed = parseProofForOnChain(
+ *   '0x1a2b3c...',
+ *   ['0x01', '0x02', '0x03'],
+ *   3
+ * );
+ *
+ * // parsed.proofHex: '0x1a2b3c...'
+ * // parsed.publicInputsHex: ['0x0000...01', '0x0000...02', '0x0000...03']
+ * ```
  */
 export function parseProofForOnChain(
   proof: string,
@@ -152,7 +222,18 @@ function requireVerifier(circuit: CircuitType, verifier?: VerifierContract): Ver
 }
 
 /**
- * Get verifier contract address for a circuit
+ * Get verifier contract address for a circuit.
+ *
+ * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param customVerifier - Optional custom verifier contract config
+ * @returns Verifier contract address as hex string
+ * @throws Error if no verifier is configured for the circuit
+ *
+ * @example
+ * ```typescript
+ * const address = getVerifierAddress('coinbase_attestation', verifierConfig);
+ * console.log(address); // '0x1234...'
+ * ```
  */
 export function getVerifierAddress(
   circuit: CircuitType,
@@ -162,7 +243,18 @@ export function getVerifierAddress(
 }
 
 /**
- * Get chain ID for a circuit's verifier
+ * Get chain ID for a circuit's verifier contract.
+ *
+ * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param customVerifier - Optional custom verifier contract config
+ * @returns Chain ID number (e.g., 11155111 for Sepolia, 84532 for Base Sepolia)
+ * @throws Error if no verifier is configured for the circuit
+ *
+ * @example
+ * ```typescript
+ * const chainId = getVerifierChainId('coinbase_attestation', verifierConfig);
+ * console.log(chainId); // 11155111
+ * ```
  */
 export function getVerifierChainId(
   circuit: CircuitType,
@@ -171,6 +263,22 @@ export function getVerifierChainId(
   return requireVerifier(circuit, customVerifier).chainId;
 }
 
+/**
+ * Extract scope value from public inputs array.
+ *
+ * The scope is a bytes32 value encoded across 32 consecutive field elements
+ * in the public inputs. The exact position depends on the circuit type.
+ *
+ * @param publicInputsHex - Array of public input hex strings (zero-padded to 32 bytes)
+ * @param circuit - Optional circuit identifier to determine field positions
+ * @returns Reconstructed scope as hex string with 0x prefix, or null if inputs are insufficient
+ *
+ * @example
+ * ```typescript
+ * const scope = extractScopeFromPublicInputs(publicInputsHex, 'coinbase_attestation');
+ * console.log(scope); // '0x7a6b70726f6f66706f72742e636f6d...'
+ * ```
+ */
 export function extractScopeFromPublicInputs(
   publicInputsHex: string[],
   circuit?: string,
@@ -186,6 +294,26 @@ export function extractScopeFromPublicInputs(
   return reconstructBytes32FromFields(scopeFields);
 }
 
+/**
+ * Extract nullifier value from public inputs array.
+ *
+ * The nullifier is a bytes32 value encoded across 32 consecutive field elements
+ * in the public inputs. The exact position depends on the circuit type.
+ * Nullifiers are used for duplicate proof detection and must be unique per user+scope.
+ *
+ * @param publicInputsHex - Array of public input hex strings (zero-padded to 32 bytes)
+ * @param circuit - Optional circuit identifier to determine field positions
+ * @returns Reconstructed nullifier as hex string with 0x prefix, or null if inputs are insufficient
+ *
+ * @example
+ * ```typescript
+ * const nullifier = extractNullifierFromPublicInputs(publicInputsHex, 'coinbase_attestation');
+ * console.log(nullifier); // '0xabcd1234...'
+ *
+ * // Check if nullifier is already registered
+ * const isRegistered = await isNullifierRegistered(nullifier, registryAddress, provider);
+ * ```
+ */
 export function extractNullifierFromPublicInputs(
   publicInputsHex: string[],
   circuit?: string,
@@ -213,7 +341,30 @@ function reconstructBytes32FromFields(fields: string[]): string {
 }
 
 /**
- * Check if a nullifier is registered on-chain (Plan 2)
+ * Check if a nullifier is already registered on-chain in the ZKProofPort nullifier registry.
+ *
+ * This function queries the on-chain nullifier registry contract to determine if a nullifier
+ * has been used before. This is used to prevent duplicate proof submissions from the same user
+ * for the same scope.
+ *
+ * @param nullifier - The nullifier hash as hex string with 0x prefix
+ * @param registryAddress - ZKProofPortNullifierRegistry contract address
+ * @param provider - ethers.js Provider instance (v5 or v6 compatible)
+ * @returns Promise resolving to true if nullifier is registered, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const nullifier = extractNullifierFromPublicInputs(publicInputsHex, circuit);
+ * const isRegistered = await isNullifierRegistered(
+ *   nullifier,
+ *   '0x...',
+ *   provider
+ * );
+ *
+ * if (isRegistered) {
+ *   console.log('This nullifier has already been used');
+ * }
+ * ```
  */
 export async function isNullifierRegistered(
   nullifier: string,
@@ -230,7 +381,28 @@ export async function isNullifierRegistered(
 }
 
 /**
- * Get nullifier info from on-chain registry (Plan 2)
+ * Get detailed information about a registered nullifier from the on-chain registry.
+ *
+ * This function retrieves the registration timestamp, scope, and circuit ID for a nullifier
+ * that has been registered on-chain. This metadata is useful for auditing and analytics.
+ *
+ * @param nullifier - The nullifier hash as hex string with 0x prefix
+ * @param registryAddress - ZKProofPortNullifierRegistry contract address
+ * @param provider - ethers.js Provider instance (v5 or v6 compatible)
+ * @returns Promise resolving to nullifier info object, or null if not registered
+ *
+ * @example
+ * ```typescript
+ * const info = await getNullifierInfo(nullifier, registryAddress, provider);
+ *
+ * if (info) {
+ *   console.log('Registered at:', new Date(info.registeredAt * 1000));
+ *   console.log('Scope:', info.scope);
+ *   console.log('Circuit:', info.circuitId);
+ * } else {
+ *   console.log('Nullifier not registered');
+ * }
+ * ```
  */
 export async function getNullifierInfo(
   nullifier: string,
