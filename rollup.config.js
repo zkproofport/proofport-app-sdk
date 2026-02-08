@@ -11,7 +11,7 @@ export default [
       format: 'cjs',
       sourcemap: true,
     },
-    external: ['ethers', 'qrcode'],
+    external: ['ethers', 'qrcode', 'socket.io-client'],
     plugins: [
       resolve(),
       commonjs(),
@@ -37,7 +37,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['ethers'],
+    external: ['ethers', 'socket.io-client'],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
       commonjs(),

@@ -26,7 +26,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
@@ -40,6 +41,11 @@
   },
   "peerDependencies": {
     "ethers": "^5.7.0 || ^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ethers": {
+      "optional": true
+    }
   },
   "keywords": [
     "zk",
