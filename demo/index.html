@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZKProofPort SDK Demo</title>
+  <title>ZKProofport SDK Demo</title>
   <!-- OpenGraph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ZKProofPort SDK Demo">
-  <meta property="og:description" content="Interactive demo of the ZKProofPort SDK for zero-knowledge proof requests and verification.">
-  <meta property="og:site_name" content="ZKProofPort">
+  <meta property="og:title" content="ZKProofport SDK Demo">
+  <meta property="og:description" content="Interactive demo of the ZKProofport SDK for zero-knowledge proof requests and verification.">
+  <meta property="og:site_name" content="ZKProofport">
   <meta property="og:url" content="__DEMO_BASE_URL__/index">
   <meta property="og:image" content="__DEMO_BASE_URL__/og-image.png">
   <meta property="og:image:width" content="1200">
@@ -16,8 +16,8 @@
   <meta property="og:image:type" content="image/png">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ZKProofPort SDK Demo">
-  <meta name="twitter:description" content="Interactive demo of the ZKProofPort SDK for zero-knowledge proof requests and verification.">
+  <meta name="twitter:title" content="ZKProofport SDK Demo">
+  <meta name="twitter:description" content="Interactive demo of the ZKProofport SDK for zero-knowledge proof requests and verification.">
   <meta name="twitter:image" content="__DEMO_BASE_URL__/og-image.png">
   <style>
     * {
@@ -240,8 +240,8 @@
 </head>
 <body>
   <div class="container">
-    <h1>ZKProofPort SDK Demo</h1>
-    <p class="subtitle">Generate ZK proof requests using the ZKProofPort SDK</p>
+    <h1>ZKProofport SDK Demo</h1>
+    <p class="subtitle">Generate ZK proof requests using the ZKProofport SDK</p>
 
     <div class="card">
       <div class="tabs">
@@ -282,7 +282,7 @@
 
           <div class="button-group">
             <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="kyc-open" class="secondary">Open in ZKProofPort</button>
+            <button type="button" id="kyc-open" class="secondary">Open in ZKProofport</button>
           </div>
         </form>
       </div>
@@ -345,7 +345,7 @@
 
           <div class="button-group">
             <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="country-open" class="secondary">Open in ZKProofPort</button>
+            <button type="button" id="country-open" class="secondary">Open in ZKProofport</button>
           </div>
         </form>
       </div>
@@ -377,7 +377,7 @@
     { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
   </script>
   <script type="module">
-    import { ProofPortSDK } from '../dist/index.mjs';
+    import { ProofportSDK } from '../dist/index.mjs';
 
     const baseUrl = window.location.origin;
 
@@ -389,7 +389,7 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofPortSDK.create(sdkEnv);
+    const sdk = ProofportSDK.create(sdkEnv);
 
     // Set callback input values dynamically from current origin
     document.getElementById('kyc-callback').value = `${baseUrl}/api/callback`;

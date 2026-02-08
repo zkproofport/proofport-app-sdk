@@ -7,7 +7,7 @@
     </linearGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
-  <text x="600" y="260" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-2">ZKProofPort</text>
+  <text x="600" y="260" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-2">ZKProofport</text>
   <text x="600" y="320" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="#818cf8">Privacy-First Identity Verification</text>
   <text x="600" y="380" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#6b7280">Zero-Knowledge Proof Verification for dApps</text>
   <text x="1152" y="598" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#4b5563">demo.zkproofport.app</text>

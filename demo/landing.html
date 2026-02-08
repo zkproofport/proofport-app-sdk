@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZKProofPort - Privacy-First Identity Verification</title>
+  <title>ZKProofport - Privacy-First Identity Verification</title>
   <!-- OpenGraph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ZKProofPort - Privacy-First Identity Verification">
+  <meta property="og:title" content="ZKProofport - Privacy-First Identity Verification">
   <meta property="og:description" content="Zero-knowledge proof verification for dApps. Prove KYC, country, and age without revealing personal data.">
-  <meta property="og:site_name" content="ZKProofPort">
+  <meta property="og:site_name" content="ZKProofport">
   <meta property="og:url" content="__DEMO_BASE_URL__">
   <meta property="og:image" content="__DEMO_BASE_URL__/og-image.png">
   <meta property="og:image:width" content="1200">
@@ -16,7 +16,7 @@
   <meta property="og:image:type" content="image/png">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ZKProofPort - Privacy-First Identity Verification">
+  <meta name="twitter:title" content="ZKProofport - Privacy-First Identity Verification">
   <meta name="twitter:description" content="Zero-knowledge proof verification for dApps. Prove KYC, country, and age without revealing personal data.">
   <meta name="twitter:image" content="__DEMO_BASE_URL__/og-image.png">
   <style>
@@ -838,7 +838,7 @@
 <body>
   <header>
     <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
-      <div class="logo">ZKProofPort</div>
+      <div class="logo">ZKProofport</div>
       <div class="plan-selector" id="auth-section">
         <input type="text" id="auth-client-id" placeholder="Client ID" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
         <input type="password" id="auth-api-key" placeholder="API Key" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
@@ -880,7 +880,7 @@
         <div class="step">
           <div class="step-number">1</div>
           <h3>Request</h3>
-          <p>Your dApp creates a proof request via the ZKProofPort SDK with specific verification requirements.</p>
+          <p>Your dApp creates a proof request via the ZKProofport SDK with specific verification requirements.</p>
         </div>
         <div class="step">
           <div class="step-number">2</div>
@@ -928,7 +928,7 @@
             <div class="deep-link" id="kyc-deep-link"></div>
             <div class="callback-status waiting" id="kyc-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
-              <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
+              <p class="status-hint">Scan the QR code with ZKProofport app to generate a proof</p>
             </div>
             <div class="callback-status failed" id="kyc-failed">
               <h4>Proof Failed</h4>
@@ -986,7 +986,7 @@
             <div class="deep-link" id="country-deep-link"></div>
             <div class="callback-status waiting" id="country-waiting">
               <h4><span class="spinner"></span>Waiting for proof...</h4>
-              <p class="status-hint">Scan the QR code with ZKProofPort app to generate a proof</p>
+              <p class="status-hint">Scan the QR code with ZKProofport app to generate a proof</p>
             </div>
             <div class="callback-status failed" id="country-failed">
               <h4>Proof Failed</h4>
@@ -1010,7 +1010,7 @@
 
   <section class="features">
     <div class="container">
-      <h2 class="section-title">Why ZKProofPort?</h2>
+      <h2 class="section-title">Why ZKProofport?</h2>
       <div class="features-grid">
         <div class="feature">
           <div class="feature-icon">🔒</div>
@@ -1041,10 +1041,10 @@
       <h2 class="section-title">Quick Integration</h2>
       <div class="code-block">
 <pre><span class="code-comment">// Install the SDK</span>
-<span class="code-keyword">import</span> { ProofPortSDK } <span class="code-keyword">from</span> <span class="code-string">'@proofport/sdk'</span>;
+<span class="code-keyword">import</span> { ProofportSDK } <span class="code-keyword">from</span> <span class="code-string">'@proofport/sdk'</span>;
 
 <span class="code-comment">// Initialize SDK (defaults to production)</span>
-<span class="code-keyword">const</span> sdk = ProofPortSDK.<span class="code-function">create</span>();
+<span class="code-keyword">const</span> sdk = ProofportSDK.<span class="code-function">create</span>();
 
 <span class="code-comment">// Create a proof request</span>
 <span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({ scope: <span class="code-string">'your-dapp:action'</span> });
@@ -1052,7 +1052,7 @@
 <span class="code-comment">// Generate QR code</span>
 <span class="code-keyword">const</span> qrDataUrl = <span class="code-keyword">await</span> sdk.<span class="code-function">generateQRCode</span>(request);
 
-<span class="code-comment">// Or open ProofPort app directly</span>
+<span class="code-comment">// Or open Proofport app directly</span>
 sdk.<span class="code-function">openProofRequest</span>(request);
 
 <span class="code-comment">// Verify the proof on-chain</span>
@@ -1067,7 +1067,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
 
   <footer>
     <div class="container">
-      <p>Built with zero-knowledge proofs by ZKProofPort</p>
+      <p>Built with zero-knowledge proofs by ZKProofport</p>
       <a href="https://github.com/zkproofport" target="_blank">GitHub</a>
     </div>
   </footer>
@@ -1083,7 +1083,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
     { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
   </script>
   <script type="module">
-    import { ProofPortSDK } from '../dist/index.mjs';
+    import { ProofportSDK } from '../dist/index.mjs';
     import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
 
     // Detect SDK environment from hostname
@@ -1094,7 +1094,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofPortSDK.create(sdkEnv);
+    const sdk = ProofportSDK.create(sdkEnv);
 
     // Authenticate with API key to get JWT token
     window.authenticateWithApiKey = async function() {
@@ -1292,7 +1292,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       const deepLinkEl = document.getElementById(deepLinkId);
 
       if (isMobileDevice()) {
-        qrContainer.innerHTML = `<a href="${deepLink}" class="open-app-btn">Open ZKProofPort App</a>`;
+        qrContainer.innerHTML = `<a href="${deepLink}" class="open-app-btn">Open ZKProofport App</a>`;
         deepLinkEl.style.display = 'none';
       } else {
         const qrDataUrl = await QRCode.toDataURL(deepLink, { width: 200, margin: 1 });
@@ -1311,7 +1311,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
 
       try {
         const result = await sdk.createRelayRequest('coinbase_attestation', {}, {
-          dappName: 'ZKProofPort Demo',
+          dappName: 'ZKProofport Demo',
         });
 
         activeKycRequestId = result.requestId;
@@ -1359,7 +1359,7 @@ sdk.<span class="code-function">openProofRequest</span>(request);
 
       try {
         const result = await sdk.createRelayRequest('coinbase_country_attestation', { countryList, isIncluded }, {
-          dappName: 'ZKProofPort Demo',
+          dappName: 'ZKProofport Demo',
         });
 
         activeCountryRequestId = result.requestId;

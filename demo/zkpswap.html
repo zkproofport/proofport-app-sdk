@@ -1610,7 +1610,7 @@
 
           <div class="kyc-divider"><span>or</span></div>
 
-          <button id="kycOpenBtn" class="kyc-open-btn" onclick="openProofPortApp()">
+          <button id="kycOpenBtn" class="kyc-open-btn" onclick="openProofportApp()">
             <svg viewBox="0 0 18 18" fill="none"><path d="M6 3H4a2 2 0 00-2 2v2m0 4v2a2 2 0 002 2h2m4 0h2a2 2 0 002-2v-2m0-4V5a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             Open ZKProofport App
           </button>
@@ -1720,7 +1720,7 @@
     { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
   </script>
   <script type="module">
-    import { ProofPortSDK, RELAY_URLS } from '../dist/index.mjs';
+    import { ProofportSDK, RELAY_URLS } from '../dist/index.mjs';
 
     // ========== CONSTANTS ==========
     const DEFAULT_SCHEME = 'zkproofport';
@@ -1736,7 +1736,7 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofPortSDK.create(sdkEnv);
+    const sdk = ProofportSDK.create(sdkEnv);
 
     // ========== TOKEN DATA ==========
     const TOKENS = {
@@ -2323,7 +2323,7 @@
       stopPolling();
     };
 
-    window.openProofPortApp = function() {
+    window.openProofportApp = function() {
       if (currentDeepLink) {
         devLog('SDK', `Opening deep link: ${currentDeepLink}`);
         window.location.href = currentDeepLink;

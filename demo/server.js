@@ -228,7 +228,7 @@ server.listen(PORT, '0.0.0.0', () => {
   const nets = os.networkInterfaces();
   const ips = Object.values(nets).flat().filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
   const host = ips[0] || 'localhost';
-  console.log('ZKProofPort SDK Demo Server');
+  console.log('ZKProofport SDK Demo Server');
   console.log('========================');
   console.log(`Demo:     http://${host}:${PORT}`);
   console.log(`Callback: http://${host}:${PORT}/api/callback`);

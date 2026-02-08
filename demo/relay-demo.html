@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZKProofPort - Relay Demo</title>
+  <title>ZKProofport - Relay Demo</title>
   <!-- OpenGraph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ZKProofPort Relay Demo - Real-Time ZK Proof Verification">
+  <meta property="og:title" content="ZKProofport Relay Demo - Real-Time ZK Proof Verification">
   <meta property="og:description" content="Live demonstration of zero-knowledge proof requests via QR code and deep links.">
-  <meta property="og:site_name" content="ZKProofPort">
+  <meta property="og:site_name" content="ZKProofport">
   <meta property="og:url" content="__DEMO_BASE_URL__/relay-demo">
   <meta property="og:image" content="__DEMO_BASE_URL__/og-image.png">
   <meta property="og:image:width" content="1200">
@@ -16,7 +16,7 @@
   <meta property="og:image:type" content="image/png">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ZKProofPort Relay Demo - Real-Time ZK Proof Verification">
+  <meta name="twitter:title" content="ZKProofport Relay Demo - Real-Time ZK Proof Verification">
   <meta name="twitter:description" content="Live demonstration of zero-knowledge proof requests via QR code and deep links.">
   <meta name="twitter:image" content="__DEMO_BASE_URL__/og-image.png">
   <style>
@@ -868,7 +868,7 @@
   <header>
     <div class="container">
       <div class="header-content">
-        <a href="/landing" class="logo" style="text-decoration:none;">ZKProofPort</a>
+        <a href="/landing" class="logo" style="text-decoration:none;">ZKProofport</a>
         <span class="badge" id="auth-badge-header" style="display: none;">Authenticated</span>
         <nav>
           <a href="/landing#demo-kyc">Callback Demo</a>
@@ -1065,8 +1065,8 @@
         <div class="panel plan2">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Plan 2 — ZKProofPort Manages (On-Chain)</div>
-              <div class="panel-desc">ZKProofPort automatically verifies and registers nullifiers on-chain. Relay pays gas.</div>
+              <div class="panel-title">Plan 2 — ZKProofport Manages (On-Chain)</div>
+              <div class="panel-desc">ZKProofport automatically verifies and registers nullifiers on-chain. Relay pays gas.</div>
             </div>
             <div class="panel-badge green">Relay pays gas</div>
           </div>
@@ -1144,7 +1144,7 @@
     { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
   </script>
   <script type="module">
-    import { ProofPortSDK, RELAY_URLS } from '../dist/index.mjs';
+    import { ProofportSDK, RELAY_URLS } from '../dist/index.mjs';
 
     const baseUrl = window.location.origin;
 
@@ -1177,7 +1177,7 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofPortSDK.create(sdkEnv);
+    const sdk = ProofportSDK.create(sdkEnv);
 
     // Initialize UI
     function initUI() {
@@ -1443,7 +1443,7 @@
       }
 
       // Check JWT token validity before making request
-      if (state.authToken && !ProofPortSDK.isTokenValid(state.authToken)) {
+      if (state.authToken && !ProofportSDK.isTokenValid(state.authToken)) {
         logEvent('TOKEN_EXPIRED', 'JWT token expired, clearing auth');
         window.clearAuth();
         alert('Your authentication token has expired. Please re-authenticate.');
@@ -1532,7 +1532,7 @@
         console.log('[requestProof] isMobile:', isMobile, 'userAgent:', navigator.userAgent);
 
         if (isMobile) {
-          document.getElementById('qr-container').innerHTML = `<a href="${data.deepLink}" class="btn btn-primary open-app-btn">Open ZKProofPort App</a>`;
+          document.getElementById('qr-container').innerHTML = `<a href="${data.deepLink}" class="btn btn-primary open-app-btn">Open ZKProofport App</a>`;
           document.getElementById('deep-link').style.display = 'none';
         } else {
           const qrData = await sdk.generateQRCode(data.deepLink, { width: 200, margin: 1 });
