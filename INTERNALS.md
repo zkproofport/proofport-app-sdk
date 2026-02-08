@@ -1,4 +1,4 @@
-# ZKProofPort SDK Internal Reference
+# ZKProofport SDK Internal Reference
 
 > Internal documentation for SDK developers and maintainers. For user-facing documentation, see [README.md](./README.md).
 
@@ -18,7 +18,7 @@ This document covers low-level implementation details, contract ABIs, proof form
 
 ## Deep Link Protocol
 
-The ZKProofPort mobile app communicates with web applications via custom URL schemes and query parameters.
+The ZKProofport mobile app communicates with web applications via custom URL schemes and query parameters.
 
 ### Request Format
 
@@ -296,9 +296,9 @@ const components = parseDeepLink(url);
 // }
 ```
 
-#### `isProofPortDeepLink(url: string, scheme?: string): boolean`
+#### `isProofportDeepLink(url: string, scheme?: string): boolean`
 
-Checks if a URL is a valid ZKProofPort deep link.
+Checks if a URL is a valid ZKProofport deep link.
 
 **Parameters:**
 - `url` - URL to check
@@ -307,11 +307,11 @@ Checks if a URL is a valid ZKProofPort deep link.
 **Returns:** `true` if URL starts with the specified scheme (case-insensitive)
 
 ```typescript
-import { isProofPortDeepLink } from '@zkproofport-app/sdk';
+import { isProofportDeepLink } from '@zkproofport-app/sdk';
 
-isProofPortDeepLink("zkproofport://proof-request?data=...");  // true
-isProofPortDeepLink("ZKPROOFPORT://proof-request");           // true
-isProofPortDeepLink("https://example.com");                   // false
+isProofportDeepLink("zkproofport://proof-request?data=...");  // true
+isProofportDeepLink("ZKPROOFPORT://proof-request");           // true
+isProofportDeepLink("https://example.com");                   // false
 ```
 
 #### `validateProofRequest(request: ProofRequest): { valid: boolean; error?: string }`
@@ -567,7 +567,7 @@ Checks if a nullifier has been registered on-chain.
 
 **Parameters:**
 - `nullifier` - Nullifier bytes32 value
-- `registryAddress` - ZKProofPortNullifierRegistry contract address
+- `registryAddress` - ZKProofportNullifierRegistry contract address
 - `provider` - ethers Provider
 
 **Returns:** Promise<boolean> - true if registered (already used)
@@ -587,7 +587,7 @@ Retrieves detailed registration information for a nullifier.
 
 **Parameters:**
 - `nullifier` - Nullifier bytes32 value
-- `registryAddress` - ZKProofPortNullifierRegistry contract address
+- `registryAddress` - ZKProofportNullifierRegistry contract address
 - `provider` - ethers Provider
 
 **Returns:** Promise<NullifierRecord | null> with registration details
@@ -644,7 +644,7 @@ const verifier = new ethers.Contract(verifierAddress, VERIFIER_ABI, provider);
 const isValid = await verifier.verify(proofBytes, publicInputs);
 ```
 
-### ZKProofPortNullifierRegistry ABI (V2)
+### ZKProofportNullifierRegistry ABI (V2)
 
 Current nullifier registry interface with relayer-only registration (ethers v6 format):
 

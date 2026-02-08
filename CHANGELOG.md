@@ -23,7 +23,7 @@
 
 ### Documentation
 
-- update branding to ZKProofPort across all SDK references
+- update branding to ZKProofport across all SDK references
 - add documentation for Coinbase country attestation circuit
 - update documentation for dynamic verifier addresses
 - add OpenGraph and Twitter Card meta tags to demo pages
