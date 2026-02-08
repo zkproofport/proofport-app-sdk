@@ -13,6 +13,10 @@ import type {
   QRCodeOptions,
   ParsedProof,
   VerifierContract,
+  AuthCredentials,
+  AuthToken,
+  RelayProofRequest,
+  RelayProofResult,
 } from './types';
 import {
   generateRequestId,
@@ -39,7 +43,9 @@ import {
   DEFAULT_SCHEME,
   DEFAULT_REQUEST_EXPIRY_MS,
   CIRCUIT_METADATA,
+  RELAY_URLS,
 } from './constants';
+import type { SDKEnvironment } from './types';
 
 
 /**
@@ -52,43 +58,51 @@ import {
  * ```typescript
  * import { ProofPortSDK } from '@zkproofport-app/sdk';
  *
- * // Initialize SDK with default callback URL
- * const sdk = new ProofPortSDK({
- *   defaultCallbackUrl: 'https://myapp.com/callback'
- * });
+ * // Initialize SDK with environment preset (recommended)
+ * const sdk = ProofPortSDK.create('production');
  *
- * // Create a Coinbase KYC proof request
- * const request = sdk.createCoinbaseKycRequest({
+ * // Authenticate
+ * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
+ *
+ * // Create proof request via relay
+ * const relay = await sdk.createRelayRequest('coinbase_attestation', {
  *   scope: 'myapp.com'
  * });
  *
  * // Generate QR code for desktop users
- * const qrDataUrl = await sdk.generateQRCode(request);
+ * const qrDataUrl = await sdk.generateQRCode(relay.deepLink);
  *
- * // Handle callback response
- * const response = sdk.parseResponse(callbackUrl);
- * if (response?.status === 'completed') {
- *   const result = await sdk.verifyResponseOnChain(response);
- *   console.log('Proof valid:', result.valid);
+ * // Wait for proof via WebSocket (primary) or polling (fallback)
+ * const result = await sdk.waitForProof(relay.requestId);
+ * if (result.status === 'completed') {
+ *   console.log('Proof received:', result.proof);
  * }
  * ```
  */
 export class ProofPortSDK {
-  private config: Required<ProofPortConfig>;
+  private config: Required<Omit<ProofPortConfig, 'relayUrl'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
+  private authToken: AuthToken | null = null;
+  private relayUrl: string;
+  private socket: any = null;
 
   /**
    * Creates a new ProofPortSDK instance.
    *
+   * For most use cases, prefer the static factory with environment presets:
+   * ```typescript
+   * const sdk = ProofPortSDK.create('production');
+   * ```
+   *
    * @param config - SDK configuration options
    * @param config.scheme - Custom deep link scheme (default: 'zkproofport')
-   * @param config.defaultCallbackUrl - Default callback URL for proof responses
+   * @param config.relayUrl - Relay server URL (required for relay features)
    * @param config.verifiers - Custom verifier contract addresses per circuit
    *
    * @example
    * ```typescript
    * const sdk = new ProofPortSDK({
-   *   defaultCallbackUrl: 'https://myapp.com/callback',
+   *   relayUrl: 'https://relay.zkproofport.app',
    *   verifiers: {
    *     coinbase_attestation: {
    *       verifierAddress: '0x...',
@@ -101,9 +115,9 @@ export class ProofPortSDK {
   constructor(config: ProofPortConfig = {}) {
     this.config = {
       scheme: config.scheme || DEFAULT_SCHEME,
-      defaultCallbackUrl: config.defaultCallbackUrl || '',
       verifiers: config.verifiers || {},
     };
+    this.relayUrl = config.relayUrl || '';
   }
 
   // ============ Request Creation ============
@@ -143,7 +157,6 @@ export class ProofPortSDK {
   createCoinbaseKycRequest(
     inputs: CoinbaseKycInputs,
     options: {
-      callbackUrl?: string;
       message?: string;
       dappName?: string;
       dappIcon?: string;
@@ -158,7 +171,6 @@ export class ProofPortSDK {
       requestId: generateRequestId(),
       circuit: 'coinbase_attestation',
       inputs,
-      callbackUrl: options.callbackUrl || this.config.defaultCallbackUrl,
       message: options.message,
       dappName: options.dappName,
       dappIcon: options.dappIcon,
@@ -203,7 +215,6 @@ export class ProofPortSDK {
   createCoinbaseCountryRequest(
     inputs: CoinbaseCountryInputs,
     options: {
-      callbackUrl?: string;
       message?: string;
       dappName?: string;
       dappIcon?: string;
@@ -224,7 +235,6 @@ export class ProofPortSDK {
       requestId: generateRequestId(),
       circuit: 'coinbase_country_attestation',
       inputs,
-      callbackUrl: options.callbackUrl || this.config.defaultCallbackUrl,
       message: options.message,
       dappName: options.dappName,
       dappIcon: options.dappIcon,
@@ -270,7 +280,6 @@ export class ProofPortSDK {
     circuit: CircuitType,
     inputs: CircuitInputs,
     options: {
-      callbackUrl?: string;
       message?: string;
       dappName?: string;
       dappIcon?: string;
@@ -880,24 +889,47 @@ export class ProofPortSDK {
   // ============ Static Factory ============
 
   /**
-   * Creates a new ProofPortSDK instance with default configuration.
+   * Creates a new ProofPortSDK instance with environment preset or custom config.
+   * Defaults to `'production'` if no argument is provided.
    *
-   * Static factory method for creating SDK instances. Equivalent to using
-   * the constructor directly, but provides a more functional API style.
+   * **Recommended usage** — use an environment preset for zero-config initialization:
+   * ```typescript
+   * const sdk = ProofPortSDK.create('production');
+   * ```
    *
-   * @param config - Optional SDK configuration
+   * Environment presets:
+   * - `'production'` — relay.zkproofport.app
+   * - `'staging'` — stg-relay.zkproofport.app
+   * - `'local'` — localhost:4001
+   *
+   * @param envOrConfig - Environment name or custom SDK configuration
    *
    * @returns New ProofPortSDK instance
    *
    * @example
    * ```typescript
+   * // Environment preset (recommended)
+   * const sdk = ProofPortSDK.create(); // production (default)
+   * const sdk = ProofPortSDK.create('production');
+   *
+   * // Custom config
    * const sdk = ProofPortSDK.create({
-   *   defaultCallbackUrl: 'https://myapp.com/callback'
+   *   relayUrl: 'https://my-custom-relay.example.com',
    * });
    * ```
    */
-  static create(config?: ProofPortConfig): ProofPortSDK {
-    return new ProofPortSDK(config);
+  static create(envOrConfig?: SDKEnvironment | ProofPortConfig): ProofPortSDK {
+    if (typeof envOrConfig === 'undefined') {
+      return new ProofPortSDK({ relayUrl: RELAY_URLS.production });
+    }
+    if (typeof envOrConfig === 'string') {
+      const relayUrl = RELAY_URLS[envOrConfig];
+      if (!relayUrl) {
+        throw new Error(`Unknown environment: ${envOrConfig}. Use 'production', 'staging', or 'local'.`);
+      }
+      return new ProofPortSDK({ relayUrl });
+    }
+    return new ProofPortSDK(envOrConfig);
   }
 
   /**
@@ -926,6 +958,452 @@ export class ProofPortSDK {
     return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
     );
+  }
+
+  /**
+   * Authenticates with ZKProofPort using client credentials via the relay server.
+   *
+   * Exchanges a client_id and api_key pair for a short-lived JWT token
+   * that can be used to authenticate relay requests.
+   *
+   * @param credentials - Client ID and API key
+   * @param relayUrl - Relay server URL (e.g., 'https://relay.zkproofport.app')
+   * @returns Promise resolving to AuthToken with JWT token and metadata
+   * @throws Error if authentication fails
+   *
+   * @example
+   * ```typescript
+   * const auth = await ProofPortSDK.authenticate(
+   *   { clientId: 'your-client-id', apiKey: 'your-api-key' },
+   *   'https://relay.zkproofport.app'
+   * );
+   * console.log('Token:', auth.token);
+   * console.log('Expires in:', auth.expiresIn, 'seconds');
+   * ```
+   */
+  static async authenticate(
+    credentials: AuthCredentials,
+    relayUrl: string
+  ): Promise<AuthToken> {
+    if (!credentials.clientId || !credentials.apiKey) {
+      throw new Error('clientId and apiKey are required');
+    }
+    if (!relayUrl) {
+      throw new Error('relayUrl is required');
+    }
+
+    const response = await fetch(`${relayUrl}/api/v1/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: credentials.clientId,
+        api_key: credentials.apiKey,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(error.error || `Authentication failed: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      token: data.token,
+      clientId: data.client_id,
+      dappId: data.dapp_id,
+      tier: data.tier,
+      expiresIn: data.expires_in,
+      expiresAt: Date.now() + (data.expires_in * 1000),
+    };
+  }
+
+  /**
+   * Checks if an auth token is still valid (not expired).
+   *
+   * @param auth - AuthToken to check
+   * @returns True if the token has not expired
+   *
+   * @example
+   * ```typescript
+   * if (!ProofPortSDK.isTokenValid(auth)) {
+   *   auth = await ProofPortSDK.authenticate(credentials, relayUrl);
+   * }
+   * ```
+   */
+  static isTokenValid(auth: AuthToken): boolean {
+    return Date.now() < auth.expiresAt - 30000; // 30s buffer
+  }
+
+  // ============ Relay Integration ============
+
+  /**
+   * Authenticates with ZKProofPort and stores the token for relay requests.
+   *
+   * Instance method that authenticates via the relay server and stores
+   * the JWT token internally, so subsequent relay requests are automatically authenticated.
+   *
+   * @param credentials - Client ID and API key
+   * @returns Promise resolving to AuthToken
+   * @throws Error if authentication fails or relayUrl is not configured
+   *
+   * @example
+   * ```typescript
+   * const sdk = ProofPortSDK.create('production');
+   *
+   * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
+   * // SDK is now authenticated for relay requests
+   * ```
+   */
+  async login(credentials: AuthCredentials): Promise<AuthToken> {
+    if (!this.relayUrl) {
+      throw new Error('relayUrl is required for authentication. Use ProofPortSDK.create(\'production\') or set relayUrl in config.');
+    }
+    this.authToken = await ProofPortSDK.authenticate(credentials, this.relayUrl);
+    return this.authToken;
+  }
+
+  /**
+   * Logs out by clearing the stored authentication token.
+   */
+  logout(): void {
+    this.authToken = null;
+  }
+
+  /**
+   * Returns whether the SDK instance is currently authenticated with a valid token.
+   */
+  isAuthenticated(): boolean {
+    return this.authToken !== null && ProofPortSDK.isTokenValid(this.authToken);
+  }
+
+  /**
+   * Returns the current auth token, or null if not authenticated.
+   */
+  getAuthToken(): AuthToken | null {
+    return this.authToken;
+  }
+
+  /**
+   * Creates a proof request through the relay server.
+   *
+   * This is the recommended way to create proof requests. The relay server:
+   * - Issues a server-side requestId (validated by the mobile app)
+   * - Tracks request status in Redis
+   * - Handles credit deduction and tier enforcement
+   * - Builds the deep link with relay callback URL
+   *
+   * @param circuit - Circuit type identifier
+   * @param inputs - Circuit-specific inputs
+   * @param options - Request options (callbackUrl, message, dappName, dappIcon)
+   * @returns Promise resolving to RelayProofRequest with requestId, deepLink, pollUrl
+   * @throws Error if not authenticated or relay request fails
+   *
+   * @example
+   * ```typescript
+   * const sdk = ProofPortSDK.create('production');
+   * await sdk.login({ clientId: 'id', apiKey: 'key' });
+   *
+   * const relay = await sdk.createRelayRequest('coinbase_attestation', {
+   *   scope: 'myapp.com'
+   * }, { dappName: 'My DApp' });
+   *
+   * // Generate QR code from relay deep link
+   * const qr = await sdk.generateQRCode(relay.deepLink);
+   *
+   * // Wait for proof (WebSocket primary, polling fallback)
+   * const result = await sdk.waitForProof(relay.requestId);
+   * ```
+   */
+  async createRelayRequest(
+    circuit: CircuitType,
+    inputs: CircuitInputs,
+    options: {
+      message?: string;
+      dappName?: string;
+      dappIcon?: string;
+      nonce?: string;
+    } = {}
+  ): Promise<RelayProofRequest> {
+    if (!this.authToken || !ProofPortSDK.isTokenValid(this.authToken)) {
+      throw new Error('Not authenticated. Call login() first.');
+    }
+    if (!this.relayUrl) {
+      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+    }
+
+    const body: Record<string, unknown> = {
+      circuitId: circuit,
+      inputs,
+    };
+    if (options.message) body.message = options.message;
+    if (options.dappName) body.dappName = options.dappName;
+    if (options.dappIcon) body.dappIcon = options.dappIcon;
+    if (options.nonce) body.nonce = options.nonce;
+
+    const response = await fetch(`${this.relayUrl}/api/v1/proof/request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.authToken.token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(error.error || `Relay request failed: HTTP ${response.status}`);
+    }
+
+    return await response.json() as RelayProofRequest;
+  }
+
+  /**
+   * Polls the relay for proof result status.
+   *
+   * @param requestId - The relay-issued request ID
+   * @returns Promise resolving to RelayProofResult
+   * @throws Error if relay URL not configured or request not found
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.pollResult(relay.requestId);
+   * if (result.status === 'completed') {
+   *   console.log('Proof:', result.proof);
+   *   console.log('Public inputs:', result.publicInputs);
+   * }
+   * ```
+   */
+  async pollResult(requestId: string): Promise<RelayProofResult> {
+    if (!this.relayUrl) {
+      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+    }
+
+    const response = await fetch(`${this.relayUrl}/api/v1/proof/${requestId}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Request not found or expired');
+      }
+      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(error.error || `Poll failed: HTTP ${response.status}`);
+    }
+
+    return await response.json() as RelayProofResult;
+  }
+
+  /**
+   * Polls the relay until proof is completed or failed, with configurable interval and timeout.
+   *
+   * @param requestId - The relay-issued request ID
+   * @param options - Polling options
+   * @param options.intervalMs - Polling interval in milliseconds (default: 2000)
+   * @param options.timeoutMs - Maximum polling time in milliseconds (default: 300000 = 5 min)
+   * @param options.onStatusChange - Callback when status changes
+   * @returns Promise resolving to final RelayProofResult
+   * @throws Error if timeout or relay error
+   */
+  async waitForResult(
+    requestId: string,
+    options: {
+      intervalMs?: number;
+      timeoutMs?: number;
+      onStatusChange?: (result: RelayProofResult) => void;
+    } = {}
+  ): Promise<RelayProofResult> {
+    const interval = options.intervalMs || 2000;
+    const timeout = options.timeoutMs || 300000;
+    const startTime = Date.now();
+    let lastStatus = '';
+
+    while (Date.now() - startTime < timeout) {
+      const result = await this.pollResult(requestId);
+
+      if (result.status !== lastStatus) {
+        lastStatus = result.status;
+        options.onStatusChange?.(result);
+      }
+
+      if (result.status === 'completed' || result.status === 'failed') {
+        return result;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    throw new Error(`Polling timed out after ${timeout}ms`);
+  }
+
+  /**
+   * Subscribes to real-time proof status updates via Socket.IO.
+   *
+   * This is the recommended way to receive proof results. Uses WebSocket
+   * connection for instant delivery instead of polling.
+   *
+   * Requires `socket.io-client` package: `npm install socket.io-client`
+   *
+   * @param requestId - The relay-issued request ID to subscribe to
+   * @param callbacks - Event callbacks for status changes and results
+   * @param callbacks.onStatus - Called on status updates (pending, generating)
+   * @param callbacks.onResult - Called when proof is completed or failed
+   * @param callbacks.onError - Called on errors
+   * @returns Unsubscribe function to clean up the connection
+   * @throws Error if not authenticated, relayUrl not set, or socket.io-client not installed
+   *
+   * @example
+   * ```typescript
+   * const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' });
+   * const qr = await sdk.generateQRCode(relay.deepLink);
+   *
+   * const unsubscribe = await sdk.subscribe(relay.requestId, {
+   *   onResult: (result) => {
+   *     if (result.status === 'completed') {
+   *       console.log('Proof received!', result.proof);
+   *     }
+   *   },
+   *   onError: (error) => console.error('Error:', error),
+   * });
+   *
+   * // Later: clean up
+   * unsubscribe();
+   * ```
+   */
+  async subscribe(
+    requestId: string,
+    callbacks: {
+      onStatus?: (data: { requestId: string; status: string; deepLink?: string }) => void;
+      onResult?: (result: RelayProofResult) => void;
+      onError?: (error: { error: string; code?: number; requestId?: string }) => void;
+    }
+  ): Promise<() => void> {
+    if (!this.authToken || !ProofPortSDK.isTokenValid(this.authToken)) {
+      throw new Error('Not authenticated. Call login() first.');
+    }
+    if (!this.relayUrl) {
+      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+    }
+
+    let ioConnect: any;
+    try {
+      const mod: any = await import('socket.io-client');
+      ioConnect = mod.io ?? mod.connect ?? mod.default;
+    } catch {
+      throw new Error(
+        'socket.io-client is required for real-time updates. Install it: npm install socket.io-client'
+      );
+    }
+
+    if (typeof ioConnect !== 'function') {
+      throw new Error('Failed to load socket.io-client: io function not found');
+    }
+
+    // Connect to relay /proof namespace
+    const socket = ioConnect(`${this.relayUrl}/proof`, {
+      path: '/socket.io',
+      auth: { token: this.authToken.token },
+      transports: ['websocket', 'polling'],
+    });
+
+    this.socket = socket;
+
+    // Subscribe to the request room
+    socket.on('connect', () => {
+      socket.emit('proof:subscribe', { requestId });
+    });
+
+    // Listen for events
+    if (callbacks.onStatus) {
+      socket.on('proof:status', callbacks.onStatus);
+    }
+    if (callbacks.onResult) {
+      socket.on('proof:result', callbacks.onResult);
+    }
+    if (callbacks.onError) {
+      socket.on('proof:error', callbacks.onError);
+    }
+
+    // Return unsubscribe function
+    return () => {
+      socket.off('proof:status');
+      socket.off('proof:result');
+      socket.off('proof:error');
+      socket.disconnect();
+      if (this.socket === socket) {
+        this.socket = null;
+      }
+    };
+  }
+
+  /**
+   * Waits for a proof result using Socket.IO (primary) with polling fallback.
+   *
+   * Tries Socket.IO first for real-time delivery. If socket.io-client is not
+   * installed or connection fails, automatically falls back to HTTP polling.
+   *
+   * @param requestId - The relay-issued request ID
+   * @param options - Configuration options
+   * @param options.timeoutMs - Maximum wait time in ms (default: 300000 = 5 min)
+   * @param options.onStatusChange - Callback for status updates
+   * @returns Promise resolving to final RelayProofResult
+   */
+  async waitForProof(
+    requestId: string,
+    options: {
+      timeoutMs?: number;
+      onStatusChange?: (result: RelayProofResult | { requestId: string; status: string; deepLink?: string }) => void;
+    } = {}
+  ): Promise<RelayProofResult> {
+    const timeout = options.timeoutMs || 300000;
+
+    // Try Socket.IO first
+    if (this.authToken && ProofPortSDK.isTokenValid(this.authToken) && this.relayUrl) {
+      try {
+        return await new Promise<RelayProofResult>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            unsubscribePromise?.then(fn => fn());
+            reject(new Error(`Waiting for proof timed out after ${timeout}ms`));
+          }, timeout);
+
+          const unsubscribePromise = this.subscribe(requestId, {
+            onStatus: (data) => {
+              options.onStatusChange?.(data);
+            },
+            onResult: (result) => {
+              clearTimeout(timer);
+              unsubscribePromise?.then(fn => fn());
+              resolve(result);
+            },
+            onError: (error) => {
+              clearTimeout(timer);
+              unsubscribePromise?.then(fn => fn());
+              reject(new Error(error.error));
+            },
+          });
+        });
+      } catch (err: any) {
+        // Re-throw timeout — that's a real failure the caller should handle
+        if (err.message?.includes('timed out')) {
+          throw err;
+        }
+        // socket.io-client missing or connection failed → fall back to polling silently
+        console.warn('Socket.IO unavailable, falling back to HTTP polling:', err.message);
+      }
+    }
+
+    // Fallback: HTTP polling
+    return this.waitForResult(requestId, {
+      timeoutMs: timeout,
+      onStatusChange: options.onStatusChange as any,
+    });
+  }
+
+  /**
+   * Disconnects the Socket.IO connection if active.
+   */
+  disconnect(): void {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
   }
 }
 
