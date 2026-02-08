@@ -1,16 +1,16 @@
 /**
- * ZKProofPort SDK Constants
+ * ZKProofport SDK Constants
  */
 
 import type { CircuitType, SDKEnvironment } from './types';
 
 /**
  * Pre-configured relay server URLs for each environment.
- * Used by `ProofPortSDK.create('production')` for zero-config initialization.
+ * Used by `ProofportSDK.create('production')` for zero-config initialization.
  *
  * @example
  * ```typescript
- * const sdk = ProofPortSDK.create('production');
+ * const sdk = ProofportSDK.create('production');
  * // Uses RELAY_URLS.production = 'https://relay.zkproofport.app'
  * ```
  */
@@ -21,7 +21,7 @@ export const RELAY_URLS: Record<SDKEnvironment, string> = {
 };
 
 /**
- * Default deep link URL scheme for ZKProofPort mobile app.
+ * Default deep link URL scheme for ZKProofport mobile app.
  * Used to construct deep link URLs that open the mobile app.
  *
  * @example
@@ -241,7 +241,7 @@ export const NULLIFIER_REGISTRY_ABI = [
 ];
 
 /**
- * ZKProofPortNullifierRegistry contract ABI (V2).
+ * ZKProofportNullifierRegistry contract ABI (V2).
  *
  * This is the current nullifier registry interface with relayer-only registration.
  * Public view functions allow checking nullifier status and verifying proofs without registration.

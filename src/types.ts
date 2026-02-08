@@ -1,5 +1,5 @@
 /**
- * ZKProofPort SDK Types
+ * ZKProofport SDK Types
  */
 
 /**
@@ -92,7 +92,7 @@ export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | EmptyInp
 /**
  * Zero-knowledge proof request sent to mobile app via deep link.
  *
- * This structure is serialized into a deep link URL that opens the ZKProofPort mobile app.
+ * This structure is serialized into a deep link URL that opens the ZKProofport mobile app.
  * The app generates the proof and sends the result to the callbackUrl.
  *
  * @example
@@ -236,7 +236,7 @@ export interface VerifierContract {
 }
 
 /**
- * ZKProofPort SDK configuration options.
+ * ZKProofport SDK configuration options.
  *
  * Allows customization of deep link scheme, default callback URL,
  * and verifier contract addresses.
@@ -244,10 +244,10 @@ export interface VerifierContract {
  * @example
  * ```typescript
  * // Recommended: use environment preset
- * const sdk = ProofPortSDK.create('production');
+ * const sdk = ProofportSDK.create('production');
  *
  * // Or custom config:
- * const config: ProofPortConfig = {
+ * const config: ProofportConfig = {
  *   relayUrl: 'https://relay.zkproofport.app',
  *   verifiers: {
  *     coinbase_attestation: {
@@ -257,12 +257,12 @@ export interface VerifierContract {
  *     }
  *   }
  * };
- * const sdk = new ProofPortSDK(config);
+ * const sdk = new ProofportSDK(config);
  * ```
  */
 /**
  * SDK environment preset names.
- * Used with `ProofPortSDK.create('production')` for zero-config initialization.
+ * Used with `ProofportSDK.create('production')` for zero-config initialization.
  *
  * - `production` — relay.zkproofport.app
  * - `staging` — stg-relay.zkproofport.app
@@ -270,7 +270,7 @@ export interface VerifierContract {
  */
 export type SDKEnvironment = 'production' | 'staging' | 'local';
 
-export interface ProofPortConfig {
+export interface ProofportConfig {
   /** Deep link URL scheme (default: 'zkproofport') */
   scheme?: string;
   /** Relay server URL (e.g., 'https://relay.zkproofport.app'). Required for relay features. */
@@ -299,7 +299,7 @@ export interface DeepLinkComponents {
 /**
  * Nullifier verification status returned by smart contract.
  *
- * Mirrors the NullifierVerifyStatus enum in the ZKProofPortNullifierRegistry contract.
+ * Mirrors the NullifierVerifyStatus enum in the ZKProofportNullifierRegistry contract.
  * Indicates the result of verifying and registering a proof's nullifier on-chain.
  *
  * - `verified_and_registered`: Proof verified and nullifier registered successfully
@@ -319,7 +319,7 @@ export type NullifierVerifyStatus =
  * On-chain nullifier record from smart contract storage.
  *
  * Contains information about a registered nullifier retrieved from
- * the ZKProofPortNullifierRegistry contract.
+ * the ZKProofportNullifierRegistry contract.
  *
  * @example
  * ```typescript
@@ -340,7 +340,7 @@ export interface NullifierRecord {
 }
 
 /**
- * ZKProofPortNullifierRegistry smart contract configuration.
+ * ZKProofportNullifierRegistry smart contract configuration.
  *
  * Contains the address and ABI for the nullifier registry contract,
  * which tracks used nullifiers to prevent proof replay attacks.
@@ -366,7 +366,7 @@ export interface NullifierRegistryConfig {
 /**
  * Client credentials for API authentication.
  *
- * Used to authenticate with the ZKProofPort API server and obtain
+ * Used to authenticate with the ZKProofport API server and obtain
  * a JWT token for making authenticated requests to the relay server.
  *
  * @example
@@ -424,7 +424,7 @@ export interface AuthToken {
 export interface RelayProofRequest {
   /** Relay-issued unique request ID (UUID format) */
   requestId: string;
-  /** Deep link URL to open ZKProofPort app (built by relay) */
+  /** Deep link URL to open ZKProofport app (built by relay) */
   deepLink: string;
   /** Relay status: pending, completed, failed */
   status: string;

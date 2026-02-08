@@ -1,5 +1,5 @@
 /**
- * On-chain verification utilities for ZKProofPort SDK
+ * On-chain verification utilities for ZKProofport SDK
  *
  * Compatible with both ethers v5 and v6.
  */
@@ -341,14 +341,14 @@ function reconstructBytes32FromFields(fields: string[]): string {
 }
 
 /**
- * Check if a nullifier is already registered on-chain in the ZKProofPort nullifier registry.
+ * Check if a nullifier is already registered on-chain in the ZKProofport nullifier registry.
  *
  * This function queries the on-chain nullifier registry contract to determine if a nullifier
  * has been used before. This is used to prevent duplicate proof submissions from the same user
  * for the same scope.
  *
  * @param nullifier - The nullifier hash as hex string with 0x prefix
- * @param registryAddress - ZKProofPortNullifierRegistry contract address
+ * @param registryAddress - ZKProofportNullifierRegistry contract address
  * @param provider - ethers.js Provider instance (v5 or v6 compatible)
  * @returns Promise resolving to true if nullifier is registered, false otherwise
  *
@@ -387,7 +387,7 @@ export async function isNullifierRegistered(
  * that has been registered on-chain. This metadata is useful for auditing and analytics.
  *
  * @param nullifier - The nullifier hash as hex string with 0x prefix
- * @param registryAddress - ZKProofPortNullifierRegistry contract address
+ * @param registryAddress - ZKProofportNullifierRegistry contract address
  * @param provider - ethers.js Provider instance (v5 or v6 compatible)
  * @returns Promise resolving to nullifier info object, or null if not registered
  *

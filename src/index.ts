@@ -1,14 +1,14 @@
 /**
- * ZKProofPort SDK
+ * ZKProofport SDK
  *
- * SDK for requesting ZK proofs from the ZKProofPort mobile app
+ * SDK for requesting ZK proofs from the ZKProofport mobile app
  *
  * @example
  * ```typescript
- * import { ProofPortSDK } from '@zkproofport-app/sdk';
+ * import { ProofportSDK } from '@zkproofport-app/sdk';
  *
  * // Initialize with environment preset
- * const sdk = ProofPortSDK.create('production');
+ * const sdk = ProofportSDK.create('production');
  *
  * // Authenticate
  * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
@@ -27,7 +27,7 @@
  */
 
 // Main SDK class
-export { ProofPortSDK, default } from './ProofPortSDK';
+export { ProofportSDK, default } from './ProofportSDK';
 
 // Types
 export type {
@@ -41,7 +41,7 @@ export type {
   ParsedProof,
   QRCodeOptions,
   VerifierContract,
-  ProofPortConfig,
+  ProofportConfig,
   DeepLinkComponents,
   NullifierVerifyStatus,
   NullifierRecord,
@@ -59,7 +59,7 @@ export {
   buildProofRequestUrl,
   parseProofRequestUrl,
   parseDeepLink,
-  isProofPortDeepLink,
+  isProofportDeepLink,
   validateProofRequest,
   encodeData,
   decodeData,

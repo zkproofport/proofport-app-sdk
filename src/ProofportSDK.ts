@@ -1,5 +1,5 @@
 /**
- * ProofPort SDK - Main class
+ * Proofport SDK - Main class
  */
 
 import type {
@@ -9,7 +9,7 @@ import type {
   CircuitInputs,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
-  ProofPortConfig,
+  ProofportConfig,
   QRCodeOptions,
   ParsedProof,
   VerifierContract,
@@ -25,7 +25,7 @@ import {
   parseProofRequestUrl,
   parseProofResponseUrl,
   validateProofRequest,
-  isProofPortDeepLink,
+  isProofportDeepLink,
 } from './deeplink';
 import {
   generateQRCodeDataUrl,
@@ -49,17 +49,17 @@ import type { SDKEnvironment } from './types';
 
 
 /**
- * Main SDK class for interacting with the ZKProofPort mobile app.
+ * Main SDK class for interacting with the ZKProofport mobile app.
  *
  * Provides methods for creating proof requests, generating QR codes and deep links,
  * verifying proofs on-chain, and handling proof responses from the mobile app.
  *
  * @example
  * ```typescript
- * import { ProofPortSDK } from '@zkproofport-app/sdk';
+ * import { ProofportSDK } from '@zkproofport-app/sdk';
  *
  * // Initialize SDK with environment preset (recommended)
- * const sdk = ProofPortSDK.create('production');
+ * const sdk = ProofportSDK.create('production');
  *
  * // Authenticate
  * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
@@ -79,19 +79,19 @@ import type { SDKEnvironment } from './types';
  * }
  * ```
  */
-export class ProofPortSDK {
-  private config: Required<Omit<ProofPortConfig, 'relayUrl'>>;
+export class ProofportSDK {
+  private config: Required<Omit<ProofportConfig, 'relayUrl'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
   private authToken: AuthToken | null = null;
   private relayUrl: string;
   private socket: any = null;
 
   /**
-   * Creates a new ProofPortSDK instance.
+   * Creates a new ProofportSDK instance.
    *
    * For most use cases, prefer the static factory with environment presets:
    * ```typescript
-   * const sdk = ProofPortSDK.create('production');
+   * const sdk = ProofportSDK.create('production');
    * ```
    *
    * @param config - SDK configuration options
@@ -101,7 +101,7 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * const sdk = new ProofPortSDK({
+   * const sdk = new ProofportSDK({
    *   relayUrl: 'https://relay.zkproofport.app',
    *   verifiers: {
    *     coinbase_attestation: {
@@ -112,7 +112,7 @@ export class ProofPortSDK {
    * });
    * ```
    */
-  constructor(config: ProofPortConfig = {}) {
+  constructor(config: ProofportConfig = {}) {
     this.config = {
       scheme: config.scheme || DEFAULT_SCHEME,
       verifiers: config.verifiers || {},
@@ -134,8 +134,8 @@ export class ProofPortSDK {
    * @param options - Request configuration options
    * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
    * @param options.message - Custom message to display to user
-   * @param options.dappName - Application name shown in ZKProofPort app
-   * @param options.dappIcon - Application icon URL shown in ZKProofPort app
+   * @param options.dappName - Application name shown in ZKProofport app
+   * @param options.dappIcon - Application icon URL shown in ZKProofport app
    * @param options.expiresInMs - Request expiration time in milliseconds (default: 10 minutes)
    *
    * @returns ProofRequest object with unique requestId and all request details
@@ -194,8 +194,8 @@ export class ProofPortSDK {
    * @param options - Request configuration options
    * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
    * @param options.message - Custom message to display to user
-   * @param options.dappName - Application name shown in ZKProofPort app
-   * @param options.dappIcon - Application icon URL shown in ZKProofPort app
+   * @param options.dappName - Application name shown in ZKProofport app
+   * @param options.dappIcon - Application icon URL shown in ZKProofport app
    * @param options.expiresInMs - Request expiration time in milliseconds (default: 10 minutes)
    *
    * @returns ProofRequest object with unique requestId and all request details
@@ -258,8 +258,8 @@ export class ProofPortSDK {
    * @param options - Request configuration options
    * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
    * @param options.message - Custom message to display to user
-   * @param options.dappName - Application name shown in ZKProofPort app
-   * @param options.dappIcon - Application icon URL shown in ZKProofPort app
+   * @param options.dappName - Application name shown in ZKProofport app
+   * @param options.dappIcon - Application icon URL shown in ZKProofport app
    * @param options.expiresInMs - Request expiration time in milliseconds (default: 15 minutes)
    *
    * @returns ProofRequest object with unique requestId and all request details
@@ -298,7 +298,7 @@ export class ProofPortSDK {
   /**
    * Generates a deep link URL for a proof request.
    *
-   * Creates a zkproofport:// URL that opens the ZKProofPort mobile app with the
+   * Creates a zkproofport:// URL that opens the ZKProofport mobile app with the
    * specified proof request. The URL contains all request details encoded as query
    * parameters.
    *
@@ -318,9 +318,9 @@ export class ProofPortSDK {
   }
 
   /**
-   * Opens the ZKProofPort mobile app with a proof request.
+   * Opens the ZKProofport mobile app with a proof request.
    *
-   * Redirects the browser to the deep link URL, which opens the ZKProofPort app
+   * Redirects the browser to the deep link URL, which opens the ZKProofport app
    * if installed. Only works in mobile browser environments. For desktop, use
    * requestProof() to display a QR code instead.
    *
@@ -329,7 +329,7 @@ export class ProofPortSDK {
    * @example
    * ```typescript
    * const request = sdk.createCoinbaseKycRequest({ scope: 'myapp.com' });
-   * if (ProofPortSDK.isMobile()) {
+   * if (ProofportSDK.isMobile()) {
    *   sdk.openProofRequest(request); // Opens app directly
    * }
    * ```
@@ -344,7 +344,7 @@ export class ProofPortSDK {
    *
    * Detects whether the user is on mobile or desktop and automatically chooses
    * the appropriate flow:
-   * - Mobile: Opens the deep link directly to launch the ZKProofPort app
+   * - Mobile: Opens the deep link directly to launch the ZKProofport app
    * - Desktop: Generates a QR code data URL for the user to scan
    *
    * @param request - ProofRequest object to send
@@ -370,7 +370,7 @@ export class ProofPortSDK {
     qrOptions?: QRCodeOptions
   ): Promise<{ deepLink: string; qrDataUrl?: string; mobile: boolean }> {
     const deepLink = this.getDeepLinkUrl(request);
-    const mobile = ProofPortSDK.isMobile();
+    const mobile = ProofportSDK.isMobile();
 
     if (mobile) {
       window.location.href = deepLink;
@@ -509,7 +509,7 @@ export class ProofPortSDK {
    * Parses a proof response from a callback URL.
    *
    * Extracts and decodes proof response data from the callback URL query parameters
-   * after the user completes proof generation in the ZKProofPort app. The app
+   * after the user completes proof generation in the ZKProofport app. The app
    * redirects to your callback URL with the proof data encoded as query parameters.
    *
    * @param url - Callback URL containing proof response data
@@ -537,27 +537,27 @@ export class ProofPortSDK {
   }
 
   /**
-   * Checks if a URL is a ZKProofPort proof response callback.
+   * Checks if a URL is a ZKProofport proof response callback.
    *
    * Validates whether the given URL contains the required query parameters for a
    * proof response. Useful for filtering and routing callback requests.
    *
    * @param url - URL to check
    *
-   * @returns True if the URL appears to be a ZKProofPort response callback
+   * @returns True if the URL appears to be a ZKProofport response callback
    *
    * @example
    * ```typescript
    * app.get('/callback', (req, res) => {
    *   const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-   *   if (sdk.isProofPortResponse(fullUrl)) {
+   *   if (sdk.isProofportResponse(fullUrl)) {
    *     const response = sdk.parseResponse(fullUrl);
    *     // Handle proof response
    *   }
    * });
    * ```
    */
-  isProofPortResponse(url: string): boolean {
+  isProofportResponse(url: string): boolean {
     try {
       const urlObj = new URL(url);
       return urlObj.searchParams.has('requestId') && urlObj.searchParams.has('status');
@@ -626,7 +626,7 @@ export class ProofPortSDK {
    * match the claimed values.
    *
    * @param circuit - Circuit type identifier
-   * @param proof - Hex-encoded proof string from the ZKProofPort app
+   * @param proof - Hex-encoded proof string from the ZKProofport app
    * @param publicInputs - Array of hex-encoded public input strings
    * @param providerOrSigner - ethers v6 Provider or Signer (defaults to base mainnet public RPC)
    *
@@ -797,7 +797,7 @@ export class ProofPortSDK {
    * Gets all supported circuit types.
    *
    * Returns an array of all circuit type identifiers that are currently supported
-   * by the SDK and ZKProofPort app.
+   * by the SDK and ZKProofport app.
    *
    * @returns Array of supported circuit type identifiers
    *
@@ -838,26 +838,26 @@ export class ProofPortSDK {
   }
 
   /**
-   * Checks if a URL is a ZKProofPort deep link.
+   * Checks if a URL is a ZKProofport deep link.
    *
-   * Validates whether the given URL uses the ZKProofPort deep link scheme
+   * Validates whether the given URL uses the ZKProofport deep link scheme
    * (zkproofport:// by default) and has the correct format for a proof request.
    *
    * @param url - URL string to check
    *
-   * @returns True if the URL is a valid ZKProofPort deep link
+   * @returns True if the URL is a valid ZKProofport deep link
    *
    * @example
    * ```typescript
    * const url = 'zkproofport://proof?requestId=abc123&circuit=coinbase_attestation';
-   * if (sdk.isProofPortDeepLink(url)) {
+   * if (sdk.isProofportDeepLink(url)) {
    *   const request = sdk.parseDeepLink(url);
    *   console.log('Parsed request:', request);
    * }
    * ```
    */
-  isProofPortDeepLink(url: string): boolean {
-    return isProofPortDeepLink(url, this.config.scheme);
+  isProofportDeepLink(url: string): boolean {
+    return isProofportDeepLink(url, this.config.scheme);
   }
 
   /**
@@ -867,7 +867,7 @@ export class ProofPortSDK {
    * Useful for handling deep link navigation in web applications or validating
    * deep link URLs before displaying QR codes.
    *
-   * @param url - ZKProofPort deep link URL string
+   * @param url - ZKProofport deep link URL string
    *
    * @returns ProofRequest object with all request details, or null if invalid
    *
@@ -889,12 +889,12 @@ export class ProofPortSDK {
   // ============ Static Factory ============
 
   /**
-   * Creates a new ProofPortSDK instance with environment preset or custom config.
+   * Creates a new ProofportSDK instance with environment preset or custom config.
    * Defaults to `'production'` if no argument is provided.
    *
    * **Recommended usage** — use an environment preset for zero-config initialization:
    * ```typescript
-   * const sdk = ProofPortSDK.create('production');
+   * const sdk = ProofportSDK.create('production');
    * ```
    *
    * Environment presets:
@@ -904,32 +904,32 @@ export class ProofPortSDK {
    *
    * @param envOrConfig - Environment name or custom SDK configuration
    *
-   * @returns New ProofPortSDK instance
+   * @returns New ProofportSDK instance
    *
    * @example
    * ```typescript
    * // Environment preset (recommended)
-   * const sdk = ProofPortSDK.create(); // production (default)
-   * const sdk = ProofPortSDK.create('production');
+   * const sdk = ProofportSDK.create(); // production (default)
+   * const sdk = ProofportSDK.create('production');
    *
    * // Custom config
-   * const sdk = ProofPortSDK.create({
+   * const sdk = ProofportSDK.create({
    *   relayUrl: 'https://my-custom-relay.example.com',
    * });
    * ```
    */
-  static create(envOrConfig?: SDKEnvironment | ProofPortConfig): ProofPortSDK {
+  static create(envOrConfig?: SDKEnvironment | ProofportConfig): ProofportSDK {
     if (typeof envOrConfig === 'undefined') {
-      return new ProofPortSDK({ relayUrl: RELAY_URLS.production });
+      return new ProofportSDK({ relayUrl: RELAY_URLS.production });
     }
     if (typeof envOrConfig === 'string') {
       const relayUrl = RELAY_URLS[envOrConfig];
       if (!relayUrl) {
         throw new Error(`Unknown environment: ${envOrConfig}. Use 'production', 'staging', or 'local'.`);
       }
-      return new ProofPortSDK({ relayUrl });
+      return new ProofportSDK({ relayUrl });
     }
-    return new ProofPortSDK(envOrConfig);
+    return new ProofportSDK(envOrConfig);
   }
 
   /**
@@ -943,7 +943,7 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * if (ProofPortSDK.isMobile()) {
+   * if (ProofportSDK.isMobile()) {
    *   // Open deep link directly
    *   sdk.openProofRequest(request);
    * } else {
@@ -961,7 +961,7 @@ export class ProofPortSDK {
   }
 
   /**
-   * Authenticates with ZKProofPort using client credentials via the relay server.
+   * Authenticates with ZKProofport using client credentials via the relay server.
    *
    * Exchanges a client_id and api_key pair for a short-lived JWT token
    * that can be used to authenticate relay requests.
@@ -973,7 +973,7 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * const auth = await ProofPortSDK.authenticate(
+   * const auth = await ProofportSDK.authenticate(
    *   { clientId: 'your-client-id', apiKey: 'your-api-key' },
    *   'https://relay.zkproofport.app'
    * );
@@ -1025,8 +1025,8 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * if (!ProofPortSDK.isTokenValid(auth)) {
-   *   auth = await ProofPortSDK.authenticate(credentials, relayUrl);
+   * if (!ProofportSDK.isTokenValid(auth)) {
+   *   auth = await ProofportSDK.authenticate(credentials, relayUrl);
    * }
    * ```
    */
@@ -1037,7 +1037,7 @@ export class ProofPortSDK {
   // ============ Relay Integration ============
 
   /**
-   * Authenticates with ZKProofPort and stores the token for relay requests.
+   * Authenticates with ZKProofport and stores the token for relay requests.
    *
    * Instance method that authenticates via the relay server and stores
    * the JWT token internally, so subsequent relay requests are automatically authenticated.
@@ -1048,7 +1048,7 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * const sdk = ProofPortSDK.create('production');
+   * const sdk = ProofportSDK.create('production');
    *
    * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
    * // SDK is now authenticated for relay requests
@@ -1056,9 +1056,9 @@ export class ProofPortSDK {
    */
   async login(credentials: AuthCredentials): Promise<AuthToken> {
     if (!this.relayUrl) {
-      throw new Error('relayUrl is required for authentication. Use ProofPortSDK.create(\'production\') or set relayUrl in config.');
+      throw new Error('relayUrl is required for authentication. Use ProofportSDK.create(\'production\') or set relayUrl in config.');
     }
-    this.authToken = await ProofPortSDK.authenticate(credentials, this.relayUrl);
+    this.authToken = await ProofportSDK.authenticate(credentials, this.relayUrl);
     return this.authToken;
   }
 
@@ -1073,7 +1073,7 @@ export class ProofPortSDK {
    * Returns whether the SDK instance is currently authenticated with a valid token.
    */
   isAuthenticated(): boolean {
-    return this.authToken !== null && ProofPortSDK.isTokenValid(this.authToken);
+    return this.authToken !== null && ProofportSDK.isTokenValid(this.authToken);
   }
 
   /**
@@ -1100,7 +1100,7 @@ export class ProofPortSDK {
    *
    * @example
    * ```typescript
-   * const sdk = ProofPortSDK.create('production');
+   * const sdk = ProofportSDK.create('production');
    * await sdk.login({ clientId: 'id', apiKey: 'key' });
    *
    * const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -1124,11 +1124,11 @@ export class ProofPortSDK {
       nonce?: string;
     } = {}
   ): Promise<RelayProofRequest> {
-    if (!this.authToken || !ProofPortSDK.isTokenValid(this.authToken)) {
+    if (!this.authToken || !ProofportSDK.isTokenValid(this.authToken)) {
       throw new Error('Not authenticated. Call login() first.');
     }
     if (!this.relayUrl) {
-      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+      throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
     const body: Record<string, unknown> = {
@@ -1175,7 +1175,7 @@ export class ProofPortSDK {
    */
   async pollResult(requestId: string): Promise<RelayProofResult> {
     if (!this.relayUrl) {
-      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+      throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
     const response = await fetch(`${this.relayUrl}/api/v1/proof/${requestId}`);
@@ -1275,11 +1275,11 @@ export class ProofPortSDK {
       onError?: (error: { error: string; code?: number; requestId?: string }) => void;
     }
   ): Promise<() => void> {
-    if (!this.authToken || !ProofPortSDK.isTokenValid(this.authToken)) {
+    if (!this.authToken || !ProofportSDK.isTokenValid(this.authToken)) {
       throw new Error('Not authenticated. Call login() first.');
     }
     if (!this.relayUrl) {
-      throw new Error('relayUrl is required. Set it in ProofPortSDK config.');
+      throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
     let ioConnect: any;
@@ -1355,7 +1355,7 @@ export class ProofPortSDK {
     const timeout = options.timeoutMs || 300000;
 
     // Try Socket.IO first
-    if (this.authToken && ProofPortSDK.isTokenValid(this.authToken) && this.relayUrl) {
+    if (this.authToken && ProofportSDK.isTokenValid(this.authToken) && this.relayUrl) {
       try {
         return await new Promise<RelayProofResult>((resolve, reject) => {
           const timer = setTimeout(() => {
@@ -1407,4 +1407,4 @@ export class ProofPortSDK {
   }
 }
 
-export default ProofPortSDK;
+export default ProofportSDK;

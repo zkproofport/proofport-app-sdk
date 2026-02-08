@@ -1,5 +1,5 @@
 /**
- * Deep Link utilities for ZKProofPort SDK
+ * Deep Link utilities for ZKProofport SDK
  */
 
 import type {
@@ -114,7 +114,7 @@ export function decodeData<T>(encoded: string): T {
  * Builds a deep link URL for a proof request.
  *
  * Encodes the proof request and constructs a deep link URL that can be opened
- * by the ZKProofPort mobile app. The URL format is:
+ * by the ZKProofport mobile app. The URL format is:
  * `{scheme}://proof-request?data={encodedRequest}`
  *
  * @param request - The proof request to encode in the deep link
@@ -197,7 +197,7 @@ export function buildCallbackUrl(
 /**
  * Parses a proof request from a deep link URL.
  *
- * Extracts and decodes the proof request data from a ZKProofPort deep link URL.
+ * Extracts and decodes the proof request data from a ZKProofport deep link URL.
  * Returns null if the URL is invalid or missing required parameters.
  *
  * @param url - Deep link URL (e.g., "zkproofport://proof-request?data=...")
@@ -343,10 +343,10 @@ export function parseDeepLink(url: string): DeepLinkComponents | null {
 }
 
 /**
- * Checks if a URL is a valid ZKProofPort deep link.
+ * Checks if a URL is a valid ZKProofport deep link.
  *
  * Performs a case-insensitive check to see if the URL starts with the
- * ZKProofPort scheme. Does not validate the URL structure beyond the scheme.
+ * ZKProofport scheme. Does not validate the URL structure beyond the scheme.
  *
  * @param url - URL to check
  * @param scheme - Expected URL scheme (defaults to "zkproofport")
@@ -354,12 +354,12 @@ export function parseDeepLink(url: string): DeepLinkComponents | null {
  *
  * @example
  * ```typescript
- * isProofPortDeepLink("zkproofport://proof-request?data=..."); // true
- * isProofPortDeepLink("https://example.com"); // false
- * isProofPortDeepLink("ZKPROOFPORT://proof-request"); // true (case-insensitive)
+ * isProofportDeepLink("zkproofport://proof-request?data=..."); // true
+ * isProofportDeepLink("https://example.com"); // false
+ * isProofportDeepLink("ZKPROOFPORT://proof-request"); // true (case-insensitive)
  * ```
  */
-export function isProofPortDeepLink(
+export function isProofportDeepLink(
   url: string,
   scheme: string = DEFAULT_SCHEME
 ): boolean {

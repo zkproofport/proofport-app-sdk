@@ -1,5 +1,5 @@
 /**
- * QR Code utilities for ZKProofPort SDK
+ * QR Code utilities for ZKProofport SDK
  */
 
 import QRCode from 'qrcode';
