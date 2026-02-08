@@ -2,7 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
-  "name": "ZKProofPort SDK",
+  "name": "ZKProofport SDK",
   "includeVersion": true,
   "excludePrivate": true,
   "excludeProtected": true,

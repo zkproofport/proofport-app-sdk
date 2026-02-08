@@ -1,7 +1,7 @@
 {
   "name": "@zkproofport-app/sdk",
   "version": "0.1.0-beta.1",
-  "description": "ZKProofPort SDK for requesting zero-knowledge proofs from the ZKProofPort mobile app and verifying them on-chain",
+  "description": "ZKProofport SDK for requesting zero-knowledge proofs from the ZKProofport mobile app and verifying them on-chain",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -56,7 +56,7 @@
     "blockchain",
     "zkproofport"
   ],
-  "author": "ZKProofPort",
+  "author": "ZKProofport",
   "license": "MIT",
   "repository": {
     "type": "git",

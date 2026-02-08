@@ -1,4 +1,4 @@
-# ZKProofPort SDK - Publish to npm
+# ZKProofport SDK - Publish to npm
 # Triggered automatically when Release Please creates a GitHub Release
 
 name: Publish to npm

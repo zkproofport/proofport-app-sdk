@@ -1,4 +1,4 @@
-# ZKProofPort SDK - Release Please Workflow
+# ZKProofport SDK - Release Please Workflow
 # Automatically creates release PR and GitHub Release based on conventional commits
 
 name: Release Please

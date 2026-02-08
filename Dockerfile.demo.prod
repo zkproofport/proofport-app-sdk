@@ -1,4 +1,4 @@
-# ProofPort Demo - Production Dockerfile
+# Proofport Demo - Production Dockerfile
 # Multi-stage build for SDK demo page
 
 # --- Stage 1: Install dependencies ---
