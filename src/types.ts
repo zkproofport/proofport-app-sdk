@@ -115,8 +115,8 @@ export interface ProofRequest {
   circuit: CircuitType;
   /** Circuit-specific input parameters */
   inputs: CircuitInputs;
-  /** URL where mobile app will POST the proof response */
-  callbackUrl: string;
+  /** URL where mobile app will POST the proof response (set by relay, not by SDK user) */
+  callbackUrl?: string;
   /** Optional: Custom message to display to user in mobile app */
   message?: string;
   /** Optional: DApp name displayed in mobile app UI */
@@ -243,9 +243,12 @@ export interface VerifierContract {
  *
  * @example
  * ```typescript
+ * // Recommended: use environment preset
+ * const sdk = ProofPortSDK.create('production');
+ *
+ * // Or custom config:
  * const config: ProofPortConfig = {
- *   scheme: 'myapp',
- *   defaultCallbackUrl: 'https://myapp.com/proof-callback',
+ *   relayUrl: 'https://relay.zkproofport.app',
  *   verifiers: {
  *     coinbase_attestation: {
  *       address: '0x1234...',
@@ -254,15 +257,24 @@ export interface VerifierContract {
  *     }
  *   }
  * };
- *
  * const sdk = new ProofPortSDK(config);
  * ```
  */
+/**
+ * SDK environment preset names.
+ * Used with `ProofPortSDK.create('production')` for zero-config initialization.
+ *
+ * - `production` — relay.zkproofport.app
+ * - `staging` — stg-relay.zkproofport.app
+ * - `local` — localhost:4001
+ */
+export type SDKEnvironment = 'production' | 'staging' | 'local';
+
 export interface ProofPortConfig {
   /** Deep link URL scheme (default: 'zkproofport') */
   scheme?: string;
-  /** Default callback URL for proof responses (can be overridden per request) */
-  defaultCallbackUrl?: string;
+  /** Relay server URL (e.g., 'https://relay.zkproofport.app'). Required for relay features. */
+  relayUrl?: string;
   /** Custom verifier contract addresses per circuit type (overrides defaults) */
   verifiers?: Partial<Record<CircuitType, VerifierContract>>;
 }
@@ -349,4 +361,93 @@ export interface NullifierRegistryConfig {
   chainId: number;
   /** Contract ABI (ethers v6 format) */
   abi: string[];
+}
+
+/**
+ * Client credentials for API authentication.
+ *
+ * Used to authenticate with the ZKProofPort API server and obtain
+ * a JWT token for making authenticated requests to the relay server.
+ *
+ * @example
+ * ```typescript
+ * const credentials: AuthCredentials = {
+ *   clientId: 'your-client-id',
+ *   apiKey: 'your-api-key'
+ * };
+ * ```
+ */
+export interface AuthCredentials {
+  /** Client ID identifying the application */
+  clientId: string;
+  /** API key for authentication */
+  apiKey: string;
+}
+
+/**
+ * JWT authentication token received from the API server.
+ *
+ * Contains the JWT token and metadata about the authenticated session,
+ * including tier information, expiration time, and associated identifiers.
+ *
+ * @example
+ * ```typescript
+ * const auth: AuthToken = {
+ *   token: 'eyJhbGc...',
+ *   clientId: 'your-client-id',
+ *   dappId: 'app-123',
+ *   tier: 'plan1',
+ *   expiresIn: 3600,
+ *   expiresAt: 1707234567890
+ * };
+ * ```
+ */
+export interface AuthToken {
+  /** JWT token for authenticating relay requests */
+  token: string;
+  /** Client ID that the token was issued for */
+  clientId: string;
+  /** DApp ID associated with this client */
+  dappId: string;
+  /** Service tier (free, credit, plan1, plan2) */
+  tier: string;
+  /** Token lifetime in seconds (typically 3600 = 1 hour) */
+  expiresIn: number;
+  /** Unix timestamp (ms) when the token expires */
+  expiresAt: number;
+}
+
+/**
+ * Result from creating a proof request via relay.
+ * Contains relay-issued requestId, deep link, and poll URL.
+ */
+export interface RelayProofRequest {
+  /** Relay-issued unique request ID (UUID format) */
+  requestId: string;
+  /** Deep link URL to open ZKProofPort app (built by relay) */
+  deepLink: string;
+  /** Relay status: pending, completed, failed */
+  status: string;
+  /** Relative poll URL for checking proof status (e.g., /api/v1/proof/{requestId}) */
+  pollUrl: string;
+}
+
+/**
+ * Proof result retrieved from relay polling.
+ */
+export interface RelayProofResult {
+  requestId: string;
+  status: 'pending' | 'completed' | 'failed';
+  deepLink?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Present when status is 'completed' */
+  proof?: string;
+  publicInputs?: string[];
+  verifierAddress?: string;
+  chainId?: number;
+  nullifier?: string;
+  circuit?: string;
+  /** Present when status is 'failed' */
+  error?: string;
 }

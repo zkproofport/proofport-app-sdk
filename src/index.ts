@@ -7,18 +7,22 @@
  * ```typescript
  * import { ProofPortSDK } from '@zkproofport-app/sdk';
  *
- * const sdk = new ProofPortSDK({
- *   defaultCallbackUrl: 'https://myapp.com/verify'
+ * // Initialize with environment preset
+ * const sdk = ProofPortSDK.create('production');
+ *
+ * // Authenticate
+ * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
+ *
+ * // Create proof request via relay
+ * const relay = await sdk.createRelayRequest('coinbase_attestation', {
+ *   scope: 'myapp.com'
  * });
  *
- * // Create Coinbase KYC proof request
- * const request = sdk.createProofRequest('coinbase_attestation', {});
- *
  * // Generate QR code
- * const qrDataUrl = await sdk.generateQRCode(request);
+ * const qr = await sdk.generateQRCode(relay.deepLink);
  *
- * // Or open app directly
- * sdk.openProofRequest(request);
+ * // Wait for proof
+ * const result = await sdk.waitForProof(relay.requestId);
  * ```
  */
 
@@ -42,15 +46,18 @@ export type {
   NullifierVerifyStatus,
   NullifierRecord,
   NullifierRegistryConfig,
+  AuthCredentials,
+  AuthToken,
+  RelayProofRequest,
+  RelayProofResult,
+  SDKEnvironment,
 } from './types';
 
 // Deep link utilities
 export {
   generateRequestId,
   buildProofRequestUrl,
-  buildCallbackUrl,
   parseProofRequestUrl,
-  parseProofResponseUrl,
   parseDeepLink,
   isProofPortDeepLink,
   validateProofRequest,
@@ -93,4 +100,5 @@ export {
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   NULLIFIER_REGISTRY_ABI,
   ZKPROOFPORT_NULLIFIER_REGISTRY_ABI,
+  RELAY_URLS,
 } from './constants';

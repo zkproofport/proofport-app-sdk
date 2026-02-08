@@ -2,7 +2,23 @@
  * ZKProofPort SDK Constants
  */
 
-import type { CircuitType } from './types';
+import type { CircuitType, SDKEnvironment } from './types';
+
+/**
+ * Pre-configured relay server URLs for each environment.
+ * Used by `ProofPortSDK.create('production')` for zero-config initialization.
+ *
+ * @example
+ * ```typescript
+ * const sdk = ProofPortSDK.create('production');
+ * // Uses RELAY_URLS.production = 'https://relay.zkproofport.app'
+ * ```
+ */
+export const RELAY_URLS: Record<SDKEnvironment, string> = {
+  production: 'https://relay.zkproofport.app',
+  staging: 'https://stg-relay.zkproofport.app',
+  local: 'http://localhost:4001',
+};
 
 /**
  * Default deep link URL scheme for ZKProofPort mobile app.
