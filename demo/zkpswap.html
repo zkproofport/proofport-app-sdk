@@ -9,7 +9,7 @@
   <meta property="og:title" content="ZKPSwap - Compliant Decentralized Exchange">
   <meta property="og:description" content="Privacy-preserving DEX with KYC compliance powered by ZKProofport zero-knowledge proofs.">
   <meta property="og:site_name" content="ZKProofport">
-  <meta property="og:url" content="__DEMO_BASE_URL__/shieldswap">
+  <meta property="og:url" content="__DEMO_BASE_URL__/zkpswap">
   <meta property="og:image" content="__DEMO_BASE_URL__/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -1450,7 +1450,12 @@
       </div>
     </div>
     <div class="header-right">
-      <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-right: 8px;">ZKProofport</a>
+      <input type="text" id="auth-client-id" placeholder="Client ID" style="width:100px;padding:3px 8px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
+      <input type="password" id="auth-api-key" placeholder="API Key" style="width:100px;padding:3px 8px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
+      <button onclick="authenticateWithApiKey()" id="btn-auth" style="padding:3px 10px;font-size:11px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
+      <button onclick="clearAuth()" id="btn-logout" style="display:none;padding:3px 10px;font-size:11px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:4px;cursor:pointer;">Logout</button>
+      <span id="auth-status" style="font-size:11px;color:var(--text-tertiary);"></span>
+      <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-left: 8px;">ZKProofport</a>
       <div id="kycBadge" class="kyc-badge">
         <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.85 2.55 7.45 6 8 3.45-.55 6-4.15 6-8V4L8 1z" fill="currentColor"/><path d="M6.5 8l1.5 1.5 2.5-2.5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Verified
@@ -1711,15 +1716,27 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script type="importmap">
+    { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
+  </script>
   <script type="module">
+    import { ProofPortSDK, RELAY_URLS } from '../dist/index.mjs';
 
     // ========== CONSTANTS ==========
     const DEFAULT_SCHEME = 'zkproofport';
-    const SERVER_URL = window.location.origin;
-    const CALLBACK_URL = `${SERVER_URL}/api/callback`;
-    const POLL_INTERVAL = 2000;
+    const CALLBACK_URL = `${window.location.origin}/api/callback`;
     const KYC_THRESHOLD = 5;
     // Verifier address comes from proof response (no hardcoded fallback)
+
+    // Detect SDK environment from hostname
+    function detectSDKEnv() {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return 'local';
+      if (host.startsWith('stg-') || host.includes('staging')) return 'staging';
+      return 'production';
+    }
+    const sdkEnv = detectSDKEnv();
+    const sdk = ProofPortSDK.create(sdkEnv);
 
     // ========== TOKEN DATA ==========
     const TOKENS = {
@@ -1746,6 +1763,8 @@
     let tokenSelectSide = null; // 'from' or 'to'
     let lastProofData = null;
     let lastRequestData = null;
+    let jwtToken = '';
+    let authClientId = '';
 
     // Always start with default balances on page load (reset on refresh)
     sessionStorage.removeItem('tokenBalances');
@@ -1770,10 +1789,6 @@
         .replace(/=+$/, '');
     }
 
-    function buildProofRequestUrl(request) {
-      const encoded = encodeData(request);
-      return `${DEFAULT_SCHEME}://proof-request?data=${encoded}`;
-    }
 
     function generateRandomAddress() {
       const bytes = new Uint8Array(20);
@@ -1823,6 +1838,53 @@
       Object.keys(TOKENS).forEach(k => { balances[k] = TOKENS[k].balance; });
       sessionStorage.setItem('tokenBalances', JSON.stringify(balances));
     }
+
+    // ========== AUTHENTICATION ==========
+
+    window.authenticateWithApiKey = async function() {
+      const clientIdInput = document.getElementById('auth-client-id').value.trim();
+      const apiKeyInput = document.getElementById('auth-api-key').value.trim();
+
+      if (!clientIdInput || !apiKeyInput) {
+        document.getElementById('auth-status').innerHTML = '<span style="color:var(--error);">Both fields required</span>';
+        return;
+      }
+
+      try {
+        document.getElementById('btn-auth').disabled = true;
+        document.getElementById('auth-status').textContent = 'Authenticating...';
+
+        const auth = await sdk.login({ clientId: clientIdInput, apiKey: apiKeyInput });
+
+        jwtToken = auth.token;
+        authClientId = auth.clientId;
+
+        document.getElementById('auth-client-id').style.display = 'none';
+        document.getElementById('auth-api-key').style.display = 'none';
+        document.getElementById('btn-auth').style.display = 'none';
+        document.getElementById('btn-logout').style.display = '';
+        document.getElementById('auth-status').innerHTML = `<span style="color:var(--success);">${auth.clientId} (${auth.tier})</span>`;
+        document.getElementById('btn-auth').disabled = false;
+        devLog('AUTH', `Authenticated as ${auth.clientId} (tier=${auth.tier})`);
+      } catch (err) {
+        document.getElementById('auth-status').innerHTML = `<span style="color:var(--error);">${err.message}</span>`;
+        document.getElementById('btn-auth').disabled = false;
+        devLog('AUTH', `Failed: ${err.message}`);
+      }
+    };
+
+    window.clearAuth = function() {
+      jwtToken = '';
+      authClientId = '';
+      document.getElementById('auth-client-id').value = '';
+      document.getElementById('auth-api-key').value = '';
+      document.getElementById('auth-client-id').style.display = '';
+      document.getElementById('auth-api-key').style.display = '';
+      document.getElementById('btn-auth').style.display = '';
+      document.getElementById('btn-logout').style.display = 'none';
+      document.getElementById('auth-status').textContent = '';
+      devLog('AUTH', 'Logged out');
+    };
 
     // ========== DEVELOPER LOG ==========
 
@@ -2207,35 +2269,42 @@
       statusEl.innerHTML = '<span>Waiting for verification</span><span class="waiting-dots"><span>.</span><span>.</span><span>.</span></span>';
       document.getElementById('kycShieldLock').classList.add('animating');
 
-      // Create proof request
-      const request = {
-        requestId: generateRequestId(),
-        circuit: 'coinbase_attestation',
-        inputs: { scope: 'zkpswap:kyc' },
-        callbackUrl: CALLBACK_URL,
-        dappName: 'ZKPSwap',
-        message: 'Identity verification required for this swap',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 600000
-      };
+      // Check auth
+      if (!jwtToken) {
+        alert('Please authenticate first (enter Client ID and API Key in the header)');
+        document.getElementById('kycShieldLock').classList.remove('animating');
+        statusEl.className = 'kyc-status';
+        statusEl.innerHTML = '';
+        return;
+      }
 
-      currentRequestId = request.requestId;
-      currentDeepLink = buildProofRequestUrl(request);
-      lastRequestData = request;
+      devLog('SDK', 'Requesting proof via relay...');
 
-      devLog('SDK', `Created proof request: ${request.requestId}`);
-      devLog('SDK', `Circuit: ${request.circuit}`);
-      devLog('SDK', `Callback: ${CALLBACK_URL}`);
-      renderDevRequest();
-
-      // Generate QR code
+      // Request proof via relay using SDK
       try {
-        const QRCode = await import('https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm');
-        const qrDataUrl = await QRCode.toDataURL(currentDeepLink, {
-          width: 200,
-          margin: 2,
-          color: { dark: '#000000', light: '#ffffff' }
+        const result = await sdk.createRelayRequest('coinbase_attestation', {}, {
+          dappName: 'ZKPSwap',
         });
+
+        currentRequestId = result.requestId;
+        currentDeepLink = result.deepLink;
+        lastRequestData = { requestId: result.requestId, circuit: 'coinbase_attestation', scope: 'zkpswap:kyc' };
+
+        devLog('SDK', `Request ID: ${result.requestId}`);
+        devLog('SDK', `Deep link received from relay`);
+        renderDevRequest();
+      } catch (err) {
+        devLog('SDK', `Relay connection failed: ${err.message}`);
+        alert(`Failed to connect to relay: ${err.message}`);
+        document.getElementById('kycShieldLock').classList.remove('animating');
+        statusEl.className = 'kyc-status';
+        statusEl.innerHTML = '';
+        return;
+      }
+
+      // Generate QR code using SDK
+      try {
+        const qrDataUrl = await sdk.generateQRCode(currentDeepLink, { width: 200, margin: 2 });
         document.getElementById('kycQrImage').src = qrDataUrl;
         devLog('SDK', 'QR code generated');
       } catch (e) {
@@ -2244,8 +2313,8 @@
 
       document.getElementById('kycModal').classList.add('open');
 
-      // Start polling
-      startPolling(request.requestId);
+      // Start polling via SDK
+      waitForProofResult(currentRequestId);
     };
 
     window.closeKycModal = function(e) {
@@ -2264,42 +2333,35 @@
     // ========== POLLING ==========
 
     function startPolling(requestId) {
-      stopPolling();
-      devLog('POLL', `Started polling for ${requestId}`);
+      startRelayPolling(requestId);
+    }
 
-      pollingTimer = setInterval(async () => {
-        try {
-          const response = await fetch(`${SERVER_URL}/api/results/${requestId}`);
-          const data = await response.json();
-          if (data.found) {
-            devLog('POLL', `Result found for ${requestId}`);
-            stopPolling();
-            handleProofResult(data.data);
-          }
-        } catch (e) {
-          devLog('POLL', `Error: ${e.message}`);
-        }
-      }, POLL_INTERVAL);
+    async function waitForProofResult(requestId) {
+      devLog('PROOF', `Waiting for proof ${requestId} (Socket.IO primary, polling fallback)`);
 
-      // Immediate check
-      (async () => {
-        try {
-          const response = await fetch(`${SERVER_URL}/api/results/${requestId}`);
-          const data = await response.json();
-          if (data.found) {
-            stopPolling();
-            handleProofResult(data.data);
-          }
-        } catch { /* ignore */ }
-      })();
+      try {
+        const result = await sdk.waitForProof(requestId, {
+          timeoutMs: 300000,
+          onStatusChange: (data) => {
+            devLog('PROOF', `Status update: ${data.status}`);
+          },
+        });
+
+        devLog('POLL', `Proof completed for ${requestId}`);
+        handleProofResult(result);
+      } catch (err) {
+        devLog('POLL', `Proof failed: ${err.message}`);
+        // Show error
+        const statusEl = document.getElementById('kycStatus');
+        statusEl.className = 'kyc-status error';
+        statusEl.innerHTML = `<span>Verification failed: ${err.message || 'Unknown error'}</span>`;
+        document.getElementById('kycShieldLock').classList.remove('animating');
+      }
     }
 
     function stopPolling() {
-      if (pollingTimer) {
-        clearInterval(pollingTimer);
-        pollingTimer = null;
-        devLog('POLL', 'Polling stopped');
-      }
+      // SDK waitForProof handles its own cleanup, this function kept for compatibility
+      devLog('POLL', 'Polling stopped (SDK handles cleanup)');
     }
 
     // ========== PROOF HANDLING ==========
@@ -2519,7 +2581,7 @@
       document.getElementById('devConfigCallback').textContent = CALLBACK_URL;
 
       devLog('SDK', 'ZKPSwap initialized');
-      devLog('SDK', `Server: ${SERVER_URL}`);
+      devLog('SDK', `Environment: ${sdkEnv} (${RELAY_URLS[sdkEnv]})`);
       devLog('SDK', `KYC threshold: ${KYC_THRESHOLD} ETH`);
 
       if (walletConnected) {

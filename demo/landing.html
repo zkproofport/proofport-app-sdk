@@ -839,20 +839,18 @@
   <header>
     <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
       <div class="logo">ZKProofPort</div>
-      <div class="plan-selector">
-        <label>Test Account:</label>
-        <select id="plan-select" onchange="switchPlan(this.value)">
-          <option value="demo_proofport" data-tier="free">Free</option>
-          <option value="credit_test_client" data-tier="credit">Credit</option>
-          <option value="plan1_test_client" data-tier="plan1">Plan 1</option>
-          <option value="plan2_test_client" data-tier="plan2">Plan 2 (On-Chain)</option>
-        </select>
-        <span id="plan-badge" class="current-plan plan-free">FREE</span>
+      <div class="plan-selector" id="auth-section">
+        <input type="text" id="auth-client-id" placeholder="Client ID" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
+        <input type="password" id="auth-api-key" placeholder="API Key" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
+        <button onclick="authenticateWithApiKey()" id="btn-authenticate" style="padding:4px 12px;font-size:12px;background:var(--blue,#3b82f6);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
+        <button onclick="clearAuth()" id="btn-clear-auth" style="display:none;padding:4px 12px;font-size:12px;background:var(--gray-600,#444);color:white;border:none;border-radius:4px;cursor:pointer;">Logout</button>
+        <span id="auth-status" style="font-size:12px;color:var(--gray-400,#999);"></span>
+        <span id="plan-badge" class="current-plan" style="display:none;"></span>
       </div>
       <nav style="display:flex;gap:1rem;align-items:center;">
         <a href="#demo-kyc" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Callback Demo</a>
         <a href="/relay-demo" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Relay Demo</a>
-        <a href="/shieldswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ZKPSwap</a>
+        <a href="/zkpswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ZKPSwap</a>
         <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:var(--cyan);text-decoration:none;font-size:0.9rem;border:1px solid var(--cyan);padding:0.3rem 0.8rem;border-radius:6px;">Dashboard</a>
       </nav>
     </div>
@@ -867,10 +865,10 @@
         <a href="#demo-kyc" class="btn btn-primary">Try KYC Demo</a>
         <a href="#demo-country" class="btn btn-secondary">Try Country Demo</a>
         <a href="/relay-demo" class="btn btn-secondary">Relay Demo</a>
-        <a href="/shieldswap" class="btn btn-secondary">ZKPSwap</a>
+        <a href="/zkpswap" class="btn btn-secondary">ZKPSwap</a>
       </div>
       <p style="color:var(--gray-400);font-size:0.95rem;margin-top:1.5rem;">
-        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/shieldswap" style="color:var(--cyan);text-decoration:underline;">ZKPSwap</a> demonstrates a compliant DEX using ZK proofs.
+        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/zkpswap" style="color:var(--cyan);text-decoration:underline;">ZKPSwap</a> demonstrates a compliant DEX using ZK proofs.
       </p>
     </div>
   </section>
@@ -1045,10 +1043,8 @@
 <pre><span class="code-comment">// Install the SDK</span>
 <span class="code-keyword">import</span> { ProofPortSDK } <span class="code-keyword">from</span> <span class="code-string">'@proofport/sdk'</span>;
 
-<span class="code-comment">// Initialize SDK</span>
-<span class="code-keyword">const</span> sdk = <span class="code-keyword">new</span> <span class="code-function">ProofPortSDK</span>({
-  defaultCallbackUrl: <span class="code-string">'https://yourapp.com/api/callback'</span>
-});
+<span class="code-comment">// Initialize SDK (defaults to production)</span>
+<span class="code-keyword">const</span> sdk = ProofPortSDK.<span class="code-function">create</span>();
 
 <span class="code-comment">// Create a proof request</span>
 <span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({ scope: <span class="code-string">'your-dapp:action'</span> });
@@ -1083,121 +1079,71 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       }
     }
   </script>
+  <script type="importmap">
+    { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
+  </script>
   <script type="module">
     import { ProofPortSDK } from '../dist/index.mjs';
     import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
 
-    // Use demo server proxy instead of direct relay access (works from any device)
-    const RELAY_PROXY = '';
-    const urlParams = new URLSearchParams(window.location.search);
-    let DEMO_CLIENT_ID = urlParams.get('clientId') || 'demo_proofport';
-
-    const PLAN_TIERS = {
-      'demo_proofport': 'free',
-      'credit_test_client': 'credit',
-      'plan1_test_client': 'plan1',
-      'plan2_test_client': 'plan2',
-    };
-
-    // Initialize plan selector and dashboard link from URL param
-    window.addEventListener('DOMContentLoaded', () => {
-      const select = document.getElementById('plan-select');
-      if (select) {
-        select.value = DEMO_CLIENT_ID;
-        updatePlanBadge(PLAN_TIERS[DEMO_CLIENT_ID] || 'free');
-      }
-    });
-
-    window.switchPlan = function(clientId) {
-      DEMO_CLIENT_ID = clientId;
-      const tier = PLAN_TIERS[clientId] || 'free';
-      updatePlanBadge(tier);
-      // Update URL without reload
-      const url = new URL(window.location);
-      url.searchParams.set('clientId', clientId);
-      history.replaceState({}, '', url);
-    };
-
-    function updatePlanBadge(tier) {
-      const badge = document.getElementById('plan-badge');
-      if (!badge) return;
-      badge.className = `current-plan plan-${tier}`;
-      const labels = { free: 'FREE', credit: 'CREDIT', plan1: 'PLAN 1', plan2: 'PLAN 2' };
-      badge.textContent = labels[tier] || tier.toUpperCase();
+    // Detect SDK environment from hostname
+    function detectSDKEnv() {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return 'local';
+      if (host.startsWith('stg-') || host.includes('staging')) return 'staging';
+      return 'production';
     }
+    const sdkEnv = detectSDKEnv();
+    const sdk = ProofPortSDK.create(sdkEnv);
 
-    // Initialize SDK (still used for verification)
-    const sdk = new ProofPortSDK({});
+    // Authenticate with API key to get JWT token
+    window.authenticateWithApiKey = async function() {
+      const clientIdInput = document.getElementById('auth-client-id').value.trim();
+      const apiKeyInput = document.getElementById('auth-api-key').value.trim();
+
+      if (!clientIdInput || !apiKeyInput) {
+        document.getElementById('auth-status').innerHTML = '<span style="color:#ef4444;">Both fields required</span>';
+        return;
+      }
+
+      try {
+        document.getElementById('btn-authenticate').disabled = true;
+        document.getElementById('auth-status').innerHTML = 'Authenticating...';
+
+        const auth = await sdk.login({ clientId: clientIdInput, apiKey: apiKeyInput });
+
+        // Update UI
+        document.getElementById('auth-client-id').style.display = 'none';
+        document.getElementById('auth-api-key').style.display = 'none';
+        document.getElementById('btn-authenticate').style.display = 'none';
+        document.getElementById('btn-clear-auth').style.display = '';
+        document.getElementById('auth-status').innerHTML = `<span style="color:#22c55e;">Authenticated as ${auth.clientId} (${auth.tier})</span>`;
+        document.getElementById('plan-badge').style.display = '';
+        document.getElementById('plan-badge').textContent = auth.tier.toUpperCase();
+        document.getElementById('plan-badge').className = 'current-plan plan-' + auth.tier;
+        document.getElementById('btn-authenticate').disabled = false;
+      } catch (err) {
+        document.getElementById('auth-status').innerHTML = `<span style="color:#ef4444;">${err.message}</span>`;
+        document.getElementById('btn-authenticate').disabled = false;
+      }
+    };
+
+    window.clearAuth = function() {
+      document.getElementById('auth-client-id').value = '';
+      document.getElementById('auth-api-key').value = '';
+      document.getElementById('auth-client-id').style.display = '';
+      document.getElementById('auth-api-key').style.display = '';
+      document.getElementById('btn-authenticate').style.display = '';
+      document.getElementById('btn-clear-auth').style.display = 'none';
+      document.getElementById('auth-status').textContent = '';
+      document.getElementById('plan-badge').style.display = 'none';
+    };
 
     let isIncluded = true;
     let activeKycRequestId = null;
     let activeCountryRequestId = null;
     const proofDataStore = {};
     const proofObjectStore = {};
-    let pollIntervals = {};
-    const pollStartTimes = {};
-    const PROOF_TIMEOUT_MS = 180_000; // 3 minutes
-
-
-    // Request proof via relay API
-    async function requestProofViaRelay(circuitId, inputs, callbackUrl, prefix) {
-      try {
-        const res = await fetch(`${RELAY_PROXY}/api/relay/proof/request`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: DEMO_CLIENT_ID,
-            circuitId,
-            scope: 'zkproofport:demo',
-            inputs,
-            callbackUrl: callbackUrl || undefined,
-          }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Request failed' }));
-          alert(err.error || `Request failed (${res.status})`);
-          return null;
-        }
-
-        return await res.json();
-      } catch (err) {
-        alert(`Failed to connect to relay: ${err.message}`);
-        return null;
-      }
-    }
-
-    // Poll relay for proof status
-    function startPolling(requestId, prefix) {
-      if (pollIntervals[prefix]) clearInterval(pollIntervals[prefix]);
-      pollStartTimes[prefix] = Date.now();
-
-      pollIntervals[prefix] = setInterval(async () => {
-        // Check timeout
-        if (Date.now() - pollStartTimes[prefix] > PROOF_TIMEOUT_MS) {
-          clearInterval(pollIntervals[prefix]);
-          delete pollIntervals[prefix];
-          showProofTimeout(prefix);
-          return;
-        }
-
-        try {
-          const res = await fetch(`${RELAY_PROXY}/api/relay/proof/${requestId}`);
-          if (!res.ok) return;
-          const status = await res.json();
-
-          if (status.status === 'completed') {
-            clearInterval(pollIntervals[prefix]);
-            delete pollIntervals[prefix];
-            showProofReceived(prefix, status);
-          } else if (status.status === 'failed') {
-            clearInterval(pollIntervals[prefix]);
-            delete pollIntervals[prefix];
-            showProofFailed(prefix, status.error || 'Proof generation failed');
-          }
-        } catch {}
-      }, 2000);
-    }
 
     function showProofReceived(prefix, proof) {
       document.getElementById(`${prefix}-waiting`).classList.remove('show');
@@ -1356,32 +1302,52 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       }
     }
 
-    // KYC Demo - via relay
+    // KYC Demo - via SDK
     window.requestKycProof = async function() {
       document.getElementById('kyc-received').classList.remove('show');
       document.getElementById('kyc-waiting').classList.remove('show');
       document.getElementById('kyc-failed').classList.remove('show');
       document.getElementById('kyc-verify-result').classList.remove('show');
 
-      const result = await requestProofViaRelay(
-        'coinbase_attestation',
-        {},
-        window.location.origin + '/api/callback',
-        'kyc'
-      );
+      try {
+        const result = await sdk.createRelayRequest('coinbase_attestation', {}, {
+          dappName: 'ZKProofPort Demo',
+        });
 
-      if (!result) return;
+        activeKycRequestId = result.requestId;
 
-      activeKycRequestId = result.requestId;
+        await showProofResult(result.deepLink, 'kyc-qr-container', 'kyc-deep-link');
+        document.getElementById('kyc-result').classList.add('show');
+        document.getElementById('kyc-waiting').classList.add('show');
 
-      await showProofResult(result.deepLink, 'kyc-qr-container', 'kyc-deep-link');
-      document.getElementById('kyc-result').classList.add('show');
-      document.getElementById('kyc-waiting').classList.add('show');
+        // Wait for result using SDK (Socket.IO primary, polling fallback)
+        const finalResult = await sdk.waitForProof(result.requestId, {
+          timeoutMs: 180000,
+          onStatusChange: (status) => {
+            if (status.status === 'completed') {
+              showProofReceived('kyc', status);
+            } else if (status.status === 'failed') {
+              showProofFailed('kyc', status.error || 'Proof generation failed');
+            }
+          },
+        });
 
-      startPolling(result.requestId, 'kyc');
+        // Handle final result if not already handled by onStatusChange
+        if (finalResult.status === 'completed') {
+          showProofReceived('kyc', finalResult);
+        } else if (finalResult.status === 'failed') {
+          showProofFailed('kyc', finalResult.error || 'Proof generation failed');
+        }
+      } catch (err) {
+        if (err.message.includes('timeout')) {
+          showProofTimeout('kyc');
+        } else {
+          alert(`Failed to create proof request: ${err.message}`);
+        }
+      }
     };
 
-    // Country Demo - via relay
+    // Country Demo - via SDK
     window.requestCountryProof = async function() {
       const countryListInput = document.getElementById('country-list').value;
       const countryList = countryListInput.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
@@ -1391,22 +1357,42 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       document.getElementById('country-failed').classList.remove('show');
       document.getElementById('country-verify-result').classList.remove('show');
 
-      const result = await requestProofViaRelay(
-        'coinbase_country_attestation',
-        { countryList, isIncluded },
-        window.location.origin + '/api/callback',
-        'country'
-      );
+      try {
+        const result = await sdk.createRelayRequest('coinbase_country_attestation', { countryList, isIncluded }, {
+          dappName: 'ZKProofPort Demo',
+        });
 
-      if (!result) return;
+        activeCountryRequestId = result.requestId;
 
-      activeCountryRequestId = result.requestId;
+        await showProofResult(result.deepLink, 'country-qr-container', 'country-deep-link');
+        document.getElementById('country-result').classList.add('show');
+        document.getElementById('country-waiting').classList.add('show');
 
-      await showProofResult(result.deepLink, 'country-qr-container', 'country-deep-link');
-      document.getElementById('country-result').classList.add('show');
-      document.getElementById('country-waiting').classList.add('show');
+        // Wait for result using SDK (Socket.IO primary, polling fallback)
+        const finalResult = await sdk.waitForProof(result.requestId, {
+          timeoutMs: 180000,
+          onStatusChange: (status) => {
+            if (status.status === 'completed') {
+              showProofReceived('country', status);
+            } else if (status.status === 'failed') {
+              showProofFailed('country', status.error || 'Proof generation failed');
+            }
+          },
+        });
 
-      startPolling(result.requestId, 'country');
+        // Handle final result if not already handled by onStatusChange
+        if (finalResult.status === 'completed') {
+          showProofReceived('country', finalResult);
+        } else if (finalResult.status === 'failed') {
+          showProofFailed('country', finalResult.error || 'Proof generation failed');
+        }
+      } catch (err) {
+        if (err.message.includes('timeout')) {
+          showProofTimeout('country');
+        } else {
+          alert(`Failed to create proof request: ${err.message}`);
+        }
+      }
     };
 
     // Smooth scroll

@@ -373,14 +373,23 @@
     </div>
   </div>
 
+  <script type="importmap">
+    { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
+  </script>
   <script type="module">
     import { ProofPortSDK } from '../dist/index.mjs';
 
     const baseUrl = window.location.origin;
 
-    const sdk = new ProofPortSDK({
-      defaultCallbackUrl: `${baseUrl}/api/callback`
-    });
+    // Detect SDK environment from hostname
+    function detectSDKEnv() {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return 'local';
+      if (host.startsWith('stg-') || host.includes('staging')) return 'staging';
+      return 'production';
+    }
+    const sdkEnv = detectSDKEnv();
+    const sdk = ProofPortSDK.create(sdkEnv);
 
     // Set callback input values dynamically from current origin
     document.getElementById('kyc-callback').value = `${baseUrl}/api/callback`;

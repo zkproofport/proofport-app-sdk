@@ -869,19 +869,11 @@
     <div class="container">
       <div class="header-content">
         <a href="/landing" class="logo" style="text-decoration:none;">ZKProofPort</a>
-        <div class="plan-selector">
-          <label>Test Account:</label>
-          <select id="plan-select" onchange="switchPlan(this.value)">
-            <option value="demo_proofport" data-tier="free">Free</option>
-            <option value="credit_test_client" data-tier="credit">Credit</option>
-            <option value="plan1_test_client" data-tier="plan1">Plan 1</option>
-            <option value="plan2_test_client" data-tier="plan2">Plan 2 (On-Chain)</option>
-          </select>
-        </div>
+        <span class="badge" id="auth-badge-header" style="display: none;">Authenticated</span>
         <nav>
           <a href="/landing#demo-kyc">Callback Demo</a>
           <a href="/relay-demo" class="active">Relay Demo</a>
-          <a href="/shieldswap">ZKPSwap</a>
+          <a href="/zkpswap">ZKPSwap</a>
           <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:#06b6d4;border:1px solid #06b6d4;padding:0.25rem 0.75rem;border-radius:6px;">Dashboard</a>
         </nav>
       </div>
@@ -910,6 +902,38 @@
         </div>
         <div class="form-group" style="margin-top: 16px;">
           <label>Current Tier <span class="badge" id="tier-badge">free</span></label>
+        </div>
+
+        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div class="card-header" style="margin-bottom: 16px;">
+            <div class="card-title" style="font-size: 16px;">API Key Authentication (Required)</div>
+            <span class="badge" id="auth-badge" style="display: none;">Authenticated</span>
+          </div>
+          <p style="color: var(--gray-400); font-size: 13px; margin-bottom: 16px;">
+            Enter your API credentials to authenticate via JWT token. Authentication is required to use the relay.
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Client ID</label>
+              <input type="text" id="auth-client-id" placeholder="Your client_id from dashboard">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>API Key</label>
+              <input type="password" id="auth-api-key" placeholder="Your api_key (shown once at creation)">
+            </div>
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 12px; align-items: center;">
+            <button class="btn btn-secondary btn-small" id="btn-authenticate">Authenticate</button>
+            <button class="btn btn-secondary btn-small" id="btn-clear-auth" style="display: none;">Clear Auth</button>
+            <span id="auth-status" style="font-size: 13px; color: var(--gray-400);"></span>
+          </div>
+          <div id="auth-token-info" style="display: none; margin-top: 12px; padding: 12px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px;">
+            <div style="font-size: 11px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.05em;">JWT Token</div>
+            <div style="font-family: monospace; font-size: 11px; color: var(--green); word-break: break-all; margin-top: 4px;" id="auth-token-display">-</div>
+            <div style="font-size: 12px; color: var(--gray-400); margin-top: 8px;">
+              Tier: <span id="auth-tier">-</span> | Expires: <span id="auth-expires">-</span> | dApp: <span id="auth-dapp-id">-</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1116,8 +1140,11 @@
       }
     }
   </script>
+  <script type="importmap">
+    { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
+  </script>
   <script type="module">
-    import { ProofPortSDK } from '../dist/index.mjs';
+    import { ProofPortSDK, RELAY_URLS } from '../dist/index.mjs';
 
     const baseUrl = window.location.origin;
 
@@ -1125,54 +1152,50 @@
       return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
-    const PLAN_TIERS = {
-      'demo_proofport': 'free',
-      'credit_test_client': 'credit',
-      'plan1_test_client': 'plan1',
-      'plan2_test_client': 'plan2',
-    };
 
     const urlParams = new URLSearchParams(window.location.search);
-    const initialClientId = urlParams.get('clientId') || 'demo_proofport';
 
     const state = {
-      clientId: initialClientId,
+      clientId: '',
       apiKey: '',
       customerId: '',
       dappId: '',
-      tier: PLAN_TIERS[initialClientId] || 'free',
+      tier: '',
       currentRequestId: null,
       pollInterval: null,
       localNullifiers: JSON.parse(localStorage.getItem('relay_nullifiers') || '[]'),
       currentProof: null,
       jwtToken: '',
+      authToken: null,  // Full auth token object { token, clientId, dappId, tier, expiresIn, expiresAt }
     };
 
-    const sdk = new ProofPortSDK({
-      defaultCallbackUrl: `${baseUrl}/api/callback`
-    });
+    // Detect SDK environment from hostname
+    function detectSDKEnv() {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return 'local';
+      if (host.startsWith('stg-') || host.includes('staging')) return 'staging';
+      return 'production';
+    }
+    const sdkEnv = detectSDKEnv();
+    const sdk = ProofPortSDK.create(sdkEnv);
 
     // Initialize UI
     function initUI() {
       console.log('[initUI] baseUrl:', baseUrl);
       console.log('[initUI] state:', JSON.stringify(state, null, 2));
-      console.log('[initUI] SDK defaultCallbackUrl:', `${baseUrl}/api/callback`);
+      console.log('[initUI] SDK environment:', sdkEnv);
 
       updateTierBadge();
       renderLocalNullifiers();
-      if (state.tier === 'free') {
-        document.getElementById('scope-note').style.display = 'block';
-      }
-      // Enable proof button since demo account is always ready
-      document.getElementById('btn-request-proof').disabled = false;
-      // Sync selector with initial state
-      const sel = document.getElementById('plan-select');
-      if (sel) sel.value = state.clientId;
+      // Proof button disabled by default — require authentication
+      document.getElementById('btn-request-proof').disabled = true;
       // Dashboard link URL is injected server-side via __DASHBOARD_URL__ placeholder
 
       // Bind buttons (module scripts are deferred, so inline onclick may fire before module loads)
       document.getElementById('btn-init-demo').addEventListener('click', () => window.initDemo());
       document.getElementById('btn-request-proof').addEventListener('click', () => window.requestProof());
+      document.getElementById('btn-authenticate').addEventListener('click', () => window.authenticateWithApiKey());
+      document.getElementById('btn-clear-auth').addEventListener('click', () => window.clearAuth());
 
       // Show/hide country inputs based on circuit selection
       const circuitSelect = document.getElementById('circuit-select');
@@ -1196,6 +1219,83 @@
       badge.className = `badge ${state.tier}`;
       badge.textContent = state.tier;
     }
+
+    // Authentication
+    window.authenticateWithApiKey = async function() {
+      const clientIdInput = document.getElementById('auth-client-id').value.trim();
+      const apiKeyInput = document.getElementById('auth-api-key').value.trim();
+
+      if (!clientIdInput || !apiKeyInput) {
+        document.getElementById('auth-status').innerHTML = '<span style="color: var(--red);">Both Client ID and API Key are required</span>';
+        return;
+      }
+
+      try {
+        document.getElementById('btn-authenticate').disabled = true;
+        document.getElementById('auth-status').innerHTML = '<span class="spinner"></span> Authenticating...';
+
+        // Auth goes through relay server (which proxies to API)
+        console.log('[Auth] Authenticating via SDK:', sdkEnv, 'clientId:', clientIdInput);
+        logEvent('AUTH', `Authenticating clientId=${clientIdInput} via SDK (env=${sdkEnv})`);
+        logApi('POST', '/api/v1/auth/token', { client_id: clientIdInput, api_key: '***' });
+
+        const auth = await sdk.login({ clientId: clientIdInput, apiKey: apiKeyInput });
+
+        console.log('[Auth] Authentication successful:', JSON.stringify(auth));
+
+        state.jwtToken = auth.token;
+        state.authToken = auth;
+        state.clientId = auth.clientId;
+        state.tier = auth.tier;
+
+        // Update UI
+        updateTierBadge();
+        document.getElementById('auth-badge').style.display = '';
+        document.getElementById('auth-badge').className = 'badge plan1';
+        document.getElementById('auth-badge').textContent = 'Authenticated';
+        document.getElementById('auth-status').innerHTML = '<span style="color: var(--green);">Authenticated successfully</span>';
+        document.getElementById('auth-token-info').style.display = 'block';
+        document.getElementById('auth-token-display').textContent = auth.token;
+        document.getElementById('auth-tier').textContent = auth.tier;
+        document.getElementById('auth-expires').textContent = new Date(auth.expiresAt).toLocaleTimeString();
+        document.getElementById('auth-dapp-id').textContent = auth.dappId;
+        document.getElementById('btn-clear-auth').style.display = '';
+        document.getElementById('btn-authenticate').disabled = false;
+
+        // Enable proof button
+        document.getElementById('btn-request-proof').disabled = false;
+
+        // Show/hide scope note
+        document.getElementById('scope-note').style.display = auth.tier === 'free' ? 'block' : 'none';
+
+        logEvent('AUTH_SUCCESS', `Authenticated as ${auth.clientId} (tier=${auth.tier}, dapp=${auth.dappId})`);
+        logApi('RESPONSE', '/api/auth/token', { token: auth.token, client_id: auth.clientId, dapp_id: auth.dappId, tier: auth.tier, expires_in: auth.expiresIn }, 200);
+      } catch (err) {
+        console.error('[Auth] Authentication failed:', err.message);
+        document.getElementById('auth-status').innerHTML = `<span style="color: var(--red);">Auth failed: ${err.message}</span>`;
+        document.getElementById('btn-authenticate').disabled = false;
+        logEvent('AUTH_FAILED', err.message);
+        logApi('ERROR', '/api/auth/token', { error: err.message }, 401);
+      }
+    };
+
+    window.clearAuth = function() {
+      state.jwtToken = '';
+      state.authToken = null;
+      state.clientId = '';
+      state.tier = '';
+
+      updateTierBadge();
+      document.getElementById('auth-badge').style.display = 'none';
+      document.getElementById('auth-token-info').style.display = 'none';
+      document.getElementById('auth-status').textContent = '';
+      document.getElementById('btn-clear-auth').style.display = 'none';
+      document.getElementById('auth-client-id').value = '';
+      document.getElementById('auth-api-key').value = '';
+      document.getElementById('btn-request-proof').disabled = true;
+
+      logEvent('AUTH_CLEARED', 'JWT auth cleared, re-authenticate to make requests');
+    };
 
 
     // Logging — FULL verbose, no truncation
@@ -1283,14 +1383,17 @@
     // API helper
     async function api(method, path, body) {
       const url = baseUrl + path;
-      const options = {
-        method,
-        headers: { 'Content-Type': 'application/json' }
-      };
+      const headers = { 'Content-Type': 'application/json' };
 
+      // Include JWT token if authenticated
+      if (state.jwtToken) {
+        headers['Authorization'] = `Bearer ${state.jwtToken}`;
+      }
+
+      const options = { method, headers };
       if (body) options.body = JSON.stringify(body);
 
-      console.log(`[api] >>> ${method} ${url}`, body || '');
+      console.log(`[api] >>> ${method} ${url}`, body || '', state.jwtToken ? '(with JWT)' : '(no JWT)');
       logApi(method, path, body);
 
       try {
@@ -1333,6 +1436,20 @@
 
     // Proof request
     window.requestProof = async function() {
+      if (!state.jwtToken) {
+        logEvent('ERROR', 'Not authenticated. Please enter Client ID and API Key first.');
+        alert('Please authenticate first (enter Client ID and API Key above)');
+        return;
+      }
+
+      // Check JWT token validity before making request
+      if (state.authToken && !ProofPortSDK.isTokenValid(state.authToken)) {
+        logEvent('TOKEN_EXPIRED', 'JWT token expired, clearing auth');
+        window.clearAuth();
+        alert('Your authentication token has expired. Please re-authenticate.');
+        return;
+      }
+
       try {
         const circuit = document.getElementById('circuit-select').value;
         const scope = document.getElementById('scope-input').value;
@@ -1352,19 +1469,18 @@
           inputs.isIncluded = document.getElementById('is-included-select').value === 'true';
         }
 
-        const requestBody = {
-          clientId: state.clientId,
-          circuitId: circuit,
-          scope,
-          inputs,
-          callbackUrl: dappCallbackUrl
-        };
+        console.log('[requestProof] Creating relay request via SDK:', { circuit, inputs, dappCallbackUrl });
 
-        console.log('[requestProof] Sending to relay:', JSON.stringify(requestBody, null, 2));
+        // Log the request for debugging (manual log since SDK abstracts the call)
+        logApi('POST', '/api/relay/proof/request', { circuitId: circuit, scope, inputs, callbackUrl: dappCallbackUrl });
 
-        const data = await api('POST', '/api/relay/proof/request', requestBody);
+        const data = await sdk.createRelayRequest(circuit, inputs, {
+          message: undefined,
+          dappName: undefined,
+          nonce: undefined
+        });
 
-        console.log('[requestProof] Relay response (FULL):', JSON.stringify(data, null, 2));
+        console.log('[requestProof] SDK response (FULL):', JSON.stringify(data, null, 2));
         console.log('[requestProof] requestId:', data.requestId);
         console.log('[requestProof] deepLink:', data.deepLink);
         console.log('[requestProof] deepLink length:', data.deepLink?.length);
@@ -1391,6 +1507,9 @@
             logApi('DEEP_LINK_DECODED', 'deep link → app data', decoded);
             logApi('DEEP_LINK_CALLBACK', `callbackUrl = ${decoded.callbackUrl || 'MISSING!'}`, { callbackUrl: decoded.callbackUrl, fields: Object.keys(decoded) });
 
+            // Log response after logging the decoded data
+            logApi('RESPONSE', '/api/relay/proof/request', data, 200);
+
             // Also log to Events tab
             logEvent('DEEP_LINK_DATA', `<pre>${decodedStr}</pre>`);
             logEvent('DEEP_LINK_CALLBACK', `callbackUrl in deep link: ${decoded.callbackUrl || 'MISSING!'}`);
@@ -1398,10 +1517,14 @@
           } else {
             console.warn('[requestProof] No "data" param in deep link URL!');
             logApi('DEEP_LINK_WARNING', 'No data param in deep link', { deepLink: data.deepLink });
+            // Still log the response even if decode fails
+            logApi('RESPONSE', '/api/relay/proof/request', data, 200);
           }
         } catch (e) {
           console.error('[requestProof] Deep link decode error:', e);
           logEvent('DEEP_LINK_DECODE_ERR', e.message);
+          // Still log the response even if decode fails
+          logApi('RESPONSE', '/api/relay/proof/request', data, 200);
         }
 
         // Show deep link button on mobile, QR on desktop
@@ -1430,34 +1553,37 @@
       }
     };
 
-    function startPolling(requestId) {
+    async function startPolling(requestId) {
       if (state.pollInterval) clearInterval(state.pollInterval);
-      let pollCount = 0;
 
-      state.pollInterval = setInterval(async () => {
-        pollCount++;
-        try {
-          const data = await api('GET', `/api/relay/proof/${requestId}`);
+      console.log('[startPolling] Using SDK waitForProof (Socket.IO primary, polling fallback)');
 
-          console.log(`[polling #${pollCount}] requestId=${requestId} status=${data.status}`, JSON.stringify(data, null, 2));
-          logEvent('POLL', `#${pollCount} Status: ${data.status}`);
+      try {
+        const result = await sdk.waitForProof(requestId, {
+          onStatusChange: (result) => {
+            console.log('[SDK onStatusChange]', JSON.stringify(result));
+            logEvent('STATUS', `Status: ${result.status}`);
 
-          if (data.status === 'completed') {
-            clearInterval(state.pollInterval);
-            console.log('[polling] COMPLETED! Full data:', JSON.stringify(data, null, 2));
-            logApi('PROOF_COMPLETED', `/api/relay/proof/${requestId}`, data, 200);
-            showProofResult(data);
-          } else if (data.status === 'failed' || data.status === 'error') {
-            clearInterval(state.pollInterval);
-            console.error(`[polling] ${data.status.toUpperCase()}!`, JSON.stringify(data, null, 2));
-            document.getElementById('status-pending').className = 'status-box error';
-            document.getElementById('status-pending').innerHTML = `Proof ${data.status}: ${data.error || 'Unknown error'}`;
-            logEvent(`PROOF_${data.status.toUpperCase()}`, data.error || 'Unknown error');
-          }
-        } catch (err) {
-          console.error(`[polling #${pollCount}] Error:`, err);
-        }
-      }, 3000);
+            // Update UI based on status
+            if (result.status === 'pending' || result.status === 'processing') {
+              document.getElementById('status-pending').className = 'status-box pending';
+              document.getElementById('status-pending').innerHTML = `<span class="spinner"></span>Waiting for proof... (${result.status})`;
+            }
+          },
+          timeoutMs: 300000, // 5 minutes
+        });
+
+        console.log('[startPolling] SDK returned result:', JSON.stringify(result, null, 2));
+        logApi('PROOF_COMPLETED', `/api/relay/proof/${requestId}`, result, 200);
+        showProofResult(result);
+
+      } catch (err) {
+        console.error('[startPolling] SDK waitForProof failed:', err);
+        document.getElementById('status-pending').className = 'status-box error';
+        document.getElementById('status-pending').innerHTML = `Proof failed: ${err.message}`;
+        logEvent('PROOF_FAILED', err.message);
+        logApi('ERROR', `/api/relay/proof/${requestId}`, { error: err.message }, 0);
+      }
     }
 
     function showProofResult(data) {
@@ -1662,9 +1788,18 @@
 
       try {
         const nullifierHash = document.getElementById('proof-nullifier').textContent;
-        const data = await api('GET', `/api/relay/nullifier/${nullifierHash}`);
 
-        if (data.found) {
+        console.log('[checkOnChain] Checking nullifier on relay:', nullifierHash);
+        logApi('GET', `/api/v1/nullifier/${nullifierHash}`, null);
+
+        const response = await fetch(`${RELAY_URLS[sdkEnv]}/api/v1/nullifier/${nullifierHash}`);
+        if (!response.ok) throw new Error(`Nullifier query failed: HTTP ${response.status}`);
+        const data = await response.json();
+
+        console.log('[checkOnChain] Response:', JSON.stringify(data, null, 2));
+        logApi('RESPONSE', `/api/v1/nullifier/${nullifierHash}`, data, 200);
+
+        if (data.registered) {
           showOnChainInfo({
             onChainStatus: 'verified_and_registered',
             txHash: data.txHash,
@@ -1678,6 +1813,8 @@
           logNullifier('ON_CHAIN_CHECK', `Not found: ${nullifierHash}`);
         }
       } catch (err) {
+        console.error('[checkOnChain] Error:', err);
+        logApi('ERROR', '/api/relay/nullifier', { error: err.message }, 0);
         alert('On-chain check failed: ' + err.message);
       }
     };
@@ -1694,57 +1831,6 @@
     // Initialize
     initUI();
 
-    // Plan selector
-    window.switchPlan = function(clientId) {
-      console.log('[switchPlan]', clientId, '→ tier:', PLAN_TIERS[clientId]);
-      state.clientId = clientId;
-      state.tier = PLAN_TIERS[clientId] || 'free';
-      state.currentProof = null;
-      updateTierBadge();
-
-      // Show/hide scope note
-      document.getElementById('scope-note').style.display = state.tier === 'free' ? 'block' : 'none';
-
-      // Reset proof UI for new request
-      document.getElementById('qr-container').innerHTML = '';
-      document.getElementById('deep-link').textContent = '';
-      document.getElementById('status-pending').className = 'status-box';
-      document.getElementById('status-pending').innerHTML = '<span class="spinner"></span>Waiting for proof...<div style="font-size: 12px; margin-top: 8px; color: var(--gray-400);">Request ID: <span id="request-id"></span></div>';
-      document.getElementById('proof-request-result').style.display = 'none';
-      document.getElementById('proof-result-section').style.display = 'none';
-      document.getElementById('nullifier-section').style.display = 'none';
-      const creditAlert = document.getElementById('credit-alert');
-      if (creditAlert) creditAlert.style.display = 'none';
-      const onchainPlaceholder = document.getElementById('onchain-placeholder');
-      if (onchainPlaceholder) onchainPlaceholder.style.display = 'none';
-      const onchainInfo = document.getElementById('onchain-info');
-      if (onchainInfo) onchainInfo.style.display = 'none';
-
-      // Hide all copy buttons
-      ['copy-proof-nullifier', 'copy-proof-scope', 'copy-plan1-nullifier', 'copy-onchain-tx', 'copy-onchain-scope'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.style.display = 'none';
-      });
-
-      // Stop any active polling
-      if (state.pollInterval) {
-        clearInterval(state.pollInterval);
-        state.pollInterval = null;
-      }
-
-      // Update URL without reload
-      const url = new URL(window.location);
-      url.searchParams.set('clientId', clientId);
-      history.replaceState({}, '', url);
-
-      logEvent('PLAN_SWITCH', `Switched to ${state.tier} (${clientId}) — UI reset for new request`);
-    };
-
-    // Initialize selector from URL param
-    const selectEl = document.getElementById('plan-select');
-    if (selectEl) {
-      selectEl.value = state.clientId;
-    }
   </script>
 </body>
 </html>

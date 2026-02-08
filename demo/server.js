@@ -74,8 +74,8 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
-  } else if (req.method === 'GET' && pathname === '/shieldswap') {
-    const filePath = path.join(__dirname, 'shieldswap.html');
+  } else if (req.method === 'GET' && pathname === '/zkpswap') {
+    const filePath = path.join(__dirname, 'zkpswap.html');
     fs.readFile(filePath, 'utf8', (err, data) => {
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });

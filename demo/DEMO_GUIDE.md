@@ -20,11 +20,11 @@ cd /Users/nhn/Workspace/proofport-app-dev/proofport-app-sdk/demo
 node server.js
 ```
 
-Open your browser to: `http://<your-host>:3300/shieldswap`
+Open your browser to: `http://<your-host>:3300/zkpswap`
 
 For mobile testing with QR codes, use your machine's local IP instead of localhost:
 ```
-http://<your-ip>:3300/shieldswap
+http://<your-ip>:3300/zkpswap
 ```
 
 ## Demo Scenario (Step-by-Step)
@@ -253,7 +253,7 @@ Static configuration for the demo:
 - **QR Code not scanning?** Ensure mobile can reach desktop IP (test with ping first)
 - **Callback not received?** Check server logs - look for "Received callback" messages
 - **Verification stuck?** Check browser console for errors; verify Sepolia RPC is accessible
-- **Page not loading?** Ensure `shieldswap.html` exists in demo directory
+- **Page not loading?** Ensure `zkpswap.html` exists in demo directory
 
 ## Architecture Overview
 
