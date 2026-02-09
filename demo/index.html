@@ -391,7 +391,10 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofportSDK.create(sdkEnv);
+    // In local mode, derive relay URL from current hostname to work over LAN
+    const sdk = sdkEnv === 'local'
+      ? new ProofportSDK({ relayUrl: `${window.location.protocol}//${window.location.hostname}:4001` })
+      : ProofportSDK.create(sdkEnv);
 
     // Set callback input values dynamically from current origin
     document.getElementById('kyc-callback').value = `${baseUrl}/api/callback`;

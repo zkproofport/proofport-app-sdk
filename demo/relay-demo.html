@@ -1179,7 +1179,11 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofportSDK.create(sdkEnv);
+    // In local mode, derive relay URL from current hostname to work over LAN
+    const localRelayUrl = `${window.location.protocol}//${window.location.hostname}:4001`;
+    const sdk = sdkEnv === 'local'
+      ? new ProofportSDK({ relayUrl: localRelayUrl })
+      : ProofportSDK.create(sdkEnv);
 
     // Initialize UI
     function initUI() {
@@ -1794,7 +1798,8 @@
         console.log('[checkOnChain] Checking nullifier on relay:', nullifierHash);
         logApi('GET', `/api/v1/nullifier/${nullifierHash}`, null);
 
-        const response = await fetch(`${RELAY_URLS[sdkEnv]}/api/v1/nullifier/${nullifierHash}`);
+        const relayBase = sdkEnv === 'local' ? localRelayUrl : RELAY_URLS[sdkEnv];
+        const response = await fetch(`${relayBase}/api/v1/nullifier/${nullifierHash}`);
         if (!response.ok) throw new Error(`Nullifier query failed: HTTP ${response.status}`);
         const data = await response.json();
 

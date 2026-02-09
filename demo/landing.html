@@ -1096,7 +1096,10 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
-    const sdk = ProofportSDK.create(sdkEnv);
+    // In local mode, derive relay URL from current hostname to work over LAN
+    const sdk = sdkEnv === 'local'
+      ? new ProofportSDK({ relayUrl: `${window.location.protocol}//${window.location.hostname}:4001` })
+      : ProofportSDK.create(sdkEnv);
 
     // Authenticate with API key to get JWT token
     window.authenticateWithApiKey = async function() {
