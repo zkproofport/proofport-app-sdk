@@ -110,6 +110,21 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
+  } else if (req.method === 'GET' && (pathname === '/favicon.ico' || pathname === '/favicon.png')) {
+    const filePath = path.join(__dirname, pathname.slice(1));
+    const contentType = pathname.endsWith('.ico') ? 'image/x-icon' : 'image/png';
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400',
+      });
+      res.end(data);
+    });
   } else if (req.method === 'GET' && pathname === '/og-image.png') {
     const filePath = path.join(__dirname, 'og-image.png');
     fs.readFile(filePath, (err, data) => {
