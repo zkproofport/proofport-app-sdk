@@ -1310,6 +1310,12 @@ export class ProofportSDK {
       socket.emit('proof:subscribe', { requestId });
     });
 
+    // Handle connection errors (e.g. rejected by relay middleware)
+    socket.on('connect_error', (err: Error) => {
+      console.error(`[ProofportSDK] Socket.IO connect_error for requestId=${requestId}: ${err.message}`);
+      callbacks.onError?.({ error: err.message, requestId });
+    });
+
     // Listen for events
     if (callbacks.onStatus) {
       socket.on('proof:status', callbacks.onStatus);
