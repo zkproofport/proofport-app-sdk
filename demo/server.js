@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -24,15 +25,16 @@ function broadcastSSE(data) {
 
 function proxyRequest(req, res, targetBase, pathRewrite) {
   const targetUrl = new URL(pathRewrite || req.url, targetBase);
+  const transport = targetUrl.protocol === 'https:' ? https : http;
   const options = {
     hostname: targetUrl.hostname,
-    port: targetUrl.port,
+    port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
     path: targetUrl.pathname + targetUrl.search,
     method: req.method,
     headers: { ...req.headers, host: targetUrl.host },
   };
 
-  const proxyReq = http.request(options, (proxyRes) => {
+  const proxyReq = transport.request(options, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
