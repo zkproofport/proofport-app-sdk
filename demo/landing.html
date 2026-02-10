@@ -835,6 +835,134 @@
     .plan-selector .plan-credit { background: rgba(59,130,246,0.15); color: #3b82f6; }
     .plan-selector .plan-plan1 { background: rgba(168,85,247,0.15); color: #a855f7; }
     .plan-selector .plan-plan2 { background: rgba(234,179,8,0.15); color: #eab308; }
+
+    /* Beta Invite Modal */
+    .beta-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .beta-backdrop.open {
+      display: flex;
+      animation: betaFadeIn 200ms ease-out;
+    }
+    @keyframes betaFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .beta-modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--navy-mid, #16213e);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: betaSlideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes betaSlideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .beta-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 0;
+    }
+    .beta-modal-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+    }
+    .beta-modal-close {
+      background: none;
+      border: none;
+      color: var(--gray-400, #9ca3af);
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+    .beta-modal-close:hover { color: #fff; }
+    .beta-modal-body {
+      padding: 16px 24px 24px;
+    }
+    .beta-modal-body p {
+      color: var(--gray-400, #9ca3af);
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 20px;
+    }
+    .beta-form-group {
+      margin-bottom: 16px;
+    }
+    .beta-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-300, #d1d5db);
+      margin-bottom: 6px;
+    }
+    .beta-form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #fff;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .beta-form-group input:focus {
+      border-color: var(--cyan, #00d4ff);
+    }
+    .beta-platform-group {
+      display: flex;
+      gap: 8px;
+    }
+    .beta-platform-btn {
+      flex: 1;
+      padding: 8px 0;
+      font-size: 13px;
+      font-weight: 500;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: var(--gray-400, #9ca3af);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .beta-platform-btn:hover {
+      border-color: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+    .beta-platform-btn.active {
+      border-color: var(--cyan, #00d4ff);
+      color: var(--cyan, #00d4ff);
+      background: rgba(0, 212, 255, 0.08);
+    }
+    .beta-submit-btn {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--cyan, #00d4ff);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.15s;
+    }
+    .beta-submit-btn:hover { opacity: 0.9; }
+    .beta-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -842,18 +970,24 @@
     <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
       <div class="logo">ZKProofport</div>
       <div class="plan-selector" id="auth-section">
+        <!-- Auto-login enabled: manual login UI hidden
         <input type="text" id="auth-client-id" placeholder="Client ID" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
         <input type="password" id="auth-api-key" placeholder="API Key" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
         <button onclick="authenticateWithApiKey()" id="btn-authenticate" style="padding:4px 12px;font-size:12px;background:var(--blue,#3b82f6);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
         <button onclick="clearAuth()" id="btn-clear-auth" style="display:none;padding:4px 12px;font-size:12px;background:var(--gray-600,#444);color:white;border:none;border-radius:4px;cursor:pointer;">Logout</button>
+        -->
         <span id="auth-status" style="font-size:12px;color:var(--gray-400,#999);"></span>
         <span id="plan-badge" class="current-plan" style="display:none;"></span>
       </div>
-      <nav style="display:flex;gap:1rem;align-items:center;">
-        <a href="#demo-kyc" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Callback Demo</a>
-        <a href="/relay-demo" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">Relay Demo</a>
-        <a href="/zkpswap" style="color:var(--gray-300);text-decoration:none;font-size:0.9rem;">ZKPSwap</a>
-        <a href="__DASHBOARD_URL__/dashboard" target="_blank" rel="noopener noreferrer" style="color:var(--cyan);text-decoration:none;font-size:0.9rem;border:1px solid var(--cyan);padding:0.3rem 0.8rem;border-radius:6px;">Dashboard</a>
+      <nav style="display:flex;gap:0.75rem;align-items:center;">
+        <a href="javascript:void(0)" onclick="openBetaModal('iOS'); return false;" title="Download on the App Store" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--gray-300);text-decoration:none;font-size:0.8rem;padding:0.3rem 0.7rem;border:1px solid var(--gray-600);border-radius:6px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--gray-600)'">
+          <svg width="16" height="16" viewBox="0 0 384 512" fill="currentColor"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+          iOS
+        </a>
+        <a href="javascript:void(0)" onclick="openBetaModal('Android'); return false;" title="Get it on Google Play" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--gray-300);text-decoration:none;font-size:0.8rem;padding:0.3rem 0.7rem;border:1px solid var(--gray-600);border-radius:6px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--gray-600)'">
+          <svg width="16" height="16" viewBox="0 0 512 512" fill="currentColor"><path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/></svg>
+          Android
+        </a>
       </nav>
     </div>
   </header>
@@ -863,15 +997,15 @@
       <div class="tagline">Privacy-First Identity Verification</div>
       <h1>Prove who you are<br>without revealing who you are</h1>
       <p class="subtitle">Zero-knowledge proofs for identity verification. Verify credentials without exposing personal data.</p>
+      <p style="color:var(--gray-400);font-size:0.95rem;margin-top:1rem;margin-bottom:1.5rem;">
+        See live integration example: <a href="/zkpswap" style="color:var(--cyan);text-decoration:underline;">ZKPSwap</a> demonstrates a compliant DEX using ZK proofs.
+      </p>
       <div class="cta-buttons">
         <a href="#demo-kyc" class="btn btn-primary">Try KYC Demo</a>
         <a href="#demo-country" class="btn btn-secondary">Try Country Demo</a>
-        <a href="/relay-demo" class="btn btn-secondary">Relay Demo</a>
+        <!-- <a href="/relay-demo" class="btn btn-secondary">Relay Demo</a> -->
         <a href="/zkpswap" class="btn btn-secondary">ZKPSwap</a>
       </div>
-      <p style="color:var(--gray-400);font-size:0.95rem;margin-top:1.5rem;">
-        See live integration examples: <a href="/relay-demo" style="color:var(--cyan);text-decoration:underline;">Relay Demo</a> shows real-time proof flow, and <a href="/zkpswap" style="color:var(--cyan);text-decoration:underline;">ZKPSwap</a> demonstrates a compliant DEX using ZK proofs.
-      </p>
     </div>
   </section>
 
@@ -1041,28 +1175,29 @@
   <section class="code-section">
     <div class="container">
       <h2 class="section-title">Quick Integration</h2>
+      <p style="text-align:center;color:var(--gray-400,#94a3b8);font-size:0.95rem;margin-bottom:1.5rem;">SDK is currently being prepared for public release. Stay tuned!</p>
       <div class="code-block">
-<pre><span class="code-comment">// Install the SDK</span>
-<span class="code-keyword">import</span> { ProofportSDK } <span class="code-keyword">from</span> <span class="code-string">'@proofport/sdk'</span>;
+<pre><span class="code-keyword">import</span> { ProofportSDK } <span class="code-keyword">from</span> <span class="code-string">'@zkproofport-app/sdk'</span>;
 
-<span class="code-comment">// Initialize SDK (defaults to production)</span>
+<span class="code-comment">// Initialize SDK</span>
 <span class="code-keyword">const</span> sdk = ProofportSDK.<span class="code-function">create</span>();
 
-<span class="code-comment">// Create a proof request</span>
-<span class="code-keyword">const</span> request = sdk.<span class="code-function">createCoinbaseKycRequest</span>({ scope: <span class="code-string">'your-dapp:action'</span> });
+<span class="code-comment">// Authenticate with your API credentials</span>
+<span class="code-keyword">await</span> sdk.<span class="code-function">login</span>({ clientId: <span class="code-string">'your-client-id'</span>, apiKey: <span class="code-string">'your-api-key'</span> });
 
-<span class="code-comment">// Generate QR code</span>
-<span class="code-keyword">const</span> qrDataUrl = <span class="code-keyword">await</span> sdk.<span class="code-function">generateQRCode</span>(request);
+<span class="code-comment">// Create a proof request via relay</span>
+<span class="code-keyword">const</span> relay = <span class="code-keyword">await</span> sdk.<span class="code-function">createRelayRequest</span>(<span class="code-string">'coinbase_attestation'</span>, {
+  scope: <span class="code-string">'myapp.com'</span>
+});
 
-<span class="code-comment">// Or open Proofport app directly</span>
-sdk.<span class="code-function">openProofRequest</span>(request);
+<span class="code-comment">// Generate QR code for desktop users</span>
+<span class="code-keyword">const</span> qrDataUrl = <span class="code-keyword">await</span> sdk.<span class="code-function">generateQRCode</span>(relay.deepLink);
 
-<span class="code-comment">// Verify the proof on-chain</span>
-<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> sdk.<span class="code-function">verifyOnChain</span>(
-  response.circuit,
-  response.proof,
-  response.publicInputs
-);</pre>
+<span class="code-comment">// Wait for proof via WebSocket</span>
+<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> sdk.<span class="code-function">waitForProof</span>(relay.requestId);
+<span class="code-keyword">if</span> (result.status === <span class="code-string">'completed'</span>) {
+  console.<span class="code-function">log</span>(<span class="code-string">'Proof received:'</span>, result.proof);
+}</pre>
       </div>
     </div>
   </section>
@@ -1073,6 +1208,38 @@ sdk.<span class="code-function">openProofRequest</span>(request);
       <a href="https://github.com/zkproofport" target="_blank">GitHub</a>
     </div>
   </footer>
+
+  <!-- Beta Invite Modal -->
+  <div id="betaModal" class="beta-backdrop" onclick="closeBetaModal(event)">
+    <div class="beta-modal" onclick="event.stopPropagation()">
+      <div class="beta-modal-header">
+        <h3>Closed Beta</h3>
+        <button class="beta-modal-close" onclick="closeBetaModal()" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="beta-modal-body">
+        <p>ZKProofport is currently in closed beta testing. Leave your email and preferred platform — we'll send you an invite as soon as a spot opens up.</p>
+        <div class="beta-form-group">
+          <label>Email *</label>
+          <input type="email" id="beta-email" placeholder="you@example.com">
+        </div>
+        <div class="beta-form-group">
+          <label>Platform</label>
+          <div class="beta-platform-group">
+            <button class="beta-platform-btn" id="beta-plat-ios" onclick="setBetaPlatform('iOS')">iOS</button>
+            <button class="beta-platform-btn" id="beta-plat-android" onclick="setBetaPlatform('Android')">Android</button>
+            <button class="beta-platform-btn" id="beta-plat-both" onclick="setBetaPlatform('Both')">Both</button>
+          </div>
+        </div>
+        <button class="beta-submit-btn" id="beta-submit" onclick="submitBetaRequest()">Request Invite</button>
+        <div id="beta-success" style="display:none;margin-top:12px;padding:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:8px;color:#22c55e;font-size:13px;text-align:center;">
+          Thanks! We'll reach out when your invite is ready.
+        </div>
+        <div id="beta-error" style="display:none;margin-top:12px;padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;color:#ef4444;font-size:13px;text-align:center;"></div>
+      </div>
+    </div>
+  </div>
 
   <script type="importmap">
     {
@@ -1098,6 +1265,22 @@ sdk.<span class="code-function">openProofRequest</span>(request);
     const sdk = sdkEnv === 'local'
       ? new ProofportSDK({ relayUrl: `${window.location.protocol}//${window.location.hostname}:4001` })
       : ProofportSDK.create(sdkEnv);
+
+    // Auto-login with demo credentials
+    const AUTO_CREDS = {
+      local: { clientId: '89c200779bcd6c0207f7199acfd12bc4', apiKey: '69d0c1b43e32524fe531c888664f00fb14cf9379acadbc917c508e701ea9eec7' },
+      staging: { clientId: '76aac6d737e8b8de3f4b2fe17397c39c', apiKey: 'ea62d7f4def4f8fe923d4df8b0467e1cc3342798e2ea7d3ea0782738d702555b' },
+    };
+    const autoCreds = AUTO_CREDS[sdkEnv];
+    if (autoCreds) {
+      sdk.login(autoCreds).then(auth => {
+        console.log(`[Auto-login] ${auth.clientId} (${auth.tier})`);
+        document.getElementById('auth-status').innerHTML = '';
+      }).catch(err => {
+        console.error(`[Auto-login] Failed: ${err.message}`);
+        document.getElementById('auth-status').innerHTML = `<span style="color:#ef4444;">Auto-login failed: ${err.message}</span>`;
+      });
+    }
 
     // Authenticate with API key to get JWT token
     window.authenticateWithApiKey = async function() {
@@ -1408,6 +1591,76 @@ sdk.<span class="code-function">openProofRequest</span>(request);
         }
       });
     });
+  </script>
+  <script>
+    // Beta Invite Modal (non-module script so onclick handlers work even if SDK import fails)
+    var betaPlatform = null;
+
+    function openBetaModal(platform) {
+      betaPlatform = platform;
+      document.getElementById('beta-plat-ios').classList.toggle('active', platform === 'iOS');
+      document.getElementById('beta-plat-android').classList.toggle('active', platform === 'Android');
+      document.getElementById('beta-plat-both').classList.toggle('active', platform === 'Both');
+      document.getElementById('beta-email').value = '';
+      document.getElementById('beta-success').style.display = 'none';
+      document.getElementById('beta-error').style.display = 'none';
+      document.getElementById('beta-submit').style.display = '';
+      document.getElementById('beta-submit').disabled = false;
+      document.getElementById('betaModal').classList.add('open');
+    }
+
+    function closeBetaModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('betaModal').classList.remove('open');
+    }
+
+    function setBetaPlatform(platform) {
+      betaPlatform = platform;
+      document.getElementById('beta-plat-ios').classList.toggle('active', platform === 'iOS');
+      document.getElementById('beta-plat-android').classList.toggle('active', platform === 'Android');
+      document.getElementById('beta-plat-both').classList.toggle('active', platform === 'Both');
+    }
+
+    async function submitBetaRequest() {
+      var email = document.getElementById('beta-email').value.trim();
+      if (!email) {
+        document.getElementById('beta-error').textContent = 'Please enter your email address.';
+        document.getElementById('beta-error').style.display = 'block';
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        document.getElementById('beta-error').textContent = 'Please enter a valid email address.';
+        document.getElementById('beta-error').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('beta-submit').disabled = true;
+      document.getElementById('beta-error').style.display = 'none';
+
+      try {
+        var res = await fetch('/api/proxy/inquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            subject: 'Beta Invite Request - ' + (betaPlatform || 'Unknown'),
+            body: '[Beta Invite Request]\n\n' + email + ' has signed up for the ZKProofport closed beta through the demo page.\n\n- Platform: ' + (betaPlatform || 'Unknown') + '\n- Requested via: Demo landing page (' + (betaPlatform || 'Unknown') + ' download button)\n\nPlease register this email as a tester on the corresponding platform (App Store Connect / Google Play Console) and send an invite.',
+            category: 'beta_invite',
+            metadata: { platform: betaPlatform },
+          }),
+        });
+        if (!res.ok) {
+          var data = await res.json().catch(function() { return {}; });
+          throw new Error(data.error || 'Failed to submit request');
+        }
+        document.getElementById('beta-success').style.display = 'block';
+        document.getElementById('beta-submit').style.display = 'none';
+      } catch (err) {
+        document.getElementById('beta-error').textContent = err.message;
+        document.getElementById('beta-error').style.display = 'block';
+        document.getElementById('beta-submit').disabled = false;
+      }
+    }
   </script>
 </body>
 </html>

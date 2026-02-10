@@ -92,6 +92,8 @@ const server = http.createServer((req, res) => {
     proxyRequest(req, res, API_URL, '/api/auth' + pathname.replace('/api/proxy/auth', ''));
   } else if (pathname.startsWith('/api/proxy/dapps')) {
     proxyRequest(req, res, API_URL, '/api/dapps' + pathname.replace('/api/proxy/dapps', ''));
+  } else if (pathname.startsWith('/api/proxy/inquiries')) {
+    proxyRequest(req, res, API_URL, '/api/inquiries' + pathname.replace('/api/proxy/inquiries', ''));
   } else if (pathname.startsWith('/api/relay/proof')) {
     proxyRequest(req, res, RELAY_URL, '/api/v1/proof' + pathname.replace('/api/relay/proof', ''));
   } else if (pathname.startsWith('/api/relay/nullifier')) {

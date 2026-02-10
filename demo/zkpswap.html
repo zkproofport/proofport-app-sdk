@@ -1452,10 +1452,12 @@
       </div>
     </div>
     <div class="header-right">
+      <!-- Auto-login enabled: manual login UI hidden
       <input type="text" id="auth-client-id" placeholder="Client ID" style="width:100px;padding:3px 8px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
       <input type="password" id="auth-api-key" placeholder="API Key" style="width:100px;padding:3px 8px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
       <button onclick="authenticateWithApiKey()" id="btn-auth" style="padding:3px 10px;font-size:11px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
       <button onclick="clearAuth()" id="btn-logout" style="display:none;padding:3px 10px;font-size:11px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);border-radius:4px;cursor:pointer;">Logout</button>
+      -->
       <span id="auth-status" style="font-size:11px;color:var(--text-tertiary);"></span>
       <a href="/landing" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; margin-left: 8px;">ZKProofport</a>
       <div id="kycBadge" class="kyc-badge">
@@ -1744,6 +1746,23 @@
       ? new ProofportSDK({ relayUrl: localRelayUrl })
       : ProofportSDK.create(sdkEnv);
 
+    // Auto-login with demo credentials
+    const AUTO_CREDS = {
+      local: { clientId: '89c200779bcd6c0207f7199acfd12bc4', apiKey: '69d0c1b43e32524fe531c888664f00fb14cf9379acadbc917c508e701ea9eec7' },
+      staging: { clientId: '76aac6d737e8b8de3f4b2fe17397c39c', apiKey: 'ea62d7f4def4f8fe923d4df8b0467e1cc3342798e2ea7d3ea0782738d702555b' },
+    };
+    const autoCreds = AUTO_CREDS[sdkEnv];
+    if (autoCreds) {
+      sdk.login(autoCreds).then(auth => {
+        authClientId = auth.clientId;
+        console.log(`[Auto-login] ${auth.clientId} (${auth.tier})`);
+        document.getElementById('auth-status').innerHTML = '';
+      }).catch(err => {
+        console.error(`[Auto-login] Failed: ${err.message}`);
+        document.getElementById('auth-status').innerHTML = `<span style="color:var(--error);">Auto-login failed: ${err.message}</span>`;
+      });
+    }
+
     // ========== TOKEN DATA ==========
     const TOKENS = {
       ETH:  { symbol: 'ETH',  name: 'Ethereum',    color: '#627EEA', price: 2164.82, balance: 12.5000 },
@@ -1869,7 +1888,7 @@
         document.getElementById('auth-api-key').style.display = 'none';
         document.getElementById('btn-auth').style.display = 'none';
         document.getElementById('btn-logout').style.display = '';
-        document.getElementById('auth-status').innerHTML = `<span style="color:var(--success);">${auth.clientId} (${auth.tier})</span>`;
+        document.getElementById('auth-status').innerHTML = '';
         document.getElementById('btn-auth').disabled = false;
         devLog('AUTH', `Authenticated as ${auth.clientId} (tier=${auth.tier})`);
       } catch (err) {
