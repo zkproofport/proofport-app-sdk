@@ -1225,6 +1225,10 @@
           <input type="email" id="beta-email" placeholder="you@example.com">
         </div>
         <div class="beta-form-group">
+          <label>Organization *</label>
+          <input type="text" id="beta-org" placeholder="Company or team name">
+        </div>
+        <div class="beta-form-group">
           <label>Platform</label>
           <div class="beta-platform-group">
             <button class="beta-platform-btn" id="beta-plat-ios" onclick="setBetaPlatform('iOS')">iOS</button>
@@ -1602,6 +1606,7 @@
       document.getElementById('beta-plat-android').classList.toggle('active', platform === 'Android');
       document.getElementById('beta-plat-both').classList.toggle('active', platform === 'Both');
       document.getElementById('beta-email').value = '';
+      document.getElementById('beta-org').value = '';
       document.getElementById('beta-success').style.display = 'none';
       document.getElementById('beta-error').style.display = 'none';
       document.getElementById('beta-submit').style.display = '';
@@ -1623,6 +1628,7 @@
 
     async function submitBetaRequest() {
       var email = document.getElementById('beta-email').value.trim();
+      var org = document.getElementById('beta-org').value.trim();
       if (!email) {
         document.getElementById('beta-error').textContent = 'Please enter your email address.';
         document.getElementById('beta-error').style.display = 'block';
@@ -1630,6 +1636,11 @@
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         document.getElementById('beta-error').textContent = 'Please enter a valid email address.';
+        document.getElementById('beta-error').style.display = 'block';
+        return;
+      }
+      if (!org) {
+        document.getElementById('beta-error').textContent = 'Please enter your organization.';
         document.getElementById('beta-error').style.display = 'block';
         return;
       }
@@ -1643,10 +1654,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: email,
+            name: org,
             subject: 'Beta Invite Request - ' + (betaPlatform || 'Unknown'),
-            body: '[Beta Invite Request]\n\n' + email + ' has signed up for the ZKProofport closed beta through the demo page.\n\n- Platform: ' + (betaPlatform || 'Unknown') + '\n- Requested via: Demo landing page (' + (betaPlatform || 'Unknown') + ' download button)\n\nPlease register this email as a tester on the corresponding platform (App Store Connect / Google Play Console) and send an invite.',
+            body: '[Beta Invite Request]\n\n' + email + ' (' + org + ') has signed up for the ZKProofport closed beta through the demo page.\n\n- Organization: ' + org + '\n- Platform: ' + (betaPlatform || 'Unknown') + '\n- Requested via: Demo landing page (' + (betaPlatform || 'Unknown') + ' download button)\n\nPlease register this email as a tester on the corresponding platform (App Store Connect / Google Play Console) and send an invite.',
             category: 'beta_invite',
-            metadata: { platform: betaPlatform },
+            metadata: { platform: betaPlatform, organization: org },
           }),
         });
         if (!res.ok) {
