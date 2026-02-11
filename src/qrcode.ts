@@ -37,8 +37,8 @@ const DEFAULT_QR_OPTIONS: QRCodeOptions = {
  * const request: ProofRequest = {
  *   requestId: generateRequestId(),
  *   circuit: 'coinbase_attestation',
- *   inputs: { userAddress: '0x123...' },
- *   callbackUrl: 'https://example.com/callback'
+ *   inputs: { scope: 'myapp.com' },
+ *   createdAt: Date.now()
  * };
  *
  * const dataUrl = await generateQRCodeDataUrl(request, {

@@ -38,31 +38,12 @@ export type {
   CircuitInputs,
   ProofRequest,
   ProofResponse,
-  ParsedProof,
   QRCodeOptions,
   VerifierContract,
   ProofportConfig,
-  DeepLinkComponents,
-  NullifierVerifyStatus,
-  NullifierRecord,
-  NullifierRegistryConfig,
   AuthCredentials,
   AuthToken,
   RelayProofRequest,
   RelayProofResult,
   SDKEnvironment,
 } from './types';
-
-// Verification utilities
-export {
-  extractNullifierFromPublicInputs,
-  extractScopeFromPublicInputs,
-  isNullifierRegistered,
-  getNullifierInfo,
-} from './verifier';
-
-// Constants
-export {
-  CIRCUIT_METADATA,
-  ZKPROOFPORT_NULLIFIER_REGISTRY_ABI,
-} from './constants';

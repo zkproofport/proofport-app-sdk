@@ -38,6 +38,11 @@ import {
   parseProofForOnChain,
   getVerifierAddress,
   getVerifierChainId,
+  getDefaultProvider,
+  extractNullifierFromPublicInputs,
+  extractScopeFromPublicInputs,
+  isNullifierRegistered,
+  getNullifierInfo,
 } from './verifier';
 import {
   DEFAULT_SCHEME,
@@ -58,8 +63,8 @@ import type { SDKEnvironment } from './types';
  * ```typescript
  * import { ProofportSDK } from '@zkproofport-app/sdk';
  *
- * // Initialize SDK with environment preset (recommended)
- * const sdk = ProofportSDK.create('production');
+ * // Initialize SDK (uses production relay by default)
+ * const sdk = ProofportSDK.create();
  *
  * // Authenticate
  * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
@@ -80,10 +85,11 @@ import type { SDKEnvironment } from './types';
  * ```
  */
 export class ProofportSDK {
-  private config: Required<Omit<ProofportConfig, 'relayUrl'>>;
+  private config: Required<Omit<ProofportConfig, 'relayUrl' | 'nullifierRegistry'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
   private authToken: AuthToken | null = null;
   private relayUrl: string;
+  private nullifierRegistry?: { address: string; chainId: number };
   private socket: any = null;
 
   /**
@@ -118,11 +124,13 @@ export class ProofportSDK {
       verifiers: config.verifiers || {},
     };
     this.relayUrl = config.relayUrl || '';
+    this.nullifierRegistry = config.nullifierRegistry;
   }
 
   // ============ Request Creation ============
 
   /**
+   * @internal
    * Creates a Coinbase KYC verification proof request.
    *
    * Generates a proof request for verifying Coinbase KYC status without revealing
@@ -132,7 +140,7 @@ export class ProofportSDK {
    * @param inputs - Circuit inputs for Coinbase KYC
    * @param inputs.scope - Application-specific scope (e.g., domain name)
    * @param options - Request configuration options
-   * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
+
    * @param options.message - Custom message to display to user
    * @param options.dappName - Application name shown in ZKProofport app
    * @param options.dappIcon - Application icon URL shown in ZKProofport app
@@ -154,7 +162,7 @@ export class ProofportSDK {
    * const deepLink = sdk.getDeepLinkUrl(request);
    * ```
    */
-  createCoinbaseKycRequest(
+  private createCoinbaseKycRequest(
     inputs: CoinbaseKycInputs,
     options: {
       message?: string;
@@ -183,6 +191,7 @@ export class ProofportSDK {
   }
 
   /**
+   * @internal
    * Creates a Coinbase Country attestation proof request.
    *
    * Generates a proof request for verifying country eligibility through Coinbase
@@ -192,7 +201,7 @@ export class ProofportSDK {
    * @param inputs - Circuit inputs for Coinbase Country attestation
    * @param inputs.scope - Application-specific scope (e.g., domain name)
    * @param options - Request configuration options
-   * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
+
    * @param options.message - Custom message to display to user
    * @param options.dappName - Application name shown in ZKProofport app
    * @param options.dappIcon - Application icon URL shown in ZKProofport app
@@ -212,7 +221,7 @@ export class ProofportSDK {
    * });
    * ```
    */
-  createCoinbaseCountryRequest(
+  private createCoinbaseCountryRequest(
     inputs: CoinbaseCountryInputs,
     options: {
       message?: string;
@@ -247,6 +256,7 @@ export class ProofportSDK {
   }
 
   /**
+   * @internal
    * Creates a generic proof request for any supported circuit type.
    *
    * Routes to the appropriate circuit-specific request creation method based on
@@ -256,7 +266,7 @@ export class ProofportSDK {
    * @param circuit - Circuit type identifier ('coinbase_attestation' | 'coinbase_country_attestation')
    * @param inputs - Circuit-specific inputs
    * @param options - Request configuration options
-   * @param options.callbackUrl - URL to redirect after proof generation (overrides default)
+
    * @param options.message - Custom message to display to user
    * @param options.dappName - Application name shown in ZKProofport app
    * @param options.dappIcon - Application icon URL shown in ZKProofport app
@@ -276,7 +286,7 @@ export class ProofportSDK {
    * );
    * ```
    */
-  createProofRequest(
+  private createProofRequest(
     circuit: CircuitType,
     inputs: CircuitInputs,
     options: {
@@ -296,6 +306,7 @@ export class ProofportSDK {
   // ============ Deep Link Generation ============
 
   /**
+   * @internal
    * Generates a deep link URL for a proof request.
    *
    * Creates a zkproofport:// URL that opens the ZKProofport mobile app with the
@@ -313,11 +324,12 @@ export class ProofportSDK {
    * // url: 'zkproofport://proof?requestId=abc123&circuit=coinbase_attestation&...'
    * ```
    */
-  getDeepLinkUrl(request: ProofRequest): string {
+  private getDeepLinkUrl(request: ProofRequest): string {
     return buildProofRequestUrl(request, this.config.scheme);
   }
 
   /**
+   * @internal
    * Opens the ZKProofport mobile app with a proof request.
    *
    * Redirects the browser to the deep link URL, which opens the ZKProofport app
@@ -334,12 +346,13 @@ export class ProofportSDK {
    * }
    * ```
    */
-  openProofRequest(request: ProofRequest): void {
+  private openProofRequest(request: ProofRequest): void {
     const url = this.getDeepLinkUrl(request);
     window.location.href = url;
   }
 
   /**
+   * @internal
    * Requests a proof with automatic platform detection.
    *
    * Detects whether the user is on mobile or desktop and automatically chooses
@@ -365,7 +378,7 @@ export class ProofportSDK {
    * }
    * ```
    */
-  async requestProof(
+  private async requestProof(
     request: ProofRequest,
     qrOptions?: QRCodeOptions
   ): Promise<{ deepLink: string; qrDataUrl?: string; mobile: boolean }> {
@@ -506,6 +519,7 @@ export class ProofportSDK {
   // ============ Response Handling ============
 
   /**
+   * @internal
    * Parses a proof response from a callback URL.
    *
    * Extracts and decodes proof response data from the callback URL query parameters
@@ -532,11 +546,12 @@ export class ProofportSDK {
    * });
    * ```
    */
-  parseResponse(url: string): ProofResponse | null {
+  private parseResponse(url: string): ProofResponse | null {
     return parseProofResponseUrl(url);
   }
 
   /**
+   * @internal
    * Checks if a URL is a ZKProofport proof response callback.
    *
    * Validates whether the given URL contains the required query parameters for a
@@ -557,7 +572,7 @@ export class ProofportSDK {
    * });
    * ```
    */
-  isProofportResponse(url: string): boolean {
+  private isProofportResponse(url: string): boolean {
     try {
       const urlObj = new URL(url);
       return urlObj.searchParams.has('requestId') && urlObj.searchParams.has('status');
@@ -567,6 +582,7 @@ export class ProofportSDK {
   }
 
   /**
+   * @internal
    * Retrieves a pending proof request by its ID.
    *
    * Looks up a previously created proof request from the SDK's internal cache.
@@ -589,11 +605,12 @@ export class ProofportSDK {
    * });
    * ```
    */
-  getPendingRequest(requestId: string): ProofRequest | undefined {
+  private getPendingRequest(requestId: string): ProofRequest | undefined {
     return this.pendingRequests.get(requestId);
   }
 
   /**
+   * @internal
    * Clears a pending proof request from the internal cache.
    *
    * Removes a proof request from the SDK's pending requests map. Should be called
@@ -612,7 +629,7 @@ export class ProofportSDK {
    * });
    * ```
    */
-  clearPendingRequest(requestId: string): void {
+  private clearPendingRequest(requestId: string): void {
     this.pendingRequests.delete(requestId);
   }
 
@@ -813,6 +830,7 @@ export class ProofportSDK {
   }
 
   /**
+   * @internal
    * Validates a proof request for completeness and correctness.
    *
    * Checks that the proof request contains all required fields and that the
@@ -833,11 +851,12 @@ export class ProofportSDK {
    * }
    * ```
    */
-  validateRequest(request: ProofRequest): { valid: boolean; error?: string } {
+  private validateRequest(request: ProofRequest): { valid: boolean; error?: string } {
     return validateProofRequest(request);
   }
 
   /**
+   * @internal
    * Checks if a URL is a ZKProofport deep link.
    *
    * Validates whether the given URL uses the ZKProofport deep link scheme
@@ -856,11 +875,12 @@ export class ProofportSDK {
    * }
    * ```
    */
-  isProofportDeepLink(url: string): boolean {
+  private isProofportDeepLink(url: string): boolean {
     return isProofportDeepLink(url, this.config.scheme);
   }
 
   /**
+   * @internal
    * Parses a proof request from a deep link URL.
    *
    * Extracts and decodes the proof request data from a zkproofport:// deep link URL.
@@ -882,7 +902,7 @@ export class ProofportSDK {
    * }
    * ```
    */
-  parseDeepLink(url: string): ProofRequest | null {
+  private parseDeepLink(url: string): ProofRequest | null {
     return parseProofRequestUrl(url);
   }
 
@@ -892,13 +912,13 @@ export class ProofportSDK {
    * Creates a new ProofportSDK instance with environment preset or custom config.
    * Defaults to `'production'` if no argument is provided.
    *
-   * **Recommended usage** — use an environment preset for zero-config initialization:
+   * **Recommended usage** — use the default production relay:
    * ```typescript
-   * const sdk = ProofportSDK.create('production');
+   * const sdk = ProofportSDK.create();
    * ```
    *
    * Environment presets:
-   * - `'production'` — relay.zkproofport.app
+   * - `'production'` — relay.zkproofport.app (default)
    * - `'staging'` — stg-relay.zkproofport.app
    * - `'local'` — localhost:4001
    *
@@ -910,7 +930,7 @@ export class ProofportSDK {
    * ```typescript
    * // Environment preset (recommended)
    * const sdk = ProofportSDK.create(); // production (default)
-   * const sdk = ProofportSDK.create('production');
+   * const sdk = ProofportSDK.create('staging');
    *
    * // Custom config
    * const sdk = ProofportSDK.create({
@@ -1094,13 +1114,13 @@ export class ProofportSDK {
    *
    * @param circuit - Circuit type identifier
    * @param inputs - Circuit-specific inputs
-   * @param options - Request options (callbackUrl, message, dappName, dappIcon)
+   * @param options - Request options (message, dappName, dappIcon, nonce)
    * @returns Promise resolving to RelayProofRequest with requestId, deepLink, pollUrl
    * @throws Error if not authenticated or relay request fails
    *
    * @example
    * ```typescript
-   * const sdk = ProofportSDK.create('production');
+   * const sdk = ProofportSDK.create();
    * await sdk.login({ clientId: 'id', apiKey: 'key' });
    *
    * const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -1410,6 +1430,120 @@ export class ProofportSDK {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+
+  // ============ Nullifier Utilities ============
+
+  /**
+   * Extracts the nullifier from proof public inputs.
+   *
+   * The nullifier is a bytes32 value derived from the user's address and scope,
+   * used to prevent duplicate proof submissions. Each user+scope combination
+   * produces a unique nullifier.
+   *
+   * @param publicInputs - Array of public input hex strings from proof response
+   * @param circuit - Circuit type to determine field positions
+   * @returns Nullifier as hex string (0x...), or null if inputs are insufficient
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.waitForProof(relay.requestId);
+   * if (result.status === 'completed') {
+   *   const nullifier = sdk.extractNullifier(result.publicInputs, result.circuit);
+   *   console.log('Nullifier:', nullifier);
+   * }
+   * ```
+   */
+  extractNullifier(publicInputs: string[], circuit: CircuitType): string | null {
+    return extractNullifierFromPublicInputs(publicInputs, circuit);
+  }
+
+  /**
+   * Extracts the scope from proof public inputs.
+   *
+   * The scope is an application-specific identifier (e.g., domain name) encoded
+   * as bytes32 in the proof's public inputs.
+   *
+   * @param publicInputs - Array of public input hex strings from proof response
+   * @param circuit - Circuit type to determine field positions
+   * @returns Scope as hex string (0x...), or null if inputs are insufficient
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.waitForProof(relay.requestId);
+   * if (result.status === 'completed') {
+   *   const scope = sdk.extractScope(result.publicInputs, result.circuit);
+   *   console.log('Scope:', scope);
+   * }
+   * ```
+   */
+  extractScope(publicInputs: string[], circuit: CircuitType): string | null {
+    return extractScopeFromPublicInputs(publicInputs, circuit);
+  }
+
+  /**
+   * Checks if a nullifier is already registered on-chain.
+   *
+   * Queries the ZKProofportNullifierRegistry contract to determine if the
+   * nullifier has been used before. Used to prevent duplicate proof submissions.
+   *
+   * Requires `nullifierRegistry` in SDK config.
+   *
+   * @param nullifier - Nullifier hex string from extractNullifier()
+   * @param provider - Optional ethers provider (defaults to public RPC for configured chain)
+   * @returns True if nullifier is already registered
+   * @throws Error if nullifierRegistry is not configured
+   *
+   * @example
+   * ```typescript
+   * const sdk = ProofportSDK.create({
+   *   relayUrl: 'https://relay.zkproofport.app',
+   *   nullifierRegistry: { address: '0x...', chainId: 8453 }
+   * });
+   *
+   * const nullifier = sdk.extractNullifier(publicInputs, circuit);
+   * const isDuplicate = await sdk.checkNullifier(nullifier);
+   * ```
+   */
+  async checkNullifier(nullifier: string, provider?: any): Promise<boolean> {
+    if (!this.nullifierRegistry) {
+      throw new Error('nullifierRegistry is required. Set it in ProofportSDK config.');
+    }
+    const p = provider || getDefaultProvider(this.nullifierRegistry.chainId);
+    return isNullifierRegistered(nullifier, this.nullifierRegistry.address, p);
+  }
+
+  /**
+   * Gets detailed information about a registered nullifier from on-chain registry.
+   *
+   * Retrieves the registration timestamp, scope, and circuit ID for a nullifier.
+   * Returns null if the nullifier is not registered.
+   *
+   * Requires `nullifierRegistry` in SDK config.
+   *
+   * @param nullifier - Nullifier hex string from extractNullifier()
+   * @param provider - Optional ethers provider (defaults to public RPC for configured chain)
+   * @returns Nullifier info or null if not registered
+   * @throws Error if nullifierRegistry is not configured
+   *
+   * @example
+   * ```typescript
+   * const info = await sdk.getNullifierDetails(nullifier);
+   * if (info) {
+   *   console.log('Registered at:', new Date(info.registeredAt * 1000));
+   *   console.log('Circuit:', info.circuitId);
+   * }
+   * ```
+   */
+  async getNullifierDetails(
+    nullifier: string,
+    provider?: any
+  ): Promise<{ registeredAt: number; scope: string; circuitId: string } | null> {
+    if (!this.nullifierRegistry) {
+      throw new Error('nullifierRegistry is required. Set it in ProofportSDK config.');
+    }
+    const p = provider || getDefaultProvider(this.nullifierRegistry.chainId);
+    return getNullifierInfo(nullifier, this.nullifierRegistry.address, p);
   }
 }
 

@@ -126,8 +126,8 @@ export function decodeData<T>(encoded: string): T {
  * const request: ProofRequest = {
  *   requestId: generateRequestId(),
  *   circuit: 'coinbase_attestation',
- *   inputs: { userAddress: '0x123...' },
- *   callbackUrl: 'https://example.com/callback'
+ *   inputs: { scope: 'myapp.com' },
+ *   createdAt: Date.now()
  * };
  * const url = buildProofRequestUrl(request);
  * // "zkproofport://proof-request?data=eyJyZXF1ZXN0SWQi..."
@@ -355,6 +355,7 @@ export function isProofportDeepLink(
 }
 
 /**
+ * @internal
  * Validates a proof request for completeness and correctness.
  *
  * Performs comprehensive validation including:
@@ -368,20 +369,6 @@ export function isProofportDeepLink(
  *
  * @param request - Proof request to validate
  * @returns Validation result with `valid` flag and optional `error` message
- *
- * @example
- * ```typescript
- * const request: ProofRequest = {
- *   requestId: 'req-123',
- *   circuit: 'coinbase_attestation',
- *   inputs: { userAddress: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1' },
- *   callbackUrl: 'https://example.com/callback'
- * };
- * const result = validateProofRequest(request);
- * if (!result.valid) {
- *   console.error(result.error); // "Invalid userAddress format" / "Request has expired" / etc.
- * }
- * ```
  */
 export function validateProofRequest(request: ProofRequest): { valid: boolean; error?: string } {
   if (!request.requestId) {

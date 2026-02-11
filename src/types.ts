@@ -101,7 +101,6 @@ export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | EmptyInp
  *   requestId: 'req_123',
  *   circuit: 'coinbase_attestation',
  *   inputs: { scope: 'myapp.com' },
- *   callbackUrl: 'https://myapp.com/callback',
  *   dappName: 'My DApp',
  *   createdAt: Date.now(),
  *   expiresAt: Date.now() + 600000 // 10 minutes
@@ -115,7 +114,7 @@ export interface ProofRequest {
   circuit: CircuitType;
   /** Circuit-specific input parameters */
   inputs: CircuitInputs;
-  /** URL where mobile app will POST the proof response (set by relay, not by SDK user) */
+  /** @internal URL where mobile app will POST the proof response (set by relay server internally, never by SDK users) */
   callbackUrl?: string;
   /** Optional: Custom message to display to user in mobile app */
   message?: string;
@@ -277,6 +276,13 @@ export interface ProofportConfig {
   relayUrl?: string;
   /** Custom verifier contract addresses per circuit type (overrides defaults) */
   verifiers?: Partial<Record<CircuitType, VerifierContract>>;
+  /** Nullifier registry contract config. Required for checkNullifier() and getNullifierDetails(). */
+  nullifierRegistry?: {
+    /** Registry contract address */
+    address: string;
+    /** Chain ID where registry is deployed */
+    chainId: number;
+  };
 }
 
 /**
