@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.1-beta.1...v0.1.2-beta.1) (2026-02-11)
+
+
+### Bug Fixes
+
+* add ethers to devDependencies for CI type checking ([0b3e581](https://github.com/zkproofport/proofport-app-sdk/commit/0b3e5811915e7427f741c97241b309c6b82a9011))
+
 ## [0.1.1-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.0-beta.1...v0.1.1-beta.1) (2026-02-11)
 
 
