@@ -246,6 +246,31 @@
     <p class="subtitle">Generate ZK proof requests using the ZKProofport SDK</p>
 
     <div class="card">
+      <div class="card-header" style="margin-bottom: 16px;">
+        <div class="card-title" style="font-size: 16px;">API Key Authentication (Required)</div>
+        <span id="auth-badge" class="badge" style="display: none;">Authenticated</span>
+      </div>
+      <p style="color: #666; font-size: 13px; margin-bottom: 16px;">
+        Enter your API credentials to authenticate. Get these from the <a href="__DASHBOARD_URL__/dashboard/dapps" target="_blank" style="color: #2563eb;">Dashboard</a>.
+      </p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Client ID</label>
+          <input type="text" id="auth-client-id" placeholder="Your client_id from dashboard">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>API Key</label>
+          <input type="password" id="auth-api-key" placeholder="Your api_key (shown once)">
+        </div>
+      </div>
+      <div style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center;">
+        <button type="button" id="btn-authenticate" class="secondary">Authenticate</button>
+        <button type="button" id="btn-clear-auth" class="secondary" style="display: none;">Clear Auth</button>
+        <span id="auth-status" style="font-size: 13px; color: #666;"></span>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="tabs">
         <button class="tab active" data-tab="kyc">Coinbase KYC</button>
         <button class="tab" data-tab="country">Coinbase Country</button>
@@ -253,17 +278,6 @@
 
       <div id="kyc-tab" class="tab-content active">
         <form id="kyc-form">
-          <div class="form-group">
-            <label for="kyc-callback">Callback URL *</label>
-            <input
-              type="url"
-              id="kyc-callback"
-              placeholder="auto-detected from current origin"
-              required
-            >
-            <div class="help-text">URL where the proof will be sent after completion</div>
-          </div>
-
           <div class="form-group">
             <label for="kyc-dapp-name">Dapp Name (optional)</label>
             <input
@@ -283,25 +297,14 @@
           </div>
 
           <div class="button-group">
-            <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="kyc-open" class="secondary">Open in ZKProofport</button>
+            <button type="submit" class="primary" disabled id="btn-kyc-generate">Generate QR Code</button>
+            <button type="button" id="kyc-open" class="secondary" disabled>Open in ZKProofport</button>
           </div>
         </form>
       </div>
 
       <div id="country-tab" class="tab-content">
         <form id="country-form">
-          <div class="form-group">
-            <label for="country-callback">Callback URL *</label>
-            <input
-              type="url"
-              id="country-callback"
-              placeholder="auto-detected from current origin"
-              required
-            >
-            <div class="help-text">URL where the proof will be sent after completion</div>
-          </div>
-
           <div class="form-group">
             <label for="country-list">Country List *</label>
             <input
@@ -346,8 +349,8 @@
           </div>
 
           <div class="button-group">
-            <button type="submit" class="primary">Generate QR Code</button>
-            <button type="button" id="country-open" class="secondary">Open in ZKProofport</button>
+            <button type="submit" class="primary" disabled id="btn-country-generate">Generate QR Code</button>
+            <button type="button" id="country-open" class="secondary" disabled>Open in ZKProofport</button>
           </div>
         </form>
       </div>
@@ -363,14 +366,29 @@
           <span class="result-value" id="result-circuit"></span>
         </div>
         <div class="result-item">
-          <span class="result-label">Expires:</span>
-          <span class="result-value" id="result-expires"></span>
-        </div>
-        <div class="result-item">
           <span class="result-label">Deep Link:</span>
           <span class="result-value" id="result-deeplink"></span>
         </div>
         <div id="qrcode"></div>
+        <div id="proof-status" class="result-item" style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 6px;">
+          <span style="font-weight: 600;">Status:</span>
+          <span id="status-text" style="color: #f59e0b;">Waiting for proof...</span>
+        </div>
+        <div id="proof-result-data" class="hidden" style="margin-top: 20px; padding: 16px; background: #ecfdf5; border: 1px solid #10b981; border-radius: 6px;">
+          <h4 style="margin-bottom: 12px; color: #059669;">Proof Received</h4>
+          <div class="result-item">
+            <span class="result-label">Nullifier:</span>
+            <span class="result-value" id="result-nullifier"></span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Public Inputs:</span>
+            <span class="result-value" id="result-public-inputs"></span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Proof (hex):</span>
+            <span class="result-value" id="result-proof" style="word-break: break-all; font-size: 11px;"></span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -391,17 +409,73 @@
       return 'production';
     }
     const sdkEnv = detectSDKEnv();
+    const localRelayUrl = `${window.location.protocol}//${window.location.hostname}:4001`;
     // In local mode, derive relay URL from current hostname to work over LAN
     const sdk = sdkEnv === 'local'
-      ? new ProofportSDK({ relayUrl: `${window.location.protocol}//${window.location.hostname}:4001` })
+      ? new ProofportSDK({ relayUrl: localRelayUrl })
       : ProofportSDK.create(sdkEnv);
 
-    // Set callback input values dynamically from current origin
-    document.getElementById('kyc-callback').value = `${baseUrl}/api/callback`;
-    document.getElementById('country-callback').value = `${baseUrl}/api/callback`;
-
-    let currentRequest = null;
+    let currentRelayRequest = null;
     let isIncludedCountry = true;
+    let authToken = null;
+
+    // Authentication
+    document.getElementById('btn-authenticate').addEventListener('click', async () => {
+      const clientId = document.getElementById('auth-client-id').value.trim();
+      const apiKey = document.getElementById('auth-api-key').value.trim();
+
+      if (!clientId || !apiKey) {
+        document.getElementById('auth-status').textContent = 'Both fields required';
+        document.getElementById('auth-status').style.color = '#ef4444';
+        return;
+      }
+
+      try {
+        document.getElementById('btn-authenticate').disabled = true;
+        document.getElementById('auth-status').textContent = 'Authenticating...';
+        document.getElementById('auth-status').style.color = '#f59e0b';
+
+        authToken = await sdk.login({ clientId, apiKey });
+
+        document.getElementById('auth-status').textContent = 'Authenticated';
+        document.getElementById('auth-status').style.color = '#22c55e';
+        document.getElementById('auth-badge').style.display = '';
+        document.getElementById('auth-badge').textContent = 'Authenticated';
+        document.getElementById('auth-badge').className = 'badge';
+        document.getElementById('auth-badge').style.background = 'rgba(34, 197, 94, 0.2)';
+        document.getElementById('auth-badge').style.color = '#22c55e';
+        document.getElementById('btn-clear-auth').style.display = '';
+
+        // Enable proof buttons
+        document.getElementById('btn-kyc-generate').disabled = false;
+        document.getElementById('kyc-open').disabled = false;
+        document.getElementById('btn-country-generate').disabled = false;
+        document.getElementById('country-open').disabled = false;
+
+        console.log('Authenticated:', authToken);
+      } catch (err) {
+        document.getElementById('auth-status').textContent = 'Auth failed: ' + err.message;
+        document.getElementById('auth-status').style.color = '#ef4444';
+        console.error('Authentication failed:', err);
+      } finally {
+        document.getElementById('btn-authenticate').disabled = false;
+      }
+    });
+
+    document.getElementById('btn-clear-auth').addEventListener('click', () => {
+      authToken = null;
+      document.getElementById('auth-client-id').value = '';
+      document.getElementById('auth-api-key').value = '';
+      document.getElementById('auth-status').textContent = '';
+      document.getElementById('auth-badge').style.display = 'none';
+      document.getElementById('btn-clear-auth').style.display = 'none';
+
+      // Disable proof buttons
+      document.getElementById('btn-kyc-generate').disabled = true;
+      document.getElementById('kyc-open').disabled = true;
+      document.getElementById('btn-country-generate').disabled = true;
+      document.getElementById('country-open').disabled = true;
+    });
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -431,104 +505,203 @@
     document.getElementById('kyc-form').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const callbackUrl = document.getElementById('kyc-callback').value;
-      const dappName = document.getElementById('kyc-dapp-name').value;
-      const message = document.getElementById('kyc-message').value;
+      if (!authToken) {
+        alert('Please authenticate first');
+        return;
+      }
 
-      currentRequest = sdk.createCoinbaseKycRequest(
-        { scope: 'zkproofport:demo' },
-        {
-          callbackUrl,
-          dappName: dappName || undefined,
-          message: message || undefined
-        }
-      );
-
-      await displayResult(currentRequest);
-    });
-
-    document.getElementById('kyc-open').addEventListener('click', () => {
-      if (!currentRequest) {
-        const callbackUrl = document.getElementById('kyc-callback').value;
+      try {
         const dappName = document.getElementById('kyc-dapp-name').value;
         const message = document.getElementById('kyc-message').value;
 
-        currentRequest = sdk.createCoinbaseKycRequest(
+        const options = {};
+        if (dappName) options.dappName = dappName;
+        if (message) options.message = message;
+
+        currentRelayRequest = await sdk.createRelayRequest(
+          'coinbase_attestation',
           { scope: 'zkproofport:demo' },
-          {
-            callbackUrl,
-            dappName: dappName || undefined,
-            message: message || undefined
-          }
+          options
         );
+
+        await displayResult(currentRelayRequest);
+        await waitForProof(currentRelayRequest.requestId);
+      } catch (err) {
+        alert('Request failed: ' + err.message);
+        console.error('KYC request failed:', err);
       }
-      sdk.openProofRequest(currentRequest);
+    });
+
+    document.getElementById('kyc-open').addEventListener('click', async () => {
+      if (!authToken) {
+        alert('Please authenticate first');
+        return;
+      }
+
+      try {
+        if (!currentRelayRequest) {
+          const dappName = document.getElementById('kyc-dapp-name').value;
+          const message = document.getElementById('kyc-message').value;
+
+          const options = {};
+          if (dappName) options.dappName = dappName;
+          if (message) options.message = message;
+
+          currentRelayRequest = await sdk.createRelayRequest(
+            'coinbase_attestation',
+            { scope: 'zkproofport:demo' },
+            options
+          );
+        }
+        window.location.href = currentRelayRequest.deepLink;
+      } catch (err) {
+        alert('Request failed: ' + err.message);
+        console.error('KYC request failed:', err);
+      }
     });
 
     // Country Form
     document.getElementById('country-form').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const callbackUrl = document.getElementById('country-callback').value;
-      const countryListStr = document.getElementById('country-list').value;
-      const dappName = document.getElementById('country-dapp-name').value;
-      const message = document.getElementById('country-message').value;
+      if (!authToken) {
+        alert('Please authenticate first');
+        return;
+      }
 
-      const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
-
-      currentRequest = sdk.createCoinbaseCountryRequest(
-        {
-          countryList,
-          isIncluded: isIncludedCountry,
-          scope: 'zkproofport:demo'
-        },
-        {
-          callbackUrl,
-          dappName: dappName || undefined,
-          message: message || undefined
-        }
-      );
-
-      await displayResult(currentRequest);
-    });
-
-    document.getElementById('country-open').addEventListener('click', () => {
-      if (!currentRequest) {
-        const callbackUrl = document.getElementById('country-callback').value;
+      try {
         const countryListStr = document.getElementById('country-list').value;
         const dappName = document.getElementById('country-dapp-name').value;
         const message = document.getElementById('country-message').value;
 
         const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
 
-        currentRequest = sdk.createCoinbaseCountryRequest(
-          {
-            countryList,
-            isIncluded: isIncludedCountry
-          },
-          {
-            callbackUrl,
-            dappName: dappName || undefined,
-            message: message || undefined
-          }
+        if (countryList.length === 0) {
+          alert('Country list is required');
+          return;
+        }
+
+        const inputs = {
+          countryList,
+          isIncluded: isIncludedCountry,
+          scope: 'zkproofport:demo'
+        };
+
+        const options = {};
+        if (dappName) options.dappName = dappName;
+        if (message) options.message = message;
+
+        currentRelayRequest = await sdk.createRelayRequest(
+          'coinbase_country_attestation',
+          inputs,
+          options
         );
+
+        await displayResult(currentRelayRequest);
+        await waitForProof(currentRelayRequest.requestId);
+      } catch (err) {
+        alert('Request failed: ' + err.message);
+        console.error('Country request failed:', err);
       }
-      sdk.openProofRequest(currentRequest);
     });
 
-    async function displayResult(request) {
-      const deepLink = sdk.getDeepLinkUrl(request);
-      const expiresAt = new Date(request.expiresAt);
+    document.getElementById('country-open').addEventListener('click', async () => {
+      if (!authToken) {
+        alert('Please authenticate first');
+        return;
+      }
 
-      document.getElementById('result-request-id').textContent = request.requestId;
-      document.getElementById('result-circuit').textContent = request.circuit;
-      document.getElementById('result-expires').textContent = expiresAt.toLocaleString();
-      document.getElementById('result-deeplink').textContent = deepLink;
+      try {
+        if (!currentRelayRequest) {
+          const countryListStr = document.getElementById('country-list').value;
+          const dappName = document.getElementById('country-dapp-name').value;
+          const message = document.getElementById('country-message').value;
 
-      const qrDataUrl = await sdk.generateQRCode(request, { width: 300 });
+          const countryList = countryListStr.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+
+          if (countryList.length === 0) {
+            alert('Country list is required');
+            return;
+          }
+
+          const inputs = {
+            countryList,
+            isIncluded: isIncludedCountry,
+            scope: 'zkproofport:demo'
+          };
+
+          const options = {};
+          if (dappName) options.dappName = dappName;
+          if (message) options.message = message;
+
+          currentRelayRequest = await sdk.createRelayRequest(
+            'coinbase_country_attestation',
+            inputs,
+            options
+          );
+        }
+        window.location.href = currentRelayRequest.deepLink;
+      } catch (err) {
+        alert('Request failed: ' + err.message);
+        console.error('Country request failed:', err);
+      }
+    });
+
+    async function displayResult(relayRequest) {
+      document.getElementById('result-request-id').textContent = relayRequest.requestId;
+      document.getElementById('result-circuit').textContent = relayRequest.circuit || 'N/A';
+      document.getElementById('result-deeplink').textContent = relayRequest.deepLink;
+
+      const qrDataUrl = await sdk.generateQRCode(relayRequest.deepLink, { width: 300 });
       document.getElementById('qrcode').innerHTML = `<img src="${qrDataUrl}" alt="QR Code" />`;
 
       document.getElementById('result').classList.remove('hidden');
+      document.getElementById('proof-status').classList.remove('hidden');
+      document.getElementById('status-text').textContent = 'Waiting for proof...';
+      document.getElementById('status-text').style.color = '#f59e0b';
+      document.getElementById('proof-result-data').classList.add('hidden');
+    }
+
+    async function waitForProof(requestId) {
+      try {
+        console.log('[waitForProof] Starting to wait for:', requestId);
+
+        const result = await sdk.waitForProof(requestId, {
+          onStatusChange: (statusUpdate) => {
+            console.log('[waitForProof] Status update:', statusUpdate);
+            const statusText = document.getElementById('status-text');
+            if (statusUpdate.status === 'pending') {
+              statusText.textContent = 'Pending...';
+              statusText.style.color = '#f59e0b';
+            } else if (statusUpdate.status === 'processing') {
+              statusText.textContent = 'Processing...';
+              statusText.style.color = '#3b82f6';
+            }
+          },
+          timeoutMs: 300000 // 5 minutes
+        });
+
+        console.log('[waitForProof] Proof received:', result);
+
+        // Update status
+        const statusText = document.getElementById('status-text');
+        statusText.textContent = 'Proof completed!';
+        statusText.style.color = '#22c55e';
+
+        // Display proof data
+        const nullifier = result.nullifier || (result.publicInputs && result.publicInputs[0]) || 'N/A';
+        document.getElementById('result-nullifier').textContent = nullifier;
+        document.getElementById('result-public-inputs').textContent = result.publicInputs ? result.publicInputs.length : 0;
+        document.getElementById('result-proof').textContent = result.proof || 'N/A';
+
+        document.getElementById('proof-result-data').classList.remove('hidden');
+
+      } catch (err) {
+        console.error('[waitForProof] Error:', err);
+        const statusText = document.getElementById('status-text');
+        statusText.textContent = 'Failed: ' + err.message;
+        statusText.style.color = '#ef4444';
+      }
     }
   </script>
 </body>
