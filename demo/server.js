@@ -8,6 +8,8 @@ const PORT = process.env.PORT || 3300;
 const API_URL = process.env.API_URL || 'http://localhost:4000';
 const RELAY_URL = process.env.RELAY_URL || 'http://localhost:4001';
 const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3000';
+const DEMO_CLIENT_ID = process.env.DEMO_CLIENT_ID || '';
+const DEMO_API_KEY = process.env.DEMO_API_KEY || '';
 
 // SSE clients for real-time callback push
 const sseClients = new Set();
@@ -72,7 +74,11 @@ const server = http.createServer((req, res) => {
       }
       const proto = req.headers['x-forwarded-proto'] || 'http';
       const demoBaseUrl = `${proto}://${req.headers.host}`;
-      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL).replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
+      const html = data
+        .replace(/__DASHBOARD_URL__/g, DASHBOARD_URL)
+        .replace(/__DEMO_BASE_URL__/g, demoBaseUrl)
+        .replace(/__DEMO_CLIENT_ID__/g, DEMO_CLIENT_ID)
+        .replace(/__DEMO_API_KEY__/g, DEMO_API_KEY);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
@@ -86,7 +92,10 @@ const server = http.createServer((req, res) => {
       }
       const proto = req.headers['x-forwarded-proto'] || 'http';
       const demoBaseUrl = `${proto}://${req.headers.host}`;
-      const html = data.replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
+      const html = data
+        .replace(/__DEMO_BASE_URL__/g, demoBaseUrl)
+        .replace(/__DEMO_CLIENT_ID__/g, DEMO_CLIENT_ID)
+        .replace(/__DEMO_API_KEY__/g, DEMO_API_KEY);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });
@@ -110,7 +119,11 @@ const server = http.createServer((req, res) => {
       }
       const proto = req.headers['x-forwarded-proto'] || 'http';
       const demoBaseUrl = `${proto}://${req.headers.host}`;
-      const html = data.replace(/__DASHBOARD_URL__/g, DASHBOARD_URL).replace(/__DEMO_BASE_URL__/g, demoBaseUrl);
+      const html = data
+        .replace(/__DASHBOARD_URL__/g, DASHBOARD_URL)
+        .replace(/__DEMO_BASE_URL__/g, demoBaseUrl)
+        .replace(/__DEMO_CLIENT_ID__/g, DEMO_CLIENT_ID)
+        .replace(/__DEMO_API_KEY__/g, DEMO_API_KEY);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);
     });

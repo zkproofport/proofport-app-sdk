@@ -970,12 +970,12 @@
     <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
       <div class="logo">ZKProofport</div>
       <div class="plan-selector" id="auth-section">
-        <!-- Auto-login enabled: manual login UI hidden
-        <input type="text" id="auth-client-id" placeholder="Client ID" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
-        <input type="password" id="auth-api-key" placeholder="API Key" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
-        <button onclick="authenticateWithApiKey()" id="btn-authenticate" style="padding:4px 12px;font-size:12px;background:var(--blue,#3b82f6);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
-        <button onclick="clearAuth()" id="btn-clear-auth" style="display:none;padding:4px 12px;font-size:12px;background:var(--gray-600,#444);color:white;border:none;border-radius:4px;cursor:pointer;">Logout</button>
-        -->
+        <span id="manual-auth-form" style="display:none;">
+          <input type="text" id="auth-client-id" placeholder="Client ID" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
+          <input type="password" id="auth-api-key" placeholder="API Key" style="width:120px;padding:4px 8px;font-size:12px;background:var(--gray-800,#1e1e2e);border:1px solid var(--gray-600,#444);border-radius:4px;color:var(--gray-200,#eee);">
+          <button onclick="authenticateWithApiKey()" id="btn-authenticate" style="padding:4px 12px;font-size:12px;background:var(--blue,#3b82f6);color:white;border:none;border-radius:4px;cursor:pointer;">Login</button>
+          <button onclick="clearAuth()" id="btn-clear-auth" style="display:none;padding:4px 12px;font-size:12px;background:var(--gray-600,#444);color:white;border:none;border-radius:4px;cursor:pointer;">Logout</button>
+        </span>
         <span id="auth-status" style="font-size:12px;color:var(--gray-400,#999);"></span>
         <span id="plan-badge" class="current-plan" style="display:none;"></span>
       </div>
@@ -1270,12 +1270,12 @@
       ? new ProofportSDK({ relayUrl: `${window.location.protocol}//${window.location.hostname}:4001` })
       : ProofportSDK.create(sdkEnv);
 
-    // Auto-login with demo credentials
-    const AUTO_CREDS = {
-      local: { clientId: '89c200779bcd6c0207f7199acfd12bc4', apiKey: '69d0c1b43e32524fe531c888664f00fb14cf9379acadbc917c508e701ea9eec7' },
-      staging: { clientId: '76aac6d737e8b8de3f4b2fe17397c39c', apiKey: 'ea62d7f4def4f8fe923d4df8b0467e1cc3342798e2ea7d3ea0782738d702555b' },
-    };
-    const autoCreds = AUTO_CREDS[sdkEnv];
+    // Auto-login with demo credentials (server-side injected)
+    const autoClientId = '__DEMO_CLIENT_ID__';
+    const autoApiKey = '__DEMO_API_KEY__';
+    const autoCreds = (autoClientId && autoApiKey && !autoClientId.startsWith('__'))
+      ? { clientId: autoClientId, apiKey: autoApiKey }
+      : null;
     if (autoCreds) {
       sdk.login(autoCreds).then(auth => {
         console.log(`[Auto-login] ${auth.clientId} (${auth.tier})`);
@@ -1283,7 +1283,10 @@
       }).catch(err => {
         console.error(`[Auto-login] Failed: ${err.message}`);
         document.getElementById('auth-status').innerHTML = `<span style="color:#ef4444;">Auto-login failed: ${err.message}</span>`;
+        document.getElementById('manual-auth-form').style.display = '';
       });
+    } else {
+      document.getElementById('manual-auth-form').style.display = '';
     }
 
     // Authenticate with API key to get JWT token
