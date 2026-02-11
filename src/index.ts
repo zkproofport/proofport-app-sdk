@@ -53,34 +53,8 @@ export type {
   SDKEnvironment,
 } from './types';
 
-// Deep link utilities
-export {
-  generateRequestId,
-  buildProofRequestUrl,
-  parseProofRequestUrl,
-  parseDeepLink,
-  isProofportDeepLink,
-  validateProofRequest,
-  encodeData,
-  decodeData,
-} from './deeplink';
-
-// QR code utilities
-export {
-  generateQRCodeDataUrl,
-  generateQRCodeSVG,
-  generateQRCodeToCanvas,
-  estimateQRDataSize,
-} from './qrcode';
-
 // Verification utilities
 export {
-  verifyProofOnChain,
-  parseProofForOnChain,
-  getVerifierContract,
-  getDefaultProvider,
-  getVerifierAddress,
-  getVerifierChainId,
   extractNullifierFromPublicInputs,
   extractScopeFromPublicInputs,
   isNullifierRegistered,
@@ -89,16 +63,6 @@ export {
 
 // Constants
 export {
-  DEFAULT_SCHEME,
-  DEEP_LINK_HOSTS,
   CIRCUIT_METADATA,
-  VERIFIER_ABI,
-  RPC_ENDPOINTS,
-  DEFAULT_REQUEST_EXPIRY_MS,
-  MAX_QR_DATA_SIZE,
-  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
-  COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
-  NULLIFIER_REGISTRY_ABI,
   ZKPROOFPORT_NULLIFIER_REGISTRY_ABI,
-  RELAY_URLS,
 } from './constants';

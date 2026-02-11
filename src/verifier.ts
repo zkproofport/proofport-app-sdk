@@ -11,6 +11,7 @@ import { VERIFIER_ABI, RPC_ENDPOINTS } from './constants';
 // ethers v5/v6 compatibility shims
 const _ethers = ethers as any;
 
+/** @internal ethers v5/v6 compatibility shim */
 function hexZeroPad(value: string, length: number): string {
   // v6: ethers.zeroPadValue, v5: ethers.utils.hexZeroPad
   if (typeof _ethers.zeroPadValue === 'function') return _ethers.zeroPadValue(value, length);
@@ -20,6 +21,7 @@ function hexZeroPad(value: string, length: number): string {
   return '0x' + hex.padStart(length * 2, '0');
 }
 
+/** @internal ethers v5/v6 compatibility shim */
 function createJsonRpcProvider(url: string) {
   // v6: ethers.JsonRpcProvider, v5: ethers.providers.JsonRpcProvider
   if (typeof _ethers.JsonRpcProvider === 'function') return new _ethers.JsonRpcProvider(url);
@@ -28,7 +30,7 @@ function createJsonRpcProvider(url: string) {
 }
 
 /**
- * Resolve verifier from SDK config or proof response.
+ * @internal Resolve verifier from SDK config or proof response.
  * SDK config (customVerifier) takes priority over response-provided verifier.
  */
 function resolveVerifier(
@@ -162,9 +164,7 @@ export async function verifyProofOnChain(
   }
 }
 
-/**
- * Ensure a hex string has the 0x prefix
- */
+/** @internal Ensure a hex string has the 0x prefix */
 function ensureHexPrefix(hex: string): string {
   return hex.startsWith('0x') ? hex : `0x${hex}`;
 }
@@ -211,9 +211,7 @@ export function parseProofForOnChain(
   };
 }
 
-/**
- * Require a verifier or throw with a helpful message
- */
+/** @internal Require a verifier or throw with a helpful message */
 function requireVerifier(circuit: CircuitType, verifier?: VerifierContract): VerifierContract {
   if (!verifier) {
     throw new Error(`No verifier configured for circuit '${circuit}'. Configure via SDK verifiers option.`);
@@ -329,6 +327,7 @@ export function extractNullifierFromPublicInputs(
   return reconstructBytes32FromFields(nullifierFields);
 }
 
+/** @internal Reconstruct a bytes32 value from 32 individual field elements */
 function reconstructBytes32FromFields(fields: string[]): string {
   if (fields.length !== 32) {
     throw new Error(`Expected 32 fields, got ${fields.length}`);

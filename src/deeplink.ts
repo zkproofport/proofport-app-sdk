@@ -147,23 +147,11 @@ export function buildProofRequestUrl(
  * Appends proof response fields to the provided callback URL. For completed proofs,
  * includes proof data, public inputs, and nullifier. For errors, includes error message.
  *
+ * @internal Used by the mobile app to construct callback URLs — not intended for SDK consumers.
+ *
  * @param callbackUrl - Base callback URL (from the original proof request)
  * @param response - Proof response containing status and optional proof data
  * @returns Complete callback URL with proof response as query parameters
- *
- * @example
- * ```typescript
- * const response: ProofResponse = {
- *   requestId: 'req-123',
- *   circuit: 'coinbase_attestation',
- *   status: 'completed',
- *   proof: '0x...',
- *   publicInputs: ['0x1', '0x2'],
- *   nullifier: '0xabc...'
- * };
- * const url = buildCallbackUrl('https://example.com/callback', response);
- * // "https://example.com/callback?requestId=req-123&status=completed&proof=0x...&publicInputs=0x1,0x2..."
- * ```
  */
 export function buildCallbackUrl(
   callbackUrl: string,
