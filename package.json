@@ -1,6 +1,6 @@
 {
   "name": "@zkproofport-app/sdk",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.1-beta.1",
   "description": "ZKProofport SDK for requesting zero-knowledge proofs from the ZKProofport mobile app and verifying them on-chain",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
