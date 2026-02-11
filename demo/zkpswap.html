@@ -1724,7 +1724,7 @@
     { "imports": { "socket.io-client": "https://cdn.jsdelivr.net/npm/socket.io-client@4/+esm", "ethers": "https://cdn.jsdelivr.net/npm/ethers@6/+esm" } }
   </script>
   <script type="module">
-    import { ProofportSDK, RELAY_URLS } from '../dist/index.mjs';
+    import { ProofportSDK } from '../dist/index.mjs';
 
     // ========== CONSTANTS ==========
     const DEFAULT_SCHEME = 'zkproofport';
@@ -1754,6 +1754,7 @@
       : null;
     if (autoCreds) {
       sdk.login(autoCreds).then(auth => {
+        jwtToken = auth.token;
         authClientId = auth.clientId;
         console.log(`[Auto-login] ${auth.clientId} (${auth.tier})`);
         document.getElementById('auth-status').innerHTML = '';
@@ -2180,7 +2181,7 @@
     // Close settings on outside click
     document.addEventListener('click', (e) => {
       const pop = document.getElementById('settingsPopover');
-      if (pop.classList.contains('open') && !e.target.closest('.settings-btn')) {
+      if (pop && pop.classList.contains('open') && !e.target.closest('.settings-btn')) {
         pop.classList.remove('open');
       }
     });
@@ -2609,7 +2610,7 @@
       document.getElementById('devConfigCallback').textContent = CALLBACK_URL;
 
       devLog('SDK', 'ZKPSwap initialized');
-      devLog('SDK', `Environment: ${sdkEnv} (${sdkEnv === 'local' ? localRelayUrl : RELAY_URLS[sdkEnv]})`);
+      devLog('SDK', `Environment: ${sdkEnv}`);
       devLog('SDK', `KYC threshold: ${KYC_THRESHOLD} ETH`);
 
       if (walletConnected) {
