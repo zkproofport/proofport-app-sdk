@@ -29,10 +29,18 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          if [[ "${{ github.event.release.tag_name }}" == *"beta"* ]]; then
+            npm publish --access public --tag beta
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
