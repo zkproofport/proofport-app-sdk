@@ -1,148 +1,85 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProofportSDK } from '../ProofportSDK';
 
-const mockAuthResponse = {
-  token: 'jwt-token-123',
-  client_id: 'test-client',
-  dapp_id: 'dapp-123',
-  tier: 'free',
-  expires_in: 3600,
-};
-
-describe('SDK Authentication', () => {
+describe('SDK Challenge-Signature Auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('login() sends POST with correct body', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockAuthResponse),
+  describe('setSigner', () => {
+    it('accepts a wallet signer object', () => {
+      const sdk = ProofportSDK.create('local');
+      const mockSigner = {
+        signMessage: vi.fn().mockResolvedValue('0xsig'),
+        getAddress: vi.fn().mockResolvedValue('0xaddr'),
+      };
+      // Should not throw
+      sdk.setSigner(mockSigner);
+    });
+  });
+
+  describe('getChallenge', () => {
+    it('fetches challenge from relay', async () => {
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          challenge: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          expiresAt: Date.now() + 120000,
+        }),
+      });
+
+      const sdk = ProofportSDK.create('local');
+      const result = await sdk.getChallenge();
+
+      expect(result.challenge).toBe('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
+      expect(result.expiresAt).toBeGreaterThan(Date.now());
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:4001/api/v1/challenge');
     });
 
-    const sdk = ProofportSDK.create('local');
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:4001/api/v1/auth/token',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: 'test-client', api_key: 'test-key' }),
-      }
-    );
-  });
-
-  it('login() stores auth token internally', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockAuthResponse),
+    it('throws if relayUrl not configured', async () => {
+      const sdk = new ProofportSDK();
+      await expect(sdk.getChallenge()).rejects.toThrow('relayUrl is required');
     });
 
-    const sdk = ProofportSDK.create('local');
-    expect(sdk.isAuthenticated()).toBe(false);
+    it('throws on HTTP error', async () => {
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: 'Server error' }),
+      });
 
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-
-    expect(sdk.isAuthenticated()).toBe(true);
+      const sdk = ProofportSDK.create('local');
+      await expect(sdk.getChallenge()).rejects.toThrow('Server error');
+    });
   });
 
-  it('login() throws if relayUrl not configured', async () => {
-    const sdk = new ProofportSDK();
-
-    await expect(
-      sdk.login({ clientId: 'test-client', apiKey: 'test-key' })
-    ).rejects.toThrow('relayUrl is required');
-  });
-
-  it('login() throws on 401', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: () => Promise.resolve({ error: 'Invalid credentials' }),
+  describe('removed auth methods', () => {
+    it('does not have login method', () => {
+      const sdk = ProofportSDK.create('local');
+      expect((sdk as any).login).toBeUndefined();
     });
 
-    const sdk = ProofportSDK.create('local');
-
-    await expect(
-      sdk.login({ clientId: 'test-client', apiKey: 'test-key' })
-    ).rejects.toThrow('Invalid credentials');
-  });
-
-  it('login() throws on network error', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
-
-    const sdk = ProofportSDK.create('local');
-
-    await expect(
-      sdk.login({ clientId: 'test-client', apiKey: 'test-key' })
-    ).rejects.toThrow('Network error');
-  });
-
-  it('isAuthenticated() returns false before login', () => {
-    const sdk = ProofportSDK.create('local');
-    expect(sdk.isAuthenticated()).toBe(false);
-  });
-
-  it('isAuthenticated() returns true after login', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockAuthResponse),
+    it('does not have logout method', () => {
+      const sdk = ProofportSDK.create('local');
+      expect((sdk as any).logout).toBeUndefined();
     });
 
-    const sdk = ProofportSDK.create('local');
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-
-    expect(sdk.isAuthenticated()).toBe(true);
-  });
-
-  it('isAuthenticated() returns false after token expires', async () => {
-    const expiredResponse = {
-      ...mockAuthResponse,
-      expires_in: -1,
-    };
-
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(expiredResponse),
+    it('does not have isAuthenticated method', () => {
+      const sdk = ProofportSDK.create('local');
+      expect((sdk as any).isAuthenticated).toBeUndefined();
     });
 
-    const sdk = ProofportSDK.create('local');
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-
-    expect(sdk.isAuthenticated()).toBe(false);
-  });
-
-  it('getAuthToken() returns null before login, token after', async () => {
-    const sdk = ProofportSDK.create('local');
-    expect(sdk.getAuthToken()).toBeNull();
-
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockAuthResponse),
+    it('does not have getAuthToken method', () => {
+      const sdk = ProofportSDK.create('local');
+      expect((sdk as any).getAuthToken).toBeUndefined();
     });
 
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-
-    const token = sdk.getAuthToken();
-    expect(token).not.toBeNull();
-    expect(token?.token).toBe('jwt-token-123');
-    expect(token?.clientId).toBe('test-client');
-  });
-
-  it('logout() clears stored token', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockAuthResponse),
+    it('does not have static authenticate method', () => {
+      expect((ProofportSDK as any).authenticate).toBeUndefined();
     });
 
-    const sdk = ProofportSDK.create('local');
-    await sdk.login({ clientId: 'test-client', apiKey: 'test-key' });
-    expect(sdk.isAuthenticated()).toBe(true);
-
-    sdk.logout();
-
-    expect(sdk.isAuthenticated()).toBe(false);
-    expect(sdk.getAuthToken()).toBeNull();
+    it('does not have static isTokenValid method', () => {
+      expect((ProofportSDK as any).isTokenValid).toBeUndefined();
+    });
   });
 });
