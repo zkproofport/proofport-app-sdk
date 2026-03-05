@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.2-beta.1...v0.1.3-beta.1) (2026-03-05)
+
+
+### Refactoring
+
+* replace JWT auth with challenge-signature flow ([fd27f1d](https://github.com/zkproofport/proofport-app-sdk/commit/fd27f1d19d048d06b71e221223b561cdda6aa93e))
+
 ## [0.1.2-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.1-beta.1...v0.1.2-beta.1) (2026-02-11)
 
 
