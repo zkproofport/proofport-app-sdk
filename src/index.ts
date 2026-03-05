@@ -10,8 +10,8 @@
  * // Initialize with environment preset
  * const sdk = ProofportSDK.create('production');
  *
- * // Authenticate
- * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
+ * // Set wallet signer
+ * sdk.setSigner(signer);
  *
  * // Create proof request via relay
  * const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -41,8 +41,8 @@ export type {
   QRCodeOptions,
   VerifierContract,
   ProofportConfig,
-  AuthCredentials,
-  AuthToken,
+  ChallengeResponse,
+  WalletSigner,
   RelayProofRequest,
   RelayProofResult,
   SDKEnvironment,

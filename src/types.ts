@@ -370,57 +370,45 @@ export interface NullifierRegistryConfig {
 }
 
 /**
- * Client credentials for API authentication.
+ * Challenge response from relay server.
  *
- * Used to authenticate with the ZKProofport API server and obtain
- * a JWT token for making authenticated requests to the relay server.
- *
- * @example
- * ```typescript
- * const credentials: AuthCredentials = {
- *   clientId: 'your-client-id',
- *   apiKey: 'your-api-key'
- * };
- * ```
- */
-export interface AuthCredentials {
-  /** Client ID identifying the application */
-  clientId: string;
-  /** API key for authentication */
-  apiKey: string;
-}
-
-/**
- * JWT authentication token received from the API server.
- *
- * Contains the JWT token and metadata about the authenticated session,
- * including tier information, expiration time, and associated identifiers.
+ * The relay server issues a random challenge that must be signed
+ * by the user's wallet to authenticate proof requests.
  *
  * @example
  * ```typescript
- * const auth: AuthToken = {
- *   token: 'eyJhbGc...',
- *   clientId: 'your-client-id',
- *   dappId: 'app-123',
- *   tier: 'plan1',
- *   expiresIn: 3600,
+ * const challenge: ChallengeResponse = {
+ *   challenge: '0xabcdef...',
  *   expiresAt: 1707234567890
  * };
  * ```
  */
-export interface AuthToken {
-  /** JWT token for authenticating relay requests */
-  token: string;
-  /** Client ID that the token was issued for */
-  clientId: string;
-  /** DApp ID associated with this client */
-  dappId: string;
-  /** Service tier (free, credit, plan1, plan2) */
-  tier: string;
-  /** Token lifetime in seconds (typically 3600 = 1 hour) */
-  expiresIn: number;
-  /** Unix timestamp (ms) when the token expires */
+export interface ChallengeResponse {
+  /** Hex-encoded 32-byte random challenge */
+  challenge: string;
+  /** Unix timestamp (ms) when challenge expires */
   expiresAt: number;
+}
+
+/**
+ * Wallet signer interface for challenge signing.
+ * Compatible with ethers v6 Signer.
+ *
+ * Any object implementing `signMessage` and `getAddress` can be used,
+ * including ethers v6 `Signer` instances.
+ *
+ * @example
+ * ```typescript
+ * import { BrowserProvider } from 'ethers';
+ *
+ * const provider = new BrowserProvider(window.ethereum);
+ * const signer = await provider.getSigner();
+ * // signer implements WalletSigner
+ * ```
+ */
+export interface WalletSigner {
+  signMessage(message: string | Uint8Array): Promise<string>;
+  getAddress(): Promise<string>;
 }
 
 /**

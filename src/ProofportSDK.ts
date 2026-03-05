@@ -13,8 +13,8 @@ import type {
   QRCodeOptions,
   ParsedProof,
   VerifierContract,
-  AuthCredentials,
-  AuthToken,
+  ChallengeResponse,
+  WalletSigner,
   RelayProofRequest,
   RelayProofResult,
 } from './types';
@@ -62,12 +62,15 @@ import type { SDKEnvironment } from './types';
  * @example
  * ```typescript
  * import { ProofportSDK } from '@zkproofport-app/sdk';
+ * import { BrowserProvider } from 'ethers';
  *
  * // Initialize SDK (uses production relay by default)
  * const sdk = ProofportSDK.create();
  *
- * // Authenticate
- * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
+ * // Set wallet signer for challenge-signature auth
+ * const provider = new BrowserProvider(window.ethereum);
+ * const signer = await provider.getSigner();
+ * sdk.setSigner(signer);
  *
  * // Create proof request via relay
  * const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -87,7 +90,7 @@ import type { SDKEnvironment } from './types';
 export class ProofportSDK {
   private config: Required<Omit<ProofportConfig, 'relayUrl' | 'nullifierRegistry'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
-  private authToken: AuthToken | null = null;
+  private signer: WalletSigner | null = null;
   private relayUrl: string;
   private nullifierRegistry?: { address: string; chainId: number };
   private socket: any = null;
@@ -980,127 +983,46 @@ export class ProofportSDK {
     );
   }
 
-  /**
-   * Authenticates with ZKProofport using client credentials via the relay server.
-   *
-   * Exchanges a client_id and api_key pair for a short-lived JWT token
-   * that can be used to authenticate relay requests.
-   *
-   * @param credentials - Client ID and API key
-   * @param relayUrl - Relay server URL (e.g., 'https://relay.zkproofport.app')
-   * @returns Promise resolving to AuthToken with JWT token and metadata
-   * @throws Error if authentication fails
-   *
-   * @example
-   * ```typescript
-   * const auth = await ProofportSDK.authenticate(
-   *   { clientId: 'your-client-id', apiKey: 'your-api-key' },
-   *   'https://relay.zkproofport.app'
-   * );
-   * console.log('Token:', auth.token);
-   * console.log('Expires in:', auth.expiresIn, 'seconds');
-   * ```
-   */
-  static async authenticate(
-    credentials: AuthCredentials,
-    relayUrl: string
-  ): Promise<AuthToken> {
-    if (!credentials.clientId || !credentials.apiKey) {
-      throw new Error('clientId and apiKey are required');
-    }
-    if (!relayUrl) {
-      throw new Error('relayUrl is required');
-    }
-
-    const response = await fetch(`${relayUrl}/api/v1/auth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: credentials.clientId,
-        api_key: credentials.apiKey,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      throw new Error(error.error || `Authentication failed: HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      token: data.token,
-      clientId: data.client_id,
-      dappId: data.dapp_id,
-      tier: data.tier,
-      expiresIn: data.expires_in,
-      expiresAt: Date.now() + (data.expires_in * 1000),
-    };
-  }
-
-  /**
-   * Checks if an auth token is still valid (not expired).
-   *
-   * @param auth - AuthToken to check
-   * @returns True if the token has not expired
-   *
-   * @example
-   * ```typescript
-   * if (!ProofportSDK.isTokenValid(auth)) {
-   *   auth = await ProofportSDK.authenticate(credentials, relayUrl);
-   * }
-   * ```
-   */
-  static isTokenValid(auth: AuthToken): boolean {
-    return Date.now() < auth.expiresAt - 30000; // 30s buffer
-  }
-
   // ============ Relay Integration ============
 
   /**
-   * Authenticates with ZKProofport and stores the token for relay requests.
+   * Sets the wallet signer for challenge-signature authentication.
+   * The signer will be used to sign challenges from the relay server.
    *
-   * Instance method that authenticates via the relay server and stores
-   * the JWT token internally, so subsequent relay requests are automatically authenticated.
-   *
-   * @param credentials - Client ID and API key
-   * @returns Promise resolving to AuthToken
-   * @throws Error if authentication fails or relayUrl is not configured
+   * @param signer - Wallet signer (ethers v6 Signer or compatible object with signMessage/getAddress)
    *
    * @example
    * ```typescript
-   * const sdk = ProofportSDK.create('production');
+   * import { BrowserProvider } from 'ethers';
    *
-   * await sdk.login({ clientId: 'your-id', apiKey: 'your-key' });
-   * // SDK is now authenticated for relay requests
+   * const provider = new BrowserProvider(window.ethereum);
+   * const signer = await provider.getSigner();
+   * sdk.setSigner(signer);
    * ```
    */
-  async login(credentials: AuthCredentials): Promise<AuthToken> {
+  setSigner(signer: WalletSigner): void {
+    this.signer = signer;
+  }
+
+  /**
+   * Fetches a random challenge from the relay server.
+   * The challenge must be signed and included in proof requests.
+   *
+   * @returns Promise resolving to ChallengeResponse with challenge hex and expiry
+   * @throws Error if relayUrl is not configured
+   */
+  async getChallenge(): Promise<ChallengeResponse> {
     if (!this.relayUrl) {
-      throw new Error('relayUrl is required for authentication. Use ProofportSDK.create(\'production\') or set relayUrl in config.');
+      throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
-    this.authToken = await ProofportSDK.authenticate(credentials, this.relayUrl);
-    return this.authToken;
-  }
 
-  /**
-   * Logs out by clearing the stored authentication token.
-   */
-  logout(): void {
-    this.authToken = null;
-  }
+    const response = await fetch(`${this.relayUrl}/api/v1/challenge`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(error.error || `Failed to get challenge: HTTP ${response.status}`);
+    }
 
-  /**
-   * Returns whether the SDK instance is currently authenticated with a valid token.
-   */
-  isAuthenticated(): boolean {
-    return this.authToken !== null && ProofportSDK.isTokenValid(this.authToken);
-  }
-
-  /**
-   * Returns the current auth token, or null if not authenticated.
-   */
-  getAuthToken(): AuthToken | null {
-    return this.authToken;
+    return await response.json() as ChallengeResponse;
   }
 
   /**
@@ -1109,19 +1031,19 @@ export class ProofportSDK {
    * This is the recommended way to create proof requests. The relay server:
    * - Issues a server-side requestId (validated by the mobile app)
    * - Tracks request status in Redis
-   * - Handles credit deduction and tier enforcement
    * - Builds the deep link with relay callback URL
+   * - Stores inputs hash for deep link integrity verification
    *
    * @param circuit - Circuit type identifier
    * @param inputs - Circuit-specific inputs
    * @param options - Request options (message, dappName, dappIcon, nonce)
    * @returns Promise resolving to RelayProofRequest with requestId, deepLink, pollUrl
-   * @throws Error if not authenticated or relay request fails
+   * @throws Error if signer not set or relay request fails
    *
    * @example
    * ```typescript
    * const sdk = ProofportSDK.create();
-   * await sdk.login({ clientId: 'id', apiKey: 'key' });
+   * sdk.setSigner(signer);
    *
    * const relay = await sdk.createRelayRequest('coinbase_attestation', {
    *   scope: 'myapp.com'
@@ -1144,16 +1066,22 @@ export class ProofportSDK {
       nonce?: string;
     } = {}
   ): Promise<RelayProofRequest> {
-    if (!this.authToken || !ProofportSDK.isTokenValid(this.authToken)) {
-      throw new Error('Not authenticated. Call login() first.');
+    if (!this.signer) {
+      throw new Error('Signer not set. Call setSigner() first.');
     }
     if (!this.relayUrl) {
       throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
+    // Get challenge from relay and sign it
+    const { challenge } = await this.getChallenge();
+    const signature = await this.signer.signMessage(challenge);
+
     const body: Record<string, unknown> = {
       circuitId: circuit,
       inputs,
+      challenge,
+      signature,
     };
     if (options.message) body.message = options.message;
     if (options.dappName) body.dappName = options.dappName;
@@ -1164,7 +1092,6 @@ export class ProofportSDK {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.authToken.token}`,
       },
       body: JSON.stringify(body),
     });
@@ -1267,7 +1194,7 @@ export class ProofportSDK {
    * @param callbacks.onResult - Called when proof is completed or failed
    * @param callbacks.onError - Called on errors
    * @returns Unsubscribe function to clean up the connection
-   * @throws Error if not authenticated, relayUrl not set, or socket.io-client not installed
+   * @throws Error if relayUrl not set or socket.io-client not installed
    *
    * @example
    * ```typescript
@@ -1295,9 +1222,6 @@ export class ProofportSDK {
       onError?: (error: { error: string; code?: number; requestId?: string }) => void;
     }
   ): Promise<() => void> {
-    if (!this.authToken || !ProofportSDK.isTokenValid(this.authToken)) {
-      throw new Error('Not authenticated. Call login() first.');
-    }
     if (!this.relayUrl) {
       throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
@@ -1316,10 +1240,9 @@ export class ProofportSDK {
       throw new Error('Failed to load socket.io-client: io function not found');
     }
 
-    // Connect to relay /proof namespace
+    // Connect to relay /proof namespace (no JWT — open connections)
     const socket = ioConnect(`${this.relayUrl}/proof`, {
       path: '/socket.io',
-      auth: { token: this.authToken.token },
       transports: ['websocket', 'polling'],
     });
 
@@ -1381,7 +1304,7 @@ export class ProofportSDK {
     const timeout = options.timeoutMs || 300000;
 
     // Try Socket.IO first
-    if (this.authToken && ProofportSDK.isTokenValid(this.authToken) && this.relayUrl) {
+    if (this.relayUrl) {
       try {
         return await new Promise<RelayProofResult>((resolve, reject) => {
           const timer = setTimeout(() => {
