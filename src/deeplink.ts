@@ -172,9 +172,6 @@ export function buildCallbackUrl(
     if (response.timestamp) {
       url.searchParams.set('timestamp', response.timestamp.toString());
     }
-    if (response.nullifier) {
-      url.searchParams.set('nullifier', response.nullifier);
-    }
   } else if (response.status === 'error' && response.error) {
     url.searchParams.set('error', response.error);
   }
@@ -265,7 +262,6 @@ export function parseProofResponseUrl(url: string): ProofResponse | null {
       if (timestamp) {
         response.timestamp = parseInt(timestamp, 10);
       }
-      response.nullifier = urlObj.searchParams.get('nullifier') || undefined;
     } else if (status === 'error') {
       response.error = urlObj.searchParams.get('error') || undefined;
     }

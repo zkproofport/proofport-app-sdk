@@ -39,10 +39,7 @@ import {
   getVerifierAddress,
   getVerifierChainId,
   getDefaultProvider,
-  extractNullifierFromPublicInputs,
   extractScopeFromPublicInputs,
-  isNullifierRegistered,
-  getNullifierInfo,
 } from './verifier';
 import {
   DEFAULT_SCHEME,
@@ -88,11 +85,10 @@ import type { SDKEnvironment } from './types';
  * ```
  */
 export class ProofportSDK {
-  private config: Required<Omit<ProofportConfig, 'relayUrl' | 'nullifierRegistry'>>;
+  private config: Required<Omit<ProofportConfig, 'relayUrl'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
   private signer: WalletSigner | null = null;
   private relayUrl: string;
-  private nullifierRegistry?: { address: string; chainId: number };
   private socket: any = null;
 
   /**
@@ -127,7 +123,6 @@ export class ProofportSDK {
       verifiers: config.verifiers || {},
     };
     this.relayUrl = config.relayUrl || '';
-    this.nullifierRegistry = config.nullifierRegistry;
   }
 
   // ============ Request Creation ============
@@ -1355,31 +1350,7 @@ export class ProofportSDK {
     }
   }
 
-  // ============ Nullifier Utilities ============
-
-  /**
-   * Extracts the nullifier from proof public inputs.
-   *
-   * The nullifier is a bytes32 value derived from the user's address and scope,
-   * used to prevent duplicate proof submissions. Each user+scope combination
-   * produces a unique nullifier.
-   *
-   * @param publicInputs - Array of public input hex strings from proof response
-   * @param circuit - Circuit type to determine field positions
-   * @returns Nullifier as hex string (0x...), or null if inputs are insufficient
-   *
-   * @example
-   * ```typescript
-   * const result = await sdk.waitForProof(relay.requestId);
-   * if (result.status === 'completed') {
-   *   const nullifier = sdk.extractNullifier(result.publicInputs, result.circuit);
-   *   console.log('Nullifier:', nullifier);
-   * }
-   * ```
-   */
-  extractNullifier(publicInputs: string[], circuit: CircuitType): string | null {
-    return extractNullifierFromPublicInputs(publicInputs, circuit);
-  }
+  // ============ Public Input Utilities ============
 
   /**
    * Extracts the scope from proof public inputs.
@@ -1404,70 +1375,6 @@ export class ProofportSDK {
     return extractScopeFromPublicInputs(publicInputs, circuit);
   }
 
-  /**
-   * Checks if a nullifier is already registered on-chain.
-   *
-   * Queries the ZKProofportNullifierRegistry contract to determine if the
-   * nullifier has been used before. Used to prevent duplicate proof submissions.
-   *
-   * Requires `nullifierRegistry` in SDK config.
-   *
-   * @param nullifier - Nullifier hex string from extractNullifier()
-   * @param provider - Optional ethers provider (defaults to public RPC for configured chain)
-   * @returns True if nullifier is already registered
-   * @throws Error if nullifierRegistry is not configured
-   *
-   * @example
-   * ```typescript
-   * const sdk = ProofportSDK.create({
-   *   relayUrl: 'https://relay.zkproofport.app',
-   *   nullifierRegistry: { address: '0x...', chainId: 8453 }
-   * });
-   *
-   * const nullifier = sdk.extractNullifier(publicInputs, circuit);
-   * const isDuplicate = await sdk.checkNullifier(nullifier);
-   * ```
-   */
-  async checkNullifier(nullifier: string, provider?: any): Promise<boolean> {
-    if (!this.nullifierRegistry) {
-      throw new Error('nullifierRegistry is required. Set it in ProofportSDK config.');
-    }
-    const p = provider || getDefaultProvider(this.nullifierRegistry.chainId);
-    return isNullifierRegistered(nullifier, this.nullifierRegistry.address, p);
-  }
-
-  /**
-   * Gets detailed information about a registered nullifier from on-chain registry.
-   *
-   * Retrieves the registration timestamp, scope, and circuit ID for a nullifier.
-   * Returns null if the nullifier is not registered.
-   *
-   * Requires `nullifierRegistry` in SDK config.
-   *
-   * @param nullifier - Nullifier hex string from extractNullifier()
-   * @param provider - Optional ethers provider (defaults to public RPC for configured chain)
-   * @returns Nullifier info or null if not registered
-   * @throws Error if nullifierRegistry is not configured
-   *
-   * @example
-   * ```typescript
-   * const info = await sdk.getNullifierDetails(nullifier);
-   * if (info) {
-   *   console.log('Registered at:', new Date(info.registeredAt * 1000));
-   *   console.log('Circuit:', info.circuitId);
-   * }
-   * ```
-   */
-  async getNullifierDetails(
-    nullifier: string,
-    provider?: any
-  ): Promise<{ registeredAt: number; scope: string; circuitId: string } | null> {
-    if (!this.nullifierRegistry) {
-      throw new Error('nullifierRegistry is required. Set it in ProofportSDK config.');
-    }
-    const p = provider || getDefaultProvider(this.nullifierRegistry.chainId);
-    return getNullifierInfo(nullifier, this.nullifierRegistry.address, p);
-  }
 }
 
 export default ProofportSDK;

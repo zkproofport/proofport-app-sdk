@@ -10,8 +10,6 @@ global.fetch = vi.fn();
 vi.mock('ethers', () => {
   const Contract = vi.fn().mockImplementation(function (this: any) {
     this.verify = vi.fn().mockResolvedValue(true);
-    this.isNullifierRegistered = vi.fn().mockResolvedValue(false);
-    this.getNullifierInfo = vi.fn().mockResolvedValue([0n, '0x0', '0x0']);
   });
 
   return {

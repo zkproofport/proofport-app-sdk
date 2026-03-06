@@ -145,7 +145,6 @@ export interface ProofRequest {
  *   numPublicInputs: 2,
  *   verifierAddress: '0x5678...',
  *   chainId: 84532,
- *   nullifier: '0x9abc...',
  *   timestamp: Date.now()
  * };
  * ```
@@ -171,8 +170,6 @@ export interface ProofResponse {
   verifierAddress?: string;
   /** Chain ID where verifier contract is deployed (provided by mobile app) */
   chainId?: number;
-  /** Nullifier for proof uniqueness (prevents double-use, derived from scope) */
-  nullifier?: string;
 }
 
 /**
@@ -276,13 +273,6 @@ export interface ProofportConfig {
   relayUrl?: string;
   /** Custom verifier contract addresses per circuit type (overrides defaults) */
   verifiers?: Partial<Record<CircuitType, VerifierContract>>;
-  /** Nullifier registry contract config. Required for checkNullifier() and getNullifierDetails(). */
-  nullifierRegistry?: {
-    /** Registry contract address */
-    address: string;
-    /** Chain ID where registry is deployed */
-    chainId: number;
-  };
 }
 
 /**
@@ -300,73 +290,6 @@ export interface DeepLinkComponents {
   path: string;
   /** Query parameters as key-value pairs */
   params: Record<string, string>;
-}
-
-/**
- * Nullifier verification status returned by smart contract.
- *
- * Mirrors the NullifierVerifyStatus enum in the ZKProofportNullifierRegistry contract.
- * Indicates the result of verifying and registering a proof's nullifier on-chain.
- *
- * - `verified_and_registered`: Proof verified and nullifier registered successfully
- * - `already_registered`: Proof verified but nullifier was already used (duplicate)
- * - `expired_and_reregistered`: Previous nullifier expired, new one registered
- * - `verification_failed`: Proof verification failed (invalid proof)
- * - `circuit_not_found`: Circuit not registered in the registry
- */
-export type NullifierVerifyStatus =
-  | 'verified_and_registered'
-  | 'already_registered'
-  | 'expired_and_reregistered'
-  | 'verification_failed'
-  | 'circuit_not_found';
-
-/**
- * On-chain nullifier record from smart contract storage.
- *
- * Contains information about a registered nullifier retrieved from
- * the ZKProofportNullifierRegistry contract.
- *
- * @example
- * ```typescript
- * const record: NullifierRecord = {
- *   registeredAt: 1707234567,
- *   scope: '0xabcd...',
- *   circuitId: '0x1234...'
- * };
- * ```
- */
-export interface NullifierRecord {
-  /** Unix timestamp (seconds) when nullifier was registered */
-  registeredAt: number;
-  /** Scope bytes32 (application identifier) */
-  scope: string;
-  /** Circuit ID bytes32 (circuit identifier) */
-  circuitId: string;
-}
-
-/**
- * ZKProofportNullifierRegistry smart contract configuration.
- *
- * Contains the address and ABI for the nullifier registry contract,
- * which tracks used nullifiers to prevent proof replay attacks.
- *
- * @example
- * ```typescript
- * const registryConfig: NullifierRegistryConfig = {
- *   address: '0x5678...',
- *   chainId: 84532,
- *   abi: ZKPROOFPORT_NULLIFIER_REGISTRY_ABI
- * };
- * ```
- */
-export interface NullifierRegistryConfig {
-  /** Registry contract address (checksummed) */
-  address: string;
-  /** Chain ID where registry is deployed */
-  chainId: number;
-  /** Contract ABI (ethers v6 format) */
-  abi: string[];
 }
 
 /**
@@ -440,7 +363,6 @@ export interface RelayProofResult {
   publicInputs?: string[];
   verifierAddress?: string;
   chainId?: number;
-  nullifier?: string;
   circuit?: string;
   /** Present when status is 'failed' */
   error?: string;
