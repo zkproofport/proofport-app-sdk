@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.3-beta.1...v0.2.0-beta.1) (2026-03-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* NullifierRegistry APIs removed (extractNullifier, checkNullifier, getNullifierDetails)
+
+### Refactoring
+
+* remove NullifierRegistry and update docs for official release ([78cba20](https://github.com/zkproofport/proofport-app-sdk/commit/78cba20f4b702e6a3481c4dbea2ed055096eb590))
+
 ## [0.1.3-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.2-beta.1...v0.1.3-beta.1) (2026-03-05)
 
 
