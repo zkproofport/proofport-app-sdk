@@ -159,6 +159,19 @@ interface WalletSigner {
 
 Any ethers v5/v6 `Signer` is compatible.
 
+#### About challenge-signature
+
+The challenge-signature mechanism was developed **for relay nonce replay prevention**. Each challenge is one-time use and consumed immediately. The signer's recovered address is recorded as `clientId` in relay server logs, which helps the relay operator track requests.
+
+For server-side or headless environments, using an ephemeral random wallet is fine. A persistent wallet (fixed private key) is **not recommended** as it adds unnecessary key management overhead with no functional benefit.
+
+```typescript
+import { Wallet } from 'ethers';
+
+// Server-side: ephemeral wallet per request
+sdk.setSigner(Wallet.createRandom());
+```
+
 ### Step 3: Create Request (via Relay)
 
 `createRelayRequest` authenticates with the relay (challenge-signature), creates a tracked proof request, and returns a deep link.
