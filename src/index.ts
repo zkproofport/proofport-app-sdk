@@ -29,6 +29,18 @@
 // Main SDK class
 export { ProofportSDK, default } from './ProofportSDK';
 
+// Utility functions
+export {
+  extractScopeFromPublicInputs,
+  extractNullifierFromPublicInputs,
+} from './verifier';
+
+// Public input layout constants
+export {
+  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+} from './constants';
+
 // Types
 export type {
   CircuitType,

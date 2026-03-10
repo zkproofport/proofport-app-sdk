@@ -292,6 +292,39 @@ export function extractScopeFromPublicInputs(
   return reconstructBytes32FromFields(scopeFields);
 }
 
+/**
+ * Extracts the nullifier (bytes32) from public inputs based on circuit type.
+ *
+ * The nullifier is a unique, deterministic hash derived from the user's attestation
+ * and scope. It serves as a privacy-preserving user identifier — the same user
+ * with the same scope always produces the same nullifier, enabling duplicate
+ * detection without revealing the wallet address.
+ *
+ * @param publicInputsHex - Array of hex-encoded field elements
+ * @param circuit - Circuit type (defaults to coinbase_attestation)
+ * @returns Nullifier as hex string (bytes32), or null if publicInputs too short
+ *
+ * @example
+ * ```typescript
+ * const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
+ * console.log(nullifier); // '0xabc123...'
+ * ```
+ */
+export function extractNullifierFromPublicInputs(
+  publicInputsHex: string[],
+  circuit?: string,
+): string | null {
+  let start: number, end: number;
+  if (circuit === 'coinbase_country_attestation') {
+    start = 118; end = 149;
+  } else {
+    start = 96; end = 127;
+  }
+  if (publicInputsHex.length <= end) return null;
+  const nullifierFields = publicInputsHex.slice(start, end + 1);
+  return reconstructBytes32FromFields(nullifierFields);
+}
+
 /** @internal Reconstruct a bytes32 value from 32 individual field elements */
 function reconstructBytes32FromFields(fields: string[]): string {
   if (fields.length !== 32) {

@@ -40,6 +40,7 @@ import {
   getVerifierChainId,
   getDefaultProvider,
   extractScopeFromPublicInputs,
+  extractNullifierFromPublicInputs,
 } from './verifier';
 import {
   DEFAULT_SCHEME,
@@ -1373,6 +1374,31 @@ export class ProofportSDK {
    */
   extractScope(publicInputs: string[], circuit: CircuitType): string | null {
     return extractScopeFromPublicInputs(publicInputs, circuit);
+  }
+
+  /**
+   * Extracts the nullifier (bytes32) from proof public inputs.
+   *
+   * The nullifier is a unique, deterministic hash derived from the user's attestation
+   * and scope. It serves as a privacy-preserving user identifier — the same user
+   * with the same scope always produces the same nullifier, enabling duplicate
+   * detection without revealing the wallet address.
+   *
+   * @param publicInputs - Array of hex-encoded field elements from proof result
+   * @param circuit - Circuit type that produced the public inputs
+   * @returns Nullifier as hex string (bytes32), or null if publicInputs too short
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.waitForProof(relay.requestId);
+   * if (result.status === 'completed') {
+   *   const nullifier = sdk.extractNullifier(result.publicInputs, result.circuit);
+   *   console.log('Nullifier:', nullifier); // '0xabc123...'
+   * }
+   * ```
+   */
+  extractNullifier(publicInputs: string[], circuit: CircuitType): string | null {
+    return extractNullifierFromPublicInputs(publicInputs, circuit);
   }
 
 }

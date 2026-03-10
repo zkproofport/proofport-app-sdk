@@ -294,6 +294,41 @@ if (result.status === 'completed') {
 const verification = await sdk.verifyResponseOnChain(response);
 ```
 
+### Step 7: Extract Scope and Nullifier
+
+After verification, extract the scope and nullifier from the public inputs:
+
+```typescript
+if (result.status === 'completed') {
+  // Extract scope — the keccak256 hash of the scope string you provided
+  const scope = sdk.extractScope(result.publicInputs, result.circuit);
+
+  // Extract nullifier — a unique, deterministic hash per user + scope
+  // Same user with the same scope always produces the same nullifier
+  const nullifier = sdk.extractNullifier(result.publicInputs, result.circuit);
+
+  console.log('Scope:', scope);       // '0x7a6b70726f...'
+  console.log('Nullifier:', nullifier); // '0xabc123...'
+}
+```
+
+The **nullifier** serves as a privacy-preserving user identifier:
+- Deterministic: same user + same scope = same nullifier (enables duplicate detection)
+- Privacy-preserving: the wallet address is never revealed
+- Scope-bound: different scopes produce different nullifiers for the same user
+
+**Standalone utility functions** are also available for use outside the SDK class:
+
+```typescript
+import {
+  extractScopeFromPublicInputs,
+  extractNullifierFromPublicInputs,
+} from '@zkproofport-app/sdk';
+
+const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
+const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
+```
+
 ## Complete Example
 
 End-to-end integration using the relay flow:
