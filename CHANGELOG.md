@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.1...v0.2.2) (2026-03-10)
+
+
+### Features
+
+* add extractNullifier and export utility functions ([88e8939](https://github.com/zkproofport/proofport-app-sdk/commit/88e89395f7292664505b8a2e68978ab2acef55dc))
+
 ## [0.2.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.1.3...v0.2.0) (2026-03-06)
 
 
