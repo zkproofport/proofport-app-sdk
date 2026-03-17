@@ -81,6 +81,7 @@ describe('ProofportSDK - Utility Methods', () => {
     expect(circuits).toEqual([
       'coinbase_attestation',
       'coinbase_country_attestation',
+      'oidc_domain_attestation',
     ]);
   });
 });

@@ -175,6 +175,8 @@ interface WalletSigner {
 
 Any ethers v5/v6 `Signer` is compatible.
 
+> **OIDC Domain note:** Wallet signer is not required for OIDC Domain proofs. See Step 3 for OIDC-specific usage.
+
 #### About challenge-signature
 
 The challenge-signature mechanism was developed **for relay nonce replay prevention**. Each challenge is one-time use and consumed immediately. The signer's recovered address is recorded as `clientId` in relay server logs, which helps the relay operator track requests.
@@ -216,6 +218,7 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   scope: 'myapp.com',
 }, {
   dappName: 'My DApp',
+  dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your email domain',
 });
 ```
@@ -344,8 +347,10 @@ if (result.status === 'completed') {
 
 The **nullifier** serves as a privacy-preserving user identifier:
 - Deterministic: same user + same scope = same nullifier (enables duplicate detection)
-- Privacy-preserving: the wallet address is never revealed
+- Privacy-preserving: the wallet address (Coinbase) or email (OIDC) is never revealed
 - Scope-bound: different scopes produce different nullifiers for the same user
+
+> **OIDC Domain:** The nullifier is a hash of the user's email and scope. The same email + scope always produces the same nullifier, enabling Sybil resistance without revealing the email address.
 
 **Standalone utility functions** are also available for use outside the SDK class:
 
@@ -419,21 +424,7 @@ async function verifyUser() {
 
 ## Configuration
 
-`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed for standard usage.
-
-For advanced scenarios (e.g., custom verifier deployments), pass a `ProofportConfig`:
-
-```typescript
-const sdk = new ProofportSDK({
-  relayUrl: 'https://relay.zkproofport.app',
-  verifiers: {
-    coinbase_attestation: {
-      verifierAddress: '0x...',
-      chainId: 8453,
-    },
-  },
-});
-```
+`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed — relay URLs, verifier contracts, and chain settings are all built-in.
 
 ## Types Reference
 
@@ -465,13 +456,13 @@ import type {
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation` (`{ scope, userAddress?, rawTransaction? }`) |
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation` (`{ scope, countryList, isIncluded, ... }`) |
-| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope, jwt? }`) |
+| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope }`) |
 | `CircuitInputs` | Union: `CoinbaseKycInputs \| CoinbaseCountryInputs \| OidcDomainInputs` |
 | `ProofRequest` | Proof request object with `requestId`, `circuit`, `inputs`, metadata, and expiry |
 | `ProofResponse` | Proof response with `status`, `proof`, `publicInputs`, `verifierAddress`, `chainId` |
 | `QRCodeOptions` | QR customization: `width`, `margin`, `darkColor`, `lightColor`, `errorCorrectionLevel` |
 | `VerifierContract` | Verifier contract info: `{ address, chainId, abi }` |
-| `ProofportConfig` | SDK configuration: `{ scheme?, relayUrl?, verifiers? }` |
+| `ProofportConfig` | SDK configuration (internal use — `ProofportSDK.create()` handles defaults) |
 | `ChallengeResponse` | Challenge from relay: `{ challenge, expiresAt }` |
 | `WalletSigner` | Signer interface: `{ signMessage(msg), getAddress() }` |
 | `RelayProofRequest` | Relay response: `{ requestId, deepLink, status, pollUrl }` |
@@ -483,7 +474,6 @@ The `OidcDomainInputs` interface:
 interface OidcDomainInputs {
   domain: string;    // Target email domain (e.g., 'google.com')
   scope: string;     // dApp scope identifier
-  jwt?: string;      // OIDC JWT id_token (optional, obtained via OAuth)
 }
 ```
 
@@ -507,10 +497,7 @@ try {
 
 ## Networks
 
-| Network | Chain ID | Status |
-|---------|----------|--------|
-| Base Mainnet | 8453 | Production |
-| Base Sepolia | 84532 | Testnet |
+Proofs are verified on **Base** (Ethereum L2). The SDK handles network configuration automatically — no manual setup required.
 
 ## Development
 

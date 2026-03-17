@@ -1052,6 +1052,12 @@ export class ProofportSDK {
    * const result = await sdk.waitForProof(relay.requestId);
    * ```
    */
+  // Circuits that require wallet signature (used as circuit input)
+  private static readonly WALLET_SIGNATURE_CIRCUITS: CircuitType[] = [
+    'coinbase_attestation',
+    'coinbase_country_attestation',
+  ];
+
   async createRelayRequest(
     circuit: CircuitType,
     inputs: CircuitInputs,
@@ -1062,23 +1068,31 @@ export class ProofportSDK {
       nonce?: string;
     } = {}
   ): Promise<RelayProofRequest> {
-    if (!this.signer) {
-      throw new Error('Signer not set. Call setSigner() first.');
-    }
     if (!this.relayUrl) {
       throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
-    // Get challenge from relay and sign it
-    const { challenge } = await this.getChallenge();
-    const signature = await this.signer.signMessage(challenge);
+    const needsSignature = ProofportSDK.WALLET_SIGNATURE_CIRCUITS.includes(circuit);
+
+    if (needsSignature && !this.signer) {
+      throw new Error('Signer not set. Call setSigner() first. Wallet signature is required for this circuit.');
+    }
+
+    // Get challenge + requestId from relay
+    const { requestId, challenge } = await this.getChallenge();
 
     const body: Record<string, unknown> = {
+      requestId,
       circuitId: circuit,
       inputs,
       challenge,
-      signature,
     };
+
+    // Sign challenge for circuits that require wallet signature
+    if (needsSignature && this.signer) {
+      body.signature = await this.signer.signMessage(challenge);
+    }
+
     if (options.message) body.message = options.message;
     if (options.dappName) body.dappName = options.dappName;
     if (options.dappIcon) body.dappIcon = options.dappIcon;

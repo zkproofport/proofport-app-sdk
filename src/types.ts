@@ -322,6 +322,8 @@ export interface DeepLinkComponents {
  * ```
  */
 export interface ChallengeResponse {
+  /** Session identifier (used as requestId) */
+  requestId: string;
   /** Hex-encoded 32-byte random challenge */
   challenge: string;
   /** Unix timestamp (ms) when challenge expires */
