@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.2...v0.2.3) (2026-03-17)
+
+
+### Features
+
+* add OIDC domain attestation support and tests ([deefcbf](https://github.com/zkproofport/proofport-app-sdk/commit/deefcbf40e14903157630a4cb69595605852331f))
+* session-based relay auth, OIDC without wallet signature ([d5393e9](https://github.com/zkproofport/proofport-app-sdk/commit/d5393e931d680bff6e688666f4d96fc518f6aa54))
+
+
+### Refactoring
+
+* remove jwt field from OidcDomainInputs ([1cb164e](https://github.com/zkproofport/proofport-app-sdk/commit/1cb164e511e7687c95793d06ddb34f8787992913))
+
 ## [0.2.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.1...v0.2.2) (2026-03-10)
 
 
