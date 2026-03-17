@@ -79,6 +79,12 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 14,
     publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included'],
   },
+  oidc_domain_attestation: {
+    name: 'OIDC Domain',
+    description: 'Prove email domain affiliation via OIDC JWT',
+    publicInputsCount: 420,
+    publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier'],
+  },
 };
 
 /**
@@ -215,4 +221,33 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   SCOPE_END: 117,
   NULLIFIER_START: 118,
   NULLIFIER_END: 149,
+} as const;
+
+/**
+ * OIDC Domain Attestation circuit public input layout (byte offsets).
+ * Defines the byte positions of each field in the flattened public inputs array.
+ *
+ * Public inputs are packed as individual field elements (one byte per element):
+ * - pubkey_modulus_limbs: 18 x u128 = 18 x 16 bytes = 288 bytes → fields 0–287
+ * - domain (BoundedVec<u8, 64>): 4-byte length (u32) + 64-byte storage = 68 fields → fields 288–355
+ * - scope: 32 bytes → fields 356–387
+ * - nullifier: 32 bytes → fields 388–419
+ *
+ * @example
+ * ```typescript
+ * const scope = publicInputs.slice(
+ *   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START,
+ *   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_END + 1
+ * );
+ * ```
+ */
+export const OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
+  PUBKEY_MODULUS_START: 0,
+  PUBKEY_MODULUS_END: 287,
+  DOMAIN_START: 288,
+  DOMAIN_END: 355,
+  SCOPE_START: 356,
+  SCOPE_END: 387,
+  NULLIFIER_START: 388,
+  NULLIFIER_END: 419,
 } as const;

@@ -8,6 +8,7 @@ import type {
   CircuitInputs,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
+  OidcDomainInputs,
   DeepLinkComponents,
   CircuitType,
 } from './types';
@@ -375,7 +376,7 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     return { valid: false, error: 'Missing circuit type' };
   }
 
-  if (!['coinbase_attestation', 'coinbase_country_attestation'].includes(request.circuit)) {
+  if (!['coinbase_attestation', 'coinbase_country_attestation', 'oidc_domain_attestation'].includes(request.circuit)) {
     return { valid: false, error: `Invalid circuit type: ${request.circuit}` };
   }
 
@@ -404,6 +405,14 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     }
     if (typeof inputs.isIncluded !== 'boolean') {
       return { valid: false, error: 'isIncluded is required and must be a boolean' };
+    }
+  } else if (request.circuit === 'oidc_domain_attestation') {
+    const inputs = request.inputs as OidcDomainInputs;
+    if (!inputs.domain || typeof inputs.domain !== 'string' || inputs.domain.trim() === '') {
+      return { valid: false, error: 'domain is required and must be a non-empty string' };
+    }
+    if (!inputs.scope || typeof inputs.scope !== 'string' || inputs.scope.trim() === '') {
+      return { valid: false, error: 'scope is required and must be a non-empty string' };
     }
   }
 

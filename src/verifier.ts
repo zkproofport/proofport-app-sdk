@@ -284,6 +284,8 @@ export function extractScopeFromPublicInputs(
   let start: number, end: number;
   if (circuit === 'coinbase_country_attestation') {
     start = 86; end = 117;
+  } else if (circuit === 'oidc_domain_attestation') {
+    start = 356; end = 387;
   } else {
     start = 64; end = 95;
   }
@@ -317,6 +319,8 @@ export function extractNullifierFromPublicInputs(
   let start: number, end: number;
   if (circuit === 'coinbase_country_attestation') {
     start = 118; end = 149;
+  } else if (circuit === 'oidc_domain_attestation') {
+    start = 388; end = 419;
   } else {
     start = 96; end = 127;
   }

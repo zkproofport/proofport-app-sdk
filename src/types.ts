@@ -11,7 +11,7 @@
  * const circuit: CircuitType = 'coinbase_attestation';
  * ```
  */
-export type CircuitType = 'coinbase_attestation' | 'coinbase_country_attestation';
+export type CircuitType = 'coinbase_attestation' | 'coinbase_country_attestation' | 'oidc_domain_attestation';
 
 /**
  * Proof request lifecycle status.
@@ -78,6 +78,22 @@ export interface CoinbaseCountryInputs {
 }
 
 /**
+ * Input parameters for OIDC Domain attestation circuit.
+ *
+ * This circuit proves a user's email domain affiliation via an OIDC JWT
+ * without revealing the full email address.
+ *
+ * @property domain - Email domain to prove (e.g., "google.com")
+ * @property scope - Application-specific identifier for proof uniqueness (e.g., dapp domain)
+ * @property jwt - Optional raw JWT string (app can fetch/provide if not given)
+ */
+export interface OidcDomainInputs {
+  domain: string;
+  scope: string;
+  jwt?: string;
+}
+
+/**
  * Empty input type for circuits that retrieve all data from the mobile app.
  * Used when SDK doesn't need to provide any circuit-specific parameters.
  */
@@ -87,7 +103,7 @@ export interface EmptyInputs {}
  * Union type of all circuit-specific input types.
  * Each circuit type has a corresponding input interface.
  */
-export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | EmptyInputs;
+export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | OidcDomainInputs | EmptyInputs;
 
 /**
  * Zero-knowledge proof request sent to mobile app via deep link.

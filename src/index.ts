@@ -7,8 +7,8 @@
  * ```typescript
  * import { ProofportSDK } from '@zkproofport-app/sdk';
  *
- * // Initialize with environment preset
- * const sdk = ProofportSDK.create('production');
+ * // Initialize SDK
+ * const sdk = ProofportSDK.create();
  *
  * // Set wallet signer
  * sdk.setSigner(signer);
@@ -39,6 +39,7 @@ export {
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from './constants';
 
 // Types
@@ -47,6 +48,7 @@ export type {
   ProofRequestStatus,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
+  OidcDomainInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,

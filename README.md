@@ -122,6 +122,23 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
 });
 ```
 
+### `oidc_domain_attestation`
+
+Prove email domain affiliation using OIDC JWT token (e.g., Google, Microsoft).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `domain` | `string` | Yes | Target email domain to prove affiliation with (e.g., `'google.com'`) |
+| `scope` | `string` | Yes | dApp scope identifier |
+| `jwt` | `string` | No | OIDC JWT id_token (optional, obtained via OAuth) |
+
+```typescript
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'google.com',
+  scope: 'myapp.com',
+});
+```
+
 > The ZKProofport mobile app handles wallet connection and attestation data retrieval automatically. You only provide the inputs above.
 
 ## Integration Guide
@@ -415,6 +432,7 @@ import type {
   ProofRequestStatus,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
+  OidcDomainInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,
@@ -425,17 +443,17 @@ import type {
   WalletSigner,
   RelayProofRequest,
   RelayProofResult,
-  SDKEnvironment,
 } from '@zkproofport-app/sdk';
 ```
 
 | Type | Description |
 |------|-------------|
-| `CircuitType` | `'coinbase_attestation' \| 'coinbase_country_attestation'` |
+| `CircuitType` | `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation'` |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation` (`{ scope, userAddress?, rawTransaction? }`) |
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation` (`{ scope, countryList, isIncluded, ... }`) |
-| `CircuitInputs` | Union: `CoinbaseKycInputs \| CoinbaseCountryInputs` |
+| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope, jwt? }`) |
+| `CircuitInputs` | Union: `CoinbaseKycInputs \| CoinbaseCountryInputs \| OidcDomainInputs` |
 | `ProofRequest` | Proof request object with `requestId`, `circuit`, `inputs`, metadata, and expiry |
 | `ProofResponse` | Proof response with `status`, `proof`, `publicInputs`, `verifierAddress`, `chainId` |
 | `QRCodeOptions` | QR customization: `width`, `margin`, `darkColor`, `lightColor`, `errorCorrectionLevel` |
@@ -445,7 +463,16 @@ import type {
 | `WalletSigner` | Signer interface: `{ signMessage(msg), getAddress() }` |
 | `RelayProofRequest` | Relay response: `{ requestId, deepLink, status, pollUrl }` |
 | `RelayProofResult` | Relay result: `{ requestId, status, proof?, publicInputs?, circuit?, error? }` |
-| `SDKEnvironment` | Environment preset (not needed for normal usage) |
+
+The `OidcDomainInputs` interface:
+
+```typescript
+interface OidcDomainInputs {
+  domain: string;    // Target email domain (e.g., 'google.com')
+  scope: string;     // dApp scope identifier
+  jwt?: string;      // OIDC JWT id_token (optional, obtained via OAuth)
+}
+```
 
 ## Error Handling
 
