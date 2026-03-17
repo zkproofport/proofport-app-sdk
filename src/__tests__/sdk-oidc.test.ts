@@ -39,26 +39,8 @@ describe('OIDC Domain Attestation', () => {
       expect((parsed!.inputs as OidcDomainInputs).scope).toBe('dapp.example.com');
     });
 
-    it('encodes optional jwt field when provided', () => {
-      const inputs: OidcDomainInputs = {
-        domain: 'google.com',
-        scope: 'myapp.com',
-        jwt: 'eyJhbGciOiJSUzI1NiJ9.payload.signature',
-      };
-      const request: ProofRequest = {
-        requestId: 'req-oidc-jwt',
-        circuit: 'oidc_domain_attestation',
-        inputs,
-        createdAt: 1700000000000,
-      };
-      const url = buildProofRequestUrl(request);
-      const parsed = parseProofRequestUrl(url);
-      expect(parsed).not.toBeNull();
-      expect((parsed!.inputs as OidcDomainInputs).jwt).toBe('eyJhbGciOiJSUzI1NiJ9.payload.signature');
-    });
-
-    it('omits jwt field when not provided', () => {
-      const inputs: OidcDomainInputs = { domain: 'google.com', scope: 'myapp.com' };
+    it('roundtrip preserves only domain and scope (no jwt)', () => {
+      const inputs: OidcDomainInputs = { domain: 'company.com', scope: 'myapp.com' };
       const request: ProofRequest = {
         requestId: 'req-oidc-no-jwt',
         circuit: 'oidc_domain_attestation',
@@ -68,7 +50,9 @@ describe('OIDC Domain Attestation', () => {
       const url = buildProofRequestUrl(request);
       const parsed = parseProofRequestUrl(url);
       expect(parsed).not.toBeNull();
-      expect((parsed!.inputs as OidcDomainInputs).jwt).toBeUndefined();
+      const parsedInputs = parsed!.inputs as OidcDomainInputs;
+      expect(parsedInputs.domain).toBe('company.com');
+      expect(parsedInputs.scope).toBe('myapp.com');
     });
   });
 

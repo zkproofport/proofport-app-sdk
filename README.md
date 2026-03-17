@@ -124,22 +124,21 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
 
 ### `oidc_domain_attestation`
 
-Prove email domain affiliation using OIDC JWT token (e.g., Google, Microsoft).
+Prove email domain affiliation via Google Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `domain` | `string` | Yes | Target email domain to prove affiliation with (e.g., `'google.com'`) |
-| `scope` | `string` | Yes | dApp scope identifier |
-| `jwt` | `string` | No | OIDC JWT id_token. If omitted, the mobile app triggers Google Sign-In to obtain it. |
+| `domain` | `string` | Yes | Target email domain to prove (e.g., `'google.com'`, `'company.com'`) |
+| `scope` | `string` | Yes | dApp scope identifier for proof uniqueness |
 
 ```typescript
 const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
-  domain: 'google.com',
+  domain: 'company.com',
   scope: 'myapp.com',
 });
 ```
 
-> The ZKProofport mobile app handles Google Sign-In and proof generation on-device. The JWT is never sent to any server — all computation happens locally on the user's device.
+> The mobile app prompts Google Sign-In, generates the ZK proof locally, and returns the result via relay. The `domain` is a public input — verifiers can confirm which domain was proven.
 
 ## Integration Guide
 

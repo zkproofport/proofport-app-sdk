@@ -80,17 +80,16 @@ export interface CoinbaseCountryInputs {
 /**
  * Input parameters for OIDC Domain attestation circuit.
  *
- * This circuit proves a user's email domain affiliation via an OIDC JWT
- * without revealing the full email address.
+ * This circuit proves a user's email domain affiliation via Google Sign-In
+ * without revealing the full email address. The mobile app handles
+ * authentication and proof generation entirely on-device.
  *
- * @property domain - Email domain to prove (e.g., "google.com")
+ * @property domain - Email domain to prove (e.g., "google.com", "company.com")
  * @property scope - Application-specific identifier for proof uniqueness (e.g., dapp domain)
- * @property jwt - Optional raw JWT string (app can fetch/provide if not given)
  */
 export interface OidcDomainInputs {
   domain: string;
   scope: string;
-  jwt?: string;
 }
 
 /**
