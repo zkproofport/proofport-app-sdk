@@ -130,7 +130,7 @@ Prove email domain affiliation using OIDC JWT token (e.g., Google, Microsoft).
 |-------|------|----------|-------------|
 | `domain` | `string` | Yes | Target email domain to prove affiliation with (e.g., `'google.com'`) |
 | `scope` | `string` | Yes | dApp scope identifier |
-| `jwt` | `string` | No | OIDC JWT id_token (optional, obtained via OAuth) |
+| `jwt` | `string` | No | OIDC JWT id_token. If omitted, the mobile app triggers Google Sign-In to obtain it. |
 
 ```typescript
 const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
@@ -139,7 +139,7 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 });
 ```
 
-> The ZKProofport mobile app handles wallet connection and attestation data retrieval automatically. You only provide the inputs above.
+> The ZKProofport mobile app handles Google Sign-In and proof generation on-device. The JWT is never sent to any server — all computation happens locally on the user's device.
 
 ## Integration Guide
 
@@ -208,6 +208,20 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 // relay.status     — 'pending'
 // relay.pollUrl    — Relative URL for HTTP polling
 ```
+
+**OIDC Domain Attestation:**
+
+```typescript
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'company.com',
+  scope: 'myapp.com',
+}, {
+  dappName: 'My DApp',
+  message: 'Verify your email domain',
+});
+```
+
+The mobile app will prompt the user to sign in with Google. The circuit proves the user's email ends with `@company.com` without revealing the full email address. The `domain` field is a **public input** — verifiers can confirm which domain was proven.
 
 ### Step 4: Display QR Code
 
