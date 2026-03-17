@@ -86,10 +86,15 @@ export interface CoinbaseCountryInputs {
  *
  * @property domain - Email domain to prove (e.g., "google.com", "company.com")
  * @property scope - Application-specific identifier for proof uniqueness (e.g., dapp domain)
+ * @property provider - OIDC workspace provider name for organization membership verification.
+ *   When set, the mobile app verifies the user's account is managed by the specified provider
+ *   (e.g., Google Workspace `hd` claim). Currently supported: `'google'`.
+ *   Omit for general email domain verification without organization membership check.
  */
 export interface OidcDomainInputs {
   domain: string;
   scope: string;
+  provider?: string;
 }
 
 /**

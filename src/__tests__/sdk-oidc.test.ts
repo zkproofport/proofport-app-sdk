@@ -108,6 +108,39 @@ describe('OIDC Domain Attestation', () => {
       const result = validateProofRequest(request);
       expect(result.valid).toBe(false);
     });
+
+    it('valid request with provider passes', () => {
+      const request: ProofRequest = {
+        ...baseRequest,
+        inputs: { domain: 'company.com', scope: 'myapp.com', provider: 'google' } as OidcDomainInputs,
+      };
+      const result = validateProofRequest(request);
+      expect(result.valid).toBe(true);
+    });
+
+    it('empty provider string fails', () => {
+      const request: ProofRequest = {
+        ...baseRequest,
+        inputs: { domain: 'company.com', scope: 'myapp.com', provider: '' } as OidcDomainInputs,
+      };
+      const result = validateProofRequest(request);
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/provider/i);
+    });
+
+    it('provider roundtrip preserves value', () => {
+      const inputs: OidcDomainInputs = { domain: 'company.com', scope: 'myapp.com', provider: 'google' };
+      const request: ProofRequest = {
+        requestId: 'req-oidc-provider',
+        circuit: 'oidc_domain_attestation',
+        inputs,
+        createdAt: 1700000000000,
+      };
+      const url = buildProofRequestUrl(request);
+      const parsed = parseProofRequestUrl(url);
+      expect(parsed).not.toBeNull();
+      expect((parsed!.inputs as OidcDomainInputs).provider).toBe('google');
+    });
   });
 
   describe('Circuit Metadata', () => {

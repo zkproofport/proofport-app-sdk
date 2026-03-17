@@ -130,15 +130,28 @@ Prove email domain affiliation via Google Sign-In. The mobile app handles authen
 |-------|------|----------|-------------|
 | `domain` | `string` | Yes | Target email domain to prove (e.g., `'google.com'`, `'company.com'`) |
 | `scope` | `string` | Yes | dApp scope identifier for proof uniqueness |
+| `provider` | `string` | No | OIDC workspace provider for organization membership verification. Currently supported: `'google'`. |
+
+**Email domain verification (default):**
+
+```typescript
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'gmail.com',
+  scope: 'myapp.com',
+});
+```
+
+**Organization membership verification (Google Workspace):**
 
 ```typescript
 const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   domain: 'company.com',
   scope: 'myapp.com',
+  provider: 'google',
 });
 ```
 
-> The mobile app prompts Google Sign-In, generates the ZK proof locally, and returns the result via relay. The `domain` is a public input — verifiers can confirm which domain was proven.
+> When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim). Without `provider`, only the email domain is verified.
 
 ## Integration Guide
 
@@ -213,6 +226,7 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 **OIDC Domain Attestation:**
 
 ```typescript
+// Email domain verification
 const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   domain: 'company.com',
   scope: 'myapp.com',
@@ -221,9 +235,20 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your email domain',
 });
+
+// Organization membership verification (Google Workspace)
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'company.com',
+  scope: 'myapp.com',
+  provider: 'google',
+}, {
+  dappName: 'My DApp',
+  dappIcon: 'https://myapp.com/icon.png',
+  message: 'Verify your organization membership',
+});
 ```
 
-The mobile app will prompt the user to sign in with Google. The circuit proves the user's email ends with `@company.com` without revealing the full email address. The `domain` field is a **public input** — verifiers can confirm which domain was proven.
+The mobile app prompts Google Sign-In and generates the proof locally. When `provider` is set, the app additionally verifies organization membership (e.g., Google Workspace `hd` claim).
 
 ### Step 4: Display QR Code
 
@@ -456,7 +481,7 @@ import type {
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation` (`{ scope, userAddress?, rawTransaction? }`) |
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation` (`{ scope, countryList, isIncluded, ... }`) |
-| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope }`) |
+| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope, provider? }`) |
 | `CircuitInputs` | Union: `CoinbaseKycInputs \| CoinbaseCountryInputs \| OidcDomainInputs` |
 | `ProofRequest` | Proof request object with `requestId`, `circuit`, `inputs`, metadata, and expiry |
 | `ProofResponse` | Proof response with `status`, `proof`, `publicInputs`, `verifierAddress`, `chainId` |
@@ -472,8 +497,9 @@ The `OidcDomainInputs` interface:
 
 ```typescript
 interface OidcDomainInputs {
-  domain: string;    // Target email domain (e.g., 'google.com')
-  scope: string;     // dApp scope identifier
+  domain: string;     // Target email domain (e.g., 'google.com')
+  scope: string;      // dApp scope identifier
+  provider?: string;  // Workspace provider for org membership (currently: 'google')
 }
 ```
 

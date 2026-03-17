@@ -414,6 +414,9 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     if (!inputs.scope || typeof inputs.scope !== 'string' || inputs.scope.trim() === '') {
       return { valid: false, error: 'scope is required and must be a non-empty string' };
     }
+    if (inputs.provider !== undefined && (typeof inputs.provider !== 'string' || inputs.provider.trim() === '')) {
+      return { valid: false, error: 'provider must be a non-empty string when specified' };
+    }
   }
 
   // Check expiry
