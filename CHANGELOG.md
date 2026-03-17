@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.3...v0.2.4) (2026-03-17)
+
+
+### Features
+
+* add provider field for workspace organization membership verification ([4f49b6e](https://github.com/zkproofport/proofport-app-sdk/commit/4f49b6e6f6aad51abe9e7ce0742b8677cc3ffaf1))
+
 ## [0.2.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.2...v0.2.3) (2026-03-17)
 
 
