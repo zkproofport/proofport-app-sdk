@@ -124,13 +124,13 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
 
 ### `oidc_domain_attestation`
 
-Prove email domain affiliation via Google Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed.
+Prove email domain affiliation via OIDC Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `domain` | `string` | Yes | Target email domain to prove (e.g., `'google.com'`, `'company.com'`) |
 | `scope` | `string` | Yes | dApp scope identifier for proof uniqueness |
-| `provider` | `string` | No | OIDC workspace provider for organization membership verification. Currently supported: `'google'`. |
+| `provider` | `'google' \| 'microsoft'` | No | OIDC workspace provider for organization membership verification. Supported: `'google'` (Google Workspace), `'microsoft'` (Microsoft 365). |
 
 **Email domain verification (default):**
 
@@ -151,7 +151,17 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 });
 ```
 
-> When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim). Without `provider`, only the email domain is verified.
+**Organization membership verification (Microsoft 365):**
+
+```typescript
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'company.com',
+  scope: 'myapp.com',
+  provider: 'microsoft',
+});
+```
+
+> When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim). Without `provider`, only the email domain is verified.
 
 ## Integration Guide
 
@@ -246,9 +256,20 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your organization membership',
 });
+
+// Organization membership verification (Microsoft 365)
+const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+  domain: 'company.com',
+  scope: 'myapp.com',
+  provider: 'microsoft',
+}, {
+  dappName: 'My DApp',
+  dappIcon: 'https://myapp.com/icon.png',
+  message: 'Verify your organization membership',
+});
 ```
 
-The mobile app prompts Google Sign-In and generates the proof locally. When `provider` is set, the app additionally verifies organization membership (e.g., Google Workspace `hd` claim).
+The mobile app prompts OIDC Sign-In (Google or Microsoft) and generates the proof locally. When `provider` is set, the app additionally verifies organization membership (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim).
 
 ### Step 4: Display QR Code
 
@@ -497,9 +518,9 @@ The `OidcDomainInputs` interface:
 
 ```typescript
 interface OidcDomainInputs {
-  domain: string;     // Target email domain (e.g., 'google.com')
-  scope: string;      // dApp scope identifier
-  provider?: string;  // Workspace provider for org membership (currently: 'google')
+  domain: string;                    // Target email domain (e.g., 'company.com')
+  scope: string;                     // dApp scope identifier
+  provider?: 'google' | 'microsoft'; // Workspace provider for org membership
 }
 ```
 

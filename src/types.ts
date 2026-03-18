@@ -80,21 +80,21 @@ export interface CoinbaseCountryInputs {
 /**
  * Input parameters for OIDC Domain attestation circuit.
  *
- * This circuit proves a user's email domain affiliation via Google Sign-In
+ * This circuit proves a user's email domain affiliation via OIDC Sign-In
  * without revealing the full email address. The mobile app handles
  * authentication and proof generation entirely on-device.
  *
  * @property domain - Email domain to prove (e.g., "google.com", "company.com")
  * @property scope - Application-specific identifier for proof uniqueness (e.g., dapp domain)
  * @property provider - OIDC workspace provider name for organization membership verification.
- *   When set, the mobile app verifies the user's account is managed by the specified provider
- *   (e.g., Google Workspace `hd` claim). Currently supported: `'google'`.
+ *   When set, the mobile app verifies the user's account is managed by the specified provider.
+ *   Supported: `'google'` (Google Workspace `hd` claim), `'microsoft'` (Microsoft 365 `tid` claim).
  *   Omit for general email domain verification without organization membership check.
  */
 export interface OidcDomainInputs {
   domain: string;
   scope: string;
-  provider?: string;
+  provider?: 'google' | 'microsoft';
 }
 
 /**
