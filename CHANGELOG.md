@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.4...v0.2.5) (2026-03-18)
+
+
+### Features
+
+* add Microsoft 365 as OIDC provider for organization membership verification ([8680ae1](https://github.com/zkproofport/proofport-app-sdk/commit/8680ae18b7d7eb63b8f7c4a90c427bc397e53692))
+
 ## [0.2.4](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.3...v0.2.4) (2026-03-17)
 
 
