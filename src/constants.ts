@@ -82,8 +82,8 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   oidc_domain_attestation: {
     name: 'OIDC Domain',
     description: 'Prove email domain affiliation via OIDC JWT',
-    publicInputsCount: 420,
-    publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier'],
+    publicInputsCount: 148,
+    publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider'],
   },
 };
 
@@ -224,14 +224,15 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
 } as const;
 
 /**
- * OIDC Domain Attestation circuit public input layout (byte offsets).
- * Defines the byte positions of each field in the flattened public inputs array.
+ * OIDC Domain Attestation circuit public input layout (field offsets).
+ * Defines the field positions in the flattened public inputs array (148 fields total).
  *
- * Public inputs are packed as individual field elements (one byte per element):
- * - pubkey_modulus_limbs: 18 x u128 = 18 x 16 bytes = 288 bytes → fields 0–287
- * - domain (BoundedVec<u8, 64>): 4-byte length (u32) + 64-byte storage = 68 fields → fields 288–355
- * - scope: 32 bytes → fields 356–387
- * - nullifier: 32 bytes → fields 388–419
+ * Circuit public inputs (from main.nr):
+ * - pubkey_modulus_limbs: pub [u128; 18] → 18 fields (0–17)
+ * - domain: pub BoundedVec<u8, 64> → 1 len + 64 storage = 65 fields (18–82)
+ * - scope: pub [u8; 32] → 32 fields (83–114)
+ * - nullifier: pub [u8; 32] → 32 fields (115–146)
+ * - provider: pub u8 → 1 field (147)
  *
  * @example
  * ```typescript
@@ -243,11 +244,13 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
  */
 export const OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   PUBKEY_MODULUS_START: 0,
-  PUBKEY_MODULUS_END: 287,
-  DOMAIN_START: 288,
-  DOMAIN_END: 355,
-  SCOPE_START: 356,
-  SCOPE_END: 387,
-  NULLIFIER_START: 388,
-  NULLIFIER_END: 419,
+  PUBKEY_MODULUS_END: 17,
+  DOMAIN_LEN: 18,
+  DOMAIN_START: 19,
+  DOMAIN_END: 82,
+  SCOPE_START: 83,
+  SCOPE_END: 114,
+  NULLIFIER_START: 115,
+  NULLIFIER_END: 146,
+  PROVIDER: 147,
 } as const;
