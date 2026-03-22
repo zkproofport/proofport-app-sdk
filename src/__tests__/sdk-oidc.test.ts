@@ -148,8 +148,8 @@ describe('OIDC Domain Attestation', () => {
       expect(CIRCUIT_METADATA).toHaveProperty('oidc_domain_attestation');
     });
 
-    it('has correct publicInputsCount of 420', () => {
-      expect(CIRCUIT_METADATA['oidc_domain_attestation'].publicInputsCount).toBe(420);
+    it('has correct publicInputsCount of 148', () => {
+      expect(CIRCUIT_METADATA['oidc_domain_attestation'].publicInputsCount).toBe(148);
     });
 
     it('has correct publicInputNames', () => {
@@ -158,33 +158,35 @@ describe('OIDC Domain Attestation', () => {
         'domain',
         'scope',
         'nullifier',
+        'provider',
       ]);
     });
   });
 
   describe('Public Input Layout', () => {
-    it('PUBKEY_MODULUS spans fields 0–287', () => {
+    it('PUBKEY_MODULUS spans fields 0–17', () => {
       expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.PUBKEY_MODULUS_START).toBe(0);
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.PUBKEY_MODULUS_END).toBe(287);
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.PUBKEY_MODULUS_END).toBe(17);
     });
 
-    it('DOMAIN spans fields 288–355', () => {
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.DOMAIN_START).toBe(288);
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.DOMAIN_END).toBe(355);
+    it('DOMAIN spans fields 19–82 (len at 18)', () => {
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.DOMAIN_LEN).toBe(18);
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.DOMAIN_START).toBe(19);
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.DOMAIN_END).toBe(82);
     });
 
-    it('SCOPE spans fields 356–387', () => {
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START).toBe(356);
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_END).toBe(387);
+    it('SCOPE spans fields 83–114', () => {
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START).toBe(83);
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_END).toBe(114);
     });
 
-    it('NULLIFIER spans fields 388–419', () => {
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_START).toBe(388);
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_END).toBe(419);
+    it('NULLIFIER spans fields 115–146', () => {
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_START).toBe(115);
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_END).toBe(146);
     });
 
-    it('NULLIFIER_END is 419 (total 420 public inputs)', () => {
-      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_END).toBe(419);
+    it('PROVIDER is field 147 (total 148 public inputs)', () => {
+      expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.PROVIDER).toBe(147);
     });
   });
 
