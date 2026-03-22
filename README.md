@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Supports Coinbase KYC/Country attestations and OIDC domain attestations (Google, Microsoft 365).
 
 ## How It Works
 
@@ -406,8 +406,13 @@ import {
   extractNullifierFromPublicInputs,
 } from '@zkproofport-app/sdk';
 
+// Works with all circuits: coinbase_attestation, coinbase_country_attestation, oidc_domain_attestation
 const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
 const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
+
+// OIDC domain attestation uses a different public input layout (148 fields)
+const oidcScope = extractScopeFromPublicInputs(publicInputs, 'oidc_domain_attestation');
+const oidcNullifier = extractNullifierFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 ```
 
 ## Complete Example
