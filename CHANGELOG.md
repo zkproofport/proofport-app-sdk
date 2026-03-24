@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.7](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.6...v0.2.7) (2026-03-24)
+
+
+### Features
+
+* add extractDomainFromPublicInputs, fix BoundedVec layout constants ([06e8c92](https://github.com/zkproofport/proofport-app-sdk/commit/06e8c920642d8560962b79d6ec3f7ba7df4038e3))
+
 ## [0.2.6](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.5...v0.2.6) (2026-03-24)
 
 
