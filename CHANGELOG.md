@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.6](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.5...v0.2.6) (2026-03-24)
+
+
+### Features
+
+* add extractDomainFromPublicInputs, fix BoundedVec layout constants ([06e8c92](https://github.com/zkproofport/proofport-app-sdk/commit/06e8c920642d8560962b79d6ec3f7ba7df4038e3))
+
+
+### Bug Fixes
+
+* correct OIDC domain attestation public input layout (148 fields, not 420) ([b8b0c67](https://github.com/zkproofport/proofport-app-sdk/commit/b8b0c676dcfce2107daa78ca47e13f0f0e855059))
+
 ## [0.2.5](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.4...v0.2.5) (2026-03-18)
 
 
