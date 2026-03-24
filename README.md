@@ -373,9 +373,9 @@ if (result.status === 'completed') {
 const verification = await sdk.verifyResponseOnChain(response);
 ```
 
-### Step 7: Extract Scope and Nullifier
+### Step 7: Extract Scope, Nullifier, and Domain
 
-After verification, extract the scope and nullifier from the public inputs:
+After verification, extract data from the public inputs:
 
 ```typescript
 if (result.status === 'completed') {
@@ -388,6 +388,12 @@ if (result.status === 'completed') {
 
   console.log('Scope:', scope);       // '0x7a6b70726f...'
   console.log('Nullifier:', nullifier); // '0xabc123...'
+
+  // Extract domain — only for OIDC Domain Attestation
+  if (result.circuit === 'oidc_domain_attestation') {
+    const domain = sdk.extractDomain(result.publicInputs, result.circuit);
+    console.log('Domain:', domain); // 'example.com'
+  }
 }
 ```
 
@@ -398,12 +404,18 @@ The **nullifier** serves as a privacy-preserving user identifier:
 
 > **OIDC Domain:** The nullifier is a hash of the user's email and scope. The same email + scope always produces the same nullifier, enabling Sybil resistance without revealing the email address.
 
+The **domain** (OIDC Domain Attestation only) is the email domain the user proved:
+- Extracted from the circuit's public inputs
+- Matches the domain parameter provided during proof request
+- Available only for `oidc_domain_attestation` circuits
+
 **Standalone utility functions** are also available for use outside the SDK class:
 
 ```typescript
 import {
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
+  extractDomainFromPublicInputs,
 } from '@zkproofport-app/sdk';
 
 // Works with all circuits: coinbase_attestation, coinbase_country_attestation, oidc_domain_attestation
@@ -413,6 +425,10 @@ const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attes
 // OIDC domain attestation uses a different public input layout (148 fields)
 const oidcScope = extractScopeFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 const oidcNullifier = extractNullifierFromPublicInputs(publicInputs, 'oidc_domain_attestation');
+
+// Extract domain from OIDC Domain Attestation
+const domain = extractDomainFromPublicInputs(publicInputs, 'oidc_domain_attestation');
+// domain: 'example.com' or null if circuit doesn't match or inputs insufficient
 ```
 
 ## Complete Example
@@ -528,6 +544,72 @@ interface OidcDomainInputs {
   provider?: 'google' | 'microsoft'; // Workspace provider for org membership
 }
 ```
+
+## Public Input Layout Constants
+
+The SDK exports constants defining the field positions in each circuit's public inputs array. These are useful when working with standalone extraction functions or building custom verification logic.
+
+```typescript
+import {
+  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+} from '@zkproofport-app/sdk';
+```
+
+**Coinbase KYC Attestation** (128 fields total):
+```typescript
+COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
+  SIGNAL_HASH_START: 0,      // RSA modulus limbs (Coinbase signer)
+  SIGNAL_HASH_END: 31,
+  MERKLE_ROOT_START: 32,     // Merkle root of signers
+  MERKLE_ROOT_END: 63,
+  SCOPE_START: 64,           // keccak256 hash of scope string
+  SCOPE_END: 95,
+  NULLIFIER_START: 96,       // Unique identifier per user+scope
+  NULLIFIER_END: 127,
+}
+```
+
+**Coinbase Country Attestation** (150 fields total):
+```typescript
+COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
+  SIGNAL_HASH_START: 0,
+  SIGNAL_HASH_END: 31,
+  MERKLE_ROOT_START: 32,
+  MERKLE_ROOT_END: 63,
+  COUNTRY_LIST_START: 64,    // Packed country codes
+  COUNTRY_LIST_END: 83,
+  COUNTRY_LIST_LENGTH: 84,   // Number of countries
+  IS_INCLUDED: 85,           // Boolean: user in list or not
+  SCOPE_START: 86,
+  SCOPE_END: 117,
+  NULLIFIER_START: 118,
+  NULLIFIER_END: 149,
+}
+```
+
+**OIDC Domain Attestation** (148 fields total):
+```typescript
+OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
+  PUBKEY_MODULUS_START: 0,   // RSA modulus limbs (JWT issuer key)
+  PUBKEY_MODULUS_END: 17,
+  DOMAIN_STORAGE_START: 18,  // Domain bytes (up to 64 ASCII characters)
+  DOMAIN_STORAGE_END: 81,
+  DOMAIN_LEN: 82,            // Domain string length
+  SCOPE_START: 83,           // keccak256 hash of scope string
+  SCOPE_END: 114,
+  NULLIFIER_START: 115,      // Unique identifier per user+scope
+  NULLIFIER_END: 146,
+  PROVIDER: 147,             // OIDC provider code (0=none, 1=Google, 2=Microsoft)
+
+  // Deprecated aliases (use new names above)
+  DOMAIN_START: 18,          // @deprecated Use DOMAIN_STORAGE_START
+  DOMAIN_END: 82,            // @deprecated Use DOMAIN_LEN
+}
+```
+
+> **Note on field positions:** Each position in the public inputs array corresponds to a field element in the circuit. For bytes32 values (scope, nullifier, signal hash), 32 consecutive fields are concatenated to form the final value.
 
 ## Error Handling
 

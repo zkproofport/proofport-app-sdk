@@ -6,7 +6,7 @@
 
 import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
-import { VERIFIER_ABI, RPC_ENDPOINTS } from './constants';
+import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './constants';
 
 // ethers v5/v6 compatibility shims
 const _ethers = ethers as any;
@@ -327,6 +327,47 @@ export function extractNullifierFromPublicInputs(
   if (publicInputsHex.length <= end) return null;
   const nullifierFields = publicInputsHex.slice(start, end + 1);
   return reconstructBytes32FromFields(nullifierFields);
+}
+
+/**
+ * Extract domain string from OIDC Domain Attestation public inputs.
+ *
+ * The domain is stored as a Noir BoundedVec<u8, 64>, which serializes as
+ * [storage[0..64], len]. Each storage element is a u8 value in a field element.
+ *
+ * @param publicInputsHex - Array of public input hex strings
+ * @param circuit - Circuit identifier (must be 'oidc_domain_attestation')
+ * @returns Domain as ASCII string, or null if circuit doesn't match or inputs are insufficient
+ *
+ * @example
+ * ```typescript
+ * const domain = extractDomainFromPublicInputs(publicInputs, 'oidc_domain_attestation');
+ * console.log(domain); // 'example.com'
+ * ```
+ */
+export function extractDomainFromPublicInputs(
+  publicInputsHex: string[],
+  circuit?: string,
+): string | null {
+  if (circuit !== 'oidc_domain_attestation') return null;
+
+  const layout = OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT;
+  if (publicInputsHex.length <= layout.DOMAIN_LEN) return null;
+
+  const len = Number(BigInt(publicInputsHex[layout.DOMAIN_LEN]) & 0xFFn);
+  if (len === 0 || len > 64) return null;
+
+  const storageFields = publicInputsHex.slice(
+    layout.DOMAIN_STORAGE_START,
+    layout.DOMAIN_STORAGE_START + len,
+  );
+
+  const chars = storageFields.map(f => {
+    const byte = Number(BigInt(f) & 0xFFn);
+    return String.fromCharCode(byte);
+  });
+
+  return chars.join('');
 }
 
 /** @internal Reconstruct a bytes32 value from 32 individual field elements */

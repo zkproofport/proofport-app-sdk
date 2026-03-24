@@ -41,6 +41,7 @@ import {
   getDefaultProvider,
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
+  extractDomainFromPublicInputs,
 } from './verifier';
 import {
   DEFAULT_SCHEME,
@@ -1413,6 +1414,28 @@ export class ProofportSDK {
    */
   extractNullifier(publicInputs: string[], circuit: CircuitType): string | null {
     return extractNullifierFromPublicInputs(publicInputs, circuit);
+  }
+
+  /**
+   * Extracts the domain string from OIDC Domain Attestation proof public inputs.
+   *
+   * Only works with 'oidc_domain_attestation' circuit. Returns null for other circuits.
+   *
+   * @param publicInputs - Array of hex-encoded field elements from proof result
+   * @param circuit - Circuit type that produced the public inputs
+   * @returns Domain as ASCII string (e.g., 'example.com'), or null if not applicable
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.waitForProof(relay.requestId);
+   * if (result.status === 'completed') {
+   *   const domain = sdk.extractDomain(result.publicInputs, result.circuit);
+   *   console.log('Domain:', domain); // 'example.com'
+   * }
+   * ```
+   */
+  extractDomain(publicInputs: string[], circuit: CircuitType): string | null {
+    return extractDomainFromPublicInputs(publicInputs, circuit);
   }
 
 }

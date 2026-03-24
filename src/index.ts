@@ -33,6 +33,7 @@ export { ProofportSDK, default } from './ProofportSDK';
 export {
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
+  extractDomainFromPublicInputs,
 } from './verifier';
 
 // Public input layout constants
