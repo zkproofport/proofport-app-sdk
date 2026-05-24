@@ -35,12 +35,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Publish to npm
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Publish to npm (OIDC trusted publisher)
         run: |
           if [[ "${{ github.event.release.tag_name }}" == *"beta"* ]]; then
             npm publish --access public --tag beta
           else
             npm publish --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
