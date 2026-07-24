@@ -9,6 +9,9 @@ import type {
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
   OidcDomainInputs,
+  MdlKrOwnershipInputs,
+  MdlKrAgeInputs,
+  MdlKrRegionInputs,
   DeepLinkComponents,
   CircuitType,
 } from './types';
@@ -367,6 +370,87 @@ export function isProofportDeepLink(
  * @param request - Proof request to validate
  * @returns Validation result with `valid` flag and optional `error` message
  */
+/**
+ * Validates a free-text mDL input (scope / targetRegion).
+ * Rejects empty or whitespace-only values, control characters (which break
+ * deep-link query encoding and downstream logging), and values over 256 chars
+ * (server-side length cap mirror). UTF-8 text such as Korean region names is
+ * allowed.
+ *
+ * @returns Error message string, or null when valid.
+ */
+function validateMdlTextInput(value: unknown, fieldName: string): string | null {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return `${fieldName} is required and must be a non-empty string`;
+  }
+  if (value.length > 256) {
+    return `${fieldName} must be 256 characters or fewer`;
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001F\u007F]/.test(value)) {
+    return `${fieldName} must not contain control characters`;
+  }
+  return null;
+}
+
+/**
+ * Validates dapp-supplied inputs for the Korea Mobile ID (mDL) circuits.
+ * Shared by deep-link request validation and relay request creation so the
+ * same guards apply on every request path.
+ *
+ * Rules:
+ * - `scope` — required non-empty string, ≤256 chars, no control characters
+ * - `mdl_kr_ownership.discloseFlags` — optional integer 0–15 (0x0F bitmask)
+ * - `mdl_kr_age.ageThreshold` — required integer 1–150
+ * - `mdl_kr_region.targetRegion` — required non-empty string (Korean si/do),
+ *   ≤256 chars, no control characters
+ *
+ * @param circuit - One of the three mDL circuit identifiers
+ * @param inputs - Dapp-supplied circuit inputs
+ * @returns Error message string, or null when the inputs are valid
+ */
+export function validateMdlInputs(
+  circuit: 'mdl_kr_ownership' | 'mdl_kr_age' | 'mdl_kr_region',
+  inputs: CircuitInputs
+): string | null {
+  const scopeError = validateMdlTextInput((inputs as MdlKrOwnershipInputs).scope, 'scope');
+  if (scopeError) {
+    return scopeError;
+  }
+
+  if (circuit === 'mdl_kr_ownership') {
+    const { discloseFlags } = inputs as MdlKrOwnershipInputs;
+    if (discloseFlags !== undefined) {
+      if (
+        typeof discloseFlags !== 'number' ||
+        !Number.isInteger(discloseFlags) ||
+        discloseFlags < 0 ||
+        discloseFlags > 0x0f
+      ) {
+        return 'discloseFlags must be an integer between 0 and 15';
+      }
+    }
+  } else if (circuit === 'mdl_kr_age') {
+    const { ageThreshold } = inputs as MdlKrAgeInputs;
+    if (
+      typeof ageThreshold !== 'number' ||
+      !Number.isInteger(ageThreshold) ||
+      ageThreshold < 1 ||
+      ageThreshold > 150
+    ) {
+      return 'ageThreshold is required and must be an integer between 1 and 150';
+    }
+  } else {
+    const { targetRegion } = inputs as MdlKrRegionInputs;
+    const regionError = validateMdlTextInput(targetRegion, 'targetRegion');
+    if (regionError) {
+      return regionError;
+    }
+  }
+
+  return null;
+}
+
 export function validateProofRequest(request: ProofRequest): { valid: boolean; error?: string } {
   if (!request.requestId) {
     return { valid: false, error: 'Missing requestId' };
@@ -376,7 +460,16 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     return { valid: false, error: 'Missing circuit type' };
   }
 
-  if (!['coinbase_attestation', 'coinbase_country_attestation', 'oidc_domain_attestation'].includes(request.circuit)) {
+  if (
+    ![
+      'coinbase_attestation',
+      'coinbase_country_attestation',
+      'oidc_domain_attestation',
+      'mdl_kr_ownership',
+      'mdl_kr_age',
+      'mdl_kr_region',
+    ].includes(request.circuit)
+  ) {
     return { valid: false, error: `Invalid circuit type: ${request.circuit}` };
   }
 
@@ -416,6 +509,15 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     }
     if (inputs.provider !== undefined && (typeof inputs.provider !== 'string' || inputs.provider.trim() === '')) {
       return { valid: false, error: 'provider must be a non-empty string when specified' };
+    }
+  } else if (
+    request.circuit === 'mdl_kr_ownership' ||
+    request.circuit === 'mdl_kr_age' ||
+    request.circuit === 'mdl_kr_region'
+  ) {
+    const mdlError = validateMdlInputs(request.circuit, request.inputs);
+    if (mdlError) {
+      return { valid: false, error: mdlError };
     }
   }
 

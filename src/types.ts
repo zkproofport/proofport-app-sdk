@@ -11,7 +11,13 @@
  * const circuit: CircuitType = 'coinbase_attestation';
  * ```
  */
-export type CircuitType = 'coinbase_attestation' | 'coinbase_country_attestation' | 'oidc_domain_attestation';
+export type CircuitType =
+  | 'coinbase_attestation'
+  | 'coinbase_country_attestation'
+  | 'oidc_domain_attestation'
+  | 'mdl_kr_ownership'
+  | 'mdl_kr_age'
+  | 'mdl_kr_region';
 
 /**
  * Proof request lifecycle status.
@@ -98,6 +104,71 @@ export interface OidcDomainInputs {
 }
 
 /**
+ * Input parameters for Korea Mobile ID (mDL) ownership attestation circuit.
+ *
+ * Proves the user holds a valid Korean mobile driver's license. The license
+ * data never leaves the device; only the selected attributes indicated by
+ * `discloseFlags` are revealed through the proof's public inputs.
+ *
+ * @property scope - Application-specific identifier for proof uniqueness (e.g., dapp domain)
+ * @property discloseFlags - Attribute disclosure bitmask 0x00–0x0F
+ *   (0x01 name | 0x02 birth | 0x04 sex | 0x08 phone). Omit or 0 for a fully
+ *   anonymous ownership proof. The attribute values themselves are entered
+ *   by the user on-device, never supplied by the dapp.
+ *
+ * @example
+ * ```typescript
+ * // Anonymous "I hold a valid Korean mobile ID" proof
+ * const inputs: MdlKrOwnershipInputs = { scope: 'myapp.com' };
+ * ```
+ */
+export interface MdlKrOwnershipInputs {
+  scope: string;
+  discloseFlags?: number;
+}
+
+/**
+ * Input parameters for Korea Mobile ID (mDL) age attestation circuit.
+ *
+ * Proves the user is at least `ageThreshold` years old according to their
+ * Korean mobile driver's license, without revealing the birth date.
+ *
+ * @property scope - Application-specific identifier for proof uniqueness
+ * @property ageThreshold - Minimum age to prove (integer, 1–150). E.g., 19 for
+ *   Korean adult verification.
+ *
+ * @example
+ * ```typescript
+ * const inputs: MdlKrAgeInputs = { scope: 'myapp.com', ageThreshold: 19 };
+ * ```
+ */
+export interface MdlKrAgeInputs {
+  scope: string;
+  ageThreshold: number;
+}
+
+/**
+ * Input parameters for Korea Mobile ID (mDL) region attestation circuit.
+ *
+ * Proves the user's registered address is in the specified si/do region
+ * without revealing the full address.
+ *
+ * @property scope - Application-specific identifier for proof uniqueness
+ * @property targetRegion - Region (si/do) to prove residency in, in Korean
+ *   (e.g., '경기도', '서울특별시'). Chosen by the dapp; the proof succeeds only
+ *   if the license address matches.
+ *
+ * @example
+ * ```typescript
+ * const inputs: MdlKrRegionInputs = { scope: 'myapp.com', targetRegion: '경기도' };
+ * ```
+ */
+export interface MdlKrRegionInputs {
+  scope: string;
+  targetRegion: string;
+}
+
+/**
  * Empty input type for circuits that retrieve all data from the mobile app.
  * Used when SDK doesn't need to provide any circuit-specific parameters.
  */
@@ -107,7 +178,14 @@ export interface EmptyInputs {}
  * Union type of all circuit-specific input types.
  * Each circuit type has a corresponding input interface.
  */
-export type CircuitInputs = CoinbaseKycInputs | CoinbaseCountryInputs | OidcDomainInputs | EmptyInputs;
+export type CircuitInputs =
+  | CoinbaseKycInputs
+  | CoinbaseCountryInputs
+  | OidcDomainInputs
+  | MdlKrOwnershipInputs
+  | MdlKrAgeInputs
+  | MdlKrRegionInputs
+  | EmptyInputs;
 
 /**
  * Zero-knowledge proof request sent to mobile app via deep link.

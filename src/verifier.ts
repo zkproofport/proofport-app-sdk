@@ -286,6 +286,9 @@ export function extractScopeFromPublicInputs(
     start = 86; end = 117;
   } else if (circuit === 'oidc_domain_attestation') {
     start = 83; end = 114;
+  } else if (circuit !== undefined && circuit.startsWith('mdl_kr_')) {
+    // All Korea mDL circuits: scope [0..31], nullifier_value [32..63]
+    start = 0; end = 31;
   } else {
     start = 64; end = 95;
   }
@@ -321,6 +324,9 @@ export function extractNullifierFromPublicInputs(
     start = 118; end = 149;
   } else if (circuit === 'oidc_domain_attestation') {
     start = 115; end = 146;
+  } else if (circuit !== undefined && circuit.startsWith('mdl_kr_')) {
+    // All Korea mDL circuits: scope [0..31], nullifier_value [32..63]
+    start = 32; end = 63;
   } else {
     start = 96; end = 127;
   }

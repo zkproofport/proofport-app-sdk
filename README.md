@@ -163,6 +163,56 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 
 > When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim). Without `provider`, only the email domain is verified.
 
+### `mdl_kr_ownership`
+
+Proves the user holds a valid Korean mobile driver's license (모바일 신분증). The license data stays on-device; only the attributes selected by `discloseFlags` are revealed. No wallet signature is required.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier for proof uniqueness |
+| `discloseFlags` | `number` | No | Attribute disclosure bitmask `0x00`–`0x0F` (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone). Omit or `0` for a fully anonymous ownership proof. |
+
+```typescript
+// Anonymous "holds a valid Korean mobile ID" proof
+const relay = await sdk.createRelayRequest('mdl_kr_ownership', {
+  scope: 'myapp.com',
+});
+```
+
+### `mdl_kr_age`
+
+Proves the user is at least `ageThreshold` years old according to their Korean mobile driver's license, without revealing the birth date.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier |
+| `ageThreshold` | `number` | Yes | Minimum age to prove (integer 1–150, e.g. `19` for Korean adult verification) |
+
+```typescript
+const relay = await sdk.createRelayRequest('mdl_kr_age', {
+  scope: 'myapp.com',
+  ageThreshold: 19,
+});
+```
+
+### `mdl_kr_region`
+
+Proves the user's registered address is in the specified si/do region without revealing the full address.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier |
+| `targetRegion` | `string` | Yes | Region (si/do) to prove residency in, in Korean (e.g. `'경기도'`, `'서울특별시'`) |
+
+```typescript
+const relay = await sdk.createRelayRequest('mdl_kr_region', {
+  scope: 'myapp.com',
+  targetRegion: '경기도',
+});
+```
+
+> The mDL circuits do not require `setSigner()` — the proof is bound to the license via an on-device nullifier (`nullifier_value` public input), not a wallet address. Use `sdk.extractNullifier(result.publicInputs, result.circuit)` for sybil-resistant user identification.
+
 ## Integration Guide
 
 ### Step 1: Initialize
@@ -418,7 +468,7 @@ import {
   extractDomainFromPublicInputs,
 } from '@zkproofport-app/sdk';
 
-// Works with all circuits: coinbase_attestation, coinbase_country_attestation, oidc_domain_attestation
+// Works with all circuits: coinbase_attestation, coinbase_country_attestation, oidc_domain_attestation, mdl_kr_ownership, mdl_kr_age, mdl_kr_region
 const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
 const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
 
