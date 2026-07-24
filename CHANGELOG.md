@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.8](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.7...v0.2.8) (2026-07-24)
+
+
+### Features
+
+* add Korea mobile ID (mDL) circuit support ([d4be6b2](https://github.com/zkproofport/proofport-app-sdk/commit/d4be6b20171dc5e745a8e11a4606ea1997ce0d9b))
+
 ## [0.2.7](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.6...v0.2.7) (2026-03-24)
 
 
