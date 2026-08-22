@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.9...v0.2.10) (2026-08-22)
+
+
+### Bug Fixes
+
+* **sdk:** release the rewritten documentation to npm ([4e65258](https://github.com/zkproofport/proofport-app-sdk/commit/4e652584b357be97e966a9fd79327a4dcad20c20))
+
 ## [0.2.9](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.8...v0.2.9) (2026-08-22)
 
 
