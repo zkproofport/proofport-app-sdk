@@ -460,10 +460,16 @@ export const MAX_RETURN_SCHEME_LENGTH = 128;
 /** RFC 3986 scheme (`ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`) followed by exactly `://`. */
 const BARE_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\/$/;
 
-/** `https://host[:port]` with no userinfo, path, query or fragment. */
-const HTTPS_ORIGIN_RE =
-  /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$/;
-
+/**
+ * Schemes we refuse even in the bare `scheme://` shape.
+ *
+ * `http` and `https` are the back door the shape rule alone leaves open: with
+ * no host, `https://` is shaped exactly like a bare custom scheme and would
+ * otherwise pass. A browser pointed at nowhere is not a return target, and
+ * accepting it would re-open the URL-shaped door this field just closed.
+ * `googlechrome://` and `firefox://` are deliberately NOT denied — bare, they
+ * foreground that browser without navigating, which is the whole point.
+ */
 const DENIED_RETURN_SCHEMES = new Set([
   'about',
   'blob',
@@ -474,6 +480,7 @@ const DENIED_RETURN_SCHEMES = new Set([
   'file',
   'ftp',
   'http',
+  'https',
   'intent',
   'javascript',
   'jar',
@@ -487,6 +494,11 @@ const DENIED_RETURN_SCHEMES = new Set([
  * Validates a `returnScheme` before it is sent to the relay, so a malformed
  * value fails fast in the integrator's own code instead of coming back as a
  * relay 400. The relay re-validates and is the authority.
+ *
+ * One shape is accepted: a bare custom scheme such as `mydapp://`. It names an
+ * app to switch back to, never a page to visit — so hosts, paths and query
+ * strings are rejected, and an https URL is not a valid value. A web page has
+ * no app to return to and simply omits the field.
  *
  * @param value - Candidate return target
  * @returns `null` when acceptable, otherwise a human-readable error message
@@ -510,12 +522,8 @@ export function validateReturnScheme(value: unknown): string | null {
 
   const normalized = value.toLowerCase();
 
-  if (HTTPS_ORIGIN_RE.test(normalized)) {
-    return null;
-  }
-
   if (!BARE_SCHEME_RE.test(normalized)) {
-    return 'returnScheme must be a bare custom scheme such as "mydapp://" or an https origin such as "https://myapp.com" — paths, query strings and fragments are not accepted';
+    return 'returnScheme must be a bare custom scheme such as "mydapp://" — hosts, paths, query strings and fragments are not accepted, and an https URL is not a return target';
   }
 
   const schemeName = normalized.slice(0, normalized.indexOf(':'));
@@ -524,6 +532,92 @@ export function validateReturnScheme(value: unknown): string | null {
   }
 
   return null;
+}
+
+/**
+ * The return target to use when the integrator named none.
+ *
+ * Only the requesting PAGE can answer "which browser is this?" — iOS gives the
+ * ZKProofport app nothing to work with (`sourceApplication` is nil across team
+ * identifiers, and there is no public API to foreground an app by bundle id).
+ * So the detection has to happen here, in the SDK, and travel with the request.
+ *
+ * Two cases are detected, each from a POSITIVE token, and each verified in the
+ * browser's own source to foreground WITHOUT navigating anywhere:
+ *
+ *   Chrome for iOS  (`CriOS/`) -> `googlechrome://`
+ *   Firefox for iOS (`FxiOS/`) -> `firefox://`
+ *
+ * The BARE scheme is the point in both cases: it carries no URL, so the browser
+ * comes forward with nothing to open and the user lands on the tab they were
+ * already reading — no new tab, no navigation, no reload, JS state intact.
+ *
+ * Chrome: `ios/chrome/app/startup/chrome_app_startup_parameters.mm` replaces
+ * the scheme with `http`, producing `http://`, which fails GURL validation
+ * (`if (!externalURL.is_valid()) return nil;`), so the startup parameters are
+ * nil and there is nothing to open.
+ *
+ * Firefox: `firefox://` has an empty host, and
+ * `Coordinators/Router/RouteBuilder.swift` resolves the host through
+ * `DeeplinkInput.Host(rawValue: "")`, which is nil because no case has an empty
+ * raw value (`Coordinators/Router/DeeplinkInput.swift`). The scheme is not http
+ * either, so `makeRoute(url:)` falls to its final `else { return nil }`, and
+ * `SceneDelegate.handleOpenURL` then hits `guard let route = ... else
+ * { return }` and does nothing at all. Verified on the warm path — the browser
+ * is already running, which is always true here, because the user came from a
+ * page in it.
+ *
+ * Everything else deliberately returns undefined, and that is not a gap:
+ *
+ *   - Safari has no equivalent. No scheme means "just come forward";
+ *     `https://<url>` navigates and opens a new tab, `x-web-search://` opens a
+ *     search page. Both lose the user's page.
+ *   - Brave and Arc for iOS are UNDETECTABLE. Brave ships no UA token and
+ *     identifies itself only via Client Hints, which WebKit does not implement,
+ *     so it looks exactly like Safari. Inferring "Safari" by elimination and
+ *     firing a Safari-ish scheme would throw Brave and Arc users into a browser
+ *     they were not using — strictly worse than doing nothing.
+ *   - In-app webviews (KakaoTalk, Naver, Line, Instagram) are not tabs at all.
+ *     Any scheme destroys the page; the system "< Back to X" breadcrumb is the
+ *     only thing that preserves it.
+ *   - Edge (`EdgiOS`) and Opera (`OPiOS` / `OPT`) for iOS are NOT included.
+ *     Both are closed source, so `microsoft-edge://` and `opera-http://` cannot
+ *     be checked the way Chrome's and Firefox's were. Their bare schemes are
+ *     plausible analogues, and that is exactly why they stay out: an unverified
+ *     guess that opens a new tab is the bug this field exists to avoid. Add one
+ *     only with evidence that it foregrounds WITHOUT navigating.
+ *   - Android needs nothing: the ZKProofport app brings itself to the back
+ *     (`moveTaskToBack`), which resumes the browser exactly as it was.
+ *
+ * When this returns undefined the field is omitted and the ZKProofport app
+ * tells the user the proof was delivered and to switch back themselves.
+ *
+ * @param userAgent - override, for tests. Defaults to `navigator.userAgent`.
+ *   Returns undefined when there is no navigator at all (Node, SSR).
+ * @returns a scheme that is safe to open, or undefined to send nothing
+ *
+ * @internal
+ */
+export function detectReturnScheme(userAgent?: string): string | undefined {
+  const ua =
+    userAgent ?? (typeof navigator === 'undefined' ? undefined : navigator.userAgent);
+  if (typeof ua !== 'string' || ua.length === 0) {
+    return undefined;
+  }
+  // A device token is required alongside the browser token. `CriOS` and `FxiOS`
+  // are already iOS-only and unambiguous on their own, but pairing them with the
+  // device token costs nothing and stops a synthetic or spoofed desktop user
+  // agent from producing a mobile-only scheme.
+  if (!/(iPhone|iPad|iPod)/.test(ua)) {
+    return undefined;
+  }
+  if (/CriOS\//.test(ua)) {
+    return 'googlechrome://';
+  }
+  if (/FxiOS\//.test(ua)) {
+    return 'firefox://';
+  }
+  return undefined;
 }
 
 export function validateProofRequest(request: ProofRequest): { valid: boolean; error?: string } {

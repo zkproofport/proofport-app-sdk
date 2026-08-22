@@ -222,7 +222,12 @@ export interface ProofRequest {
   dappIcon?: string;
   /**
    * Optional: which app the ZKProofport app should bring back to the foreground
-   * once it has finished. Not a URL — see {@link ProofportSDK.createRelayRequest}.
+   * once it has finished — a bare custom scheme such as `mydapp://`.
+   *
+   * Not a URL, and an https origin is not accepted: opening one launches a new
+   * browser tab on a fresh page instead of returning the user to the tab they
+   * started from. A web requester therefore has nothing valid to put here and
+   * omits the field. See {@link ProofportSDK.createRelayRequest}.
    */
   returnScheme?: string;
   /** Unix timestamp (ms) when request was created */

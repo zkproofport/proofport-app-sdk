@@ -30,6 +30,7 @@ import {
   validateProofRequest,
   validateMdlInputs,
   validateReturnScheme,
+  detectReturnScheme,
   isProofportDeepLink,
 } from './deeplink';
 import {
@@ -1092,8 +1093,10 @@ export class ProofportSDK {
    * @param options - Request options (message, dappName, dappIcon, nonce, returnScheme)
    * @param options.returnScheme - Which app the ZKProofport app should switch back
    *   to once it has finished. Put **your own** deep link scheme here — the bare
-   *   scheme your app registers, e.g. `'mydapp://'`. A web app can instead pass its
-   *   own https origin, e.g. `'https://myapp.com'`.
+   *   scheme your app registers, e.g. `'mydapp://'`. Only a native app has an
+   *   answer to this question; a web app omits the option entirely, because
+   *   opening its https origin would launch a new browser tab on a fresh page
+   *   rather than return the user to the tab they started from.
    *
    *   This is intentionally **not** a URL and not a return address: no path, query
    *   string or fragment is accepted, and the ZKProofport app never sends the proof
@@ -1102,14 +1105,26 @@ export class ProofportSDK {
    *   "which app should come back to the foreground", exactly like the
    *   `redirect.native` value a wallet uses to hand control back after signing.
    *
-   *   **Omit it and nothing changes** — the user simply stays in the ZKProofport app
-   *   after the proof and switches back manually. There is no auto-switch on proof
-   *   failure either; only on success and on the user declining the request.
+   *   **Omit it and the SDK decides for you.** When the request is created from a
+   *   page running in Chrome for iOS (`CriOS`) or Firefox for iOS (`FxiOS`), the
+   *   SDK fills in `'googlechrome://'` or `'firefox://'` by itself: opening either
+   *   scheme bare brings that browser forward without navigating, so the user lands
+   *   back on the tab they were already reading. Every other browser sends nothing,
+   *   because nothing safe exists to send — Safari has no such scheme, and Brave
+   *   and Arc are indistinguishable from Safari on iOS, so guessing would eject the
+   *   user into the wrong browser.
+   *   On Android nothing is needed at all: the ZKProofport app brings itself to the
+   *   back and the browser resumes exactly as it was. When no target is sent and
+   *   none can be inferred, the ZKProofport app tells the user the proof was
+   *   delivered and lets them switch back themselves.
+   *
+   *   There is no auto-switch on proof failure; only on success and on the user
+   *   declining the request.
    *
    *   Rejected with an error before the request is sent: empty or whitespace values,
-   *   anything longer than 128 characters, values containing a path/query/fragment,
-   *   and the `http:`, `file:`, `data:`, `javascript:`, `intent:`, `tel:`, `sms:`,
-   *   `mailto:` families.
+   *   anything longer than 128 characters, values carrying a host/path/query/fragment
+   *   (including https origins such as `'https://myapp.com'`), and the `http:`,
+   *   `file:`, `data:`, `javascript:`, `intent:`, `tel:`, `sms:`, `mailto:` families.
    * @returns Promise resolving to RelayProofRequest with requestId, deepLink, pollUrl
    * @throws Error if signer not set, returnScheme is malformed, or the relay request fails
    *
@@ -1193,7 +1208,12 @@ export class ProofportSDK {
     if (options.dappName) body.dappName = options.dappName;
     if (options.dappIcon) body.dappIcon = options.dappIcon;
     if (options.nonce) body.nonce = options.nonce;
-    if (options.returnScheme) body.returnScheme = options.returnScheme;
+    // An explicit value always wins. Otherwise ask the SDK to work one out from
+    // the page's own user agent — the requesting page is the only side that can
+    // (iOS tells the app nothing about who launched it). Both paths can end in
+    // "send nothing", which is a legitimate outcome, not a failure.
+    const returnScheme = options.returnScheme ?? detectReturnScheme();
+    if (returnScheme) body.returnScheme = returnScheme;
 
     const response = await fetch(`${this.relayUrl}/api/v1/proof/request`, {
       method: 'POST',

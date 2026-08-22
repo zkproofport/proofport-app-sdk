@@ -292,7 +292,7 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
   dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your identity to continue',
   nonce: 'unique-nonce-123',  // Optional: replay prevention
-  returnScheme: 'mydapp://',  // Optional: mobile-only, see below
+  returnScheme: 'mydapp://',  // Optional: native apps only, see below
 });
 
 // relay.requestId  — Relay-issued UUID
@@ -303,48 +303,72 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 
 Every field of the third argument is optional: `message`, `dappName` and `dappIcon` are shown to the user in the ZKProofport app, `nonce` is a value of your own choosing that the relay refuses to accept twice, and `returnScheme` is described next.
 
-#### Switching back to your app: `returnScheme`
+#### Switching back: `returnScheme`
 
-By default the user stays in the ZKProofport app after generating a proof and switches back to your app themselves. Pass `returnScheme` and the ZKProofport app brings your app to the foreground once the proof has been delivered — the same handoff a wallet performs after a signature.
+When ZKProofport finishes a proof, the user is sitting in the ZKProofport app. `returnScheme` answers one question: **which app should come back to the foreground?**
+
+It names an app. It is not a URL, not a return address, and the proof is never sent to it — the proof still reaches you exactly as before, through `waitForProof()` / `waitForResult()`. This is the same handoff a wallet performs after a signature (`redirect.native`).
+
+**One form is accepted:**
+
+| Form | Example |
+|------|---------|
+| Bare custom scheme | `'mydapp://'` — an RFC 3986 scheme followed by exactly `://` |
+
+**If you are a native app**, pass the scheme your app registers:
 
 ```typescript
-// Native app: your own registered scheme
 await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
   returnScheme: 'mydapp://',
 });
-
-// Web app: your own origin
-await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
-  returnScheme: 'https://myapp.com',
-});
 ```
 
-**Only set it in the mobile deep-link flow.** The switch happens on the phone that generated the proof, so it makes sense only when that phone is also where the user started — i.e. when you navigated the browser to `relay.deepLink` on the same device. In the desktop QR flow the user is watching the desktop screen while the proof happens on their phone; opening a page or an app on the phone at that moment surfaces something nobody asked for. Gate it:
+**If you are a web page, pass nothing.** You have no app to come back to, so there is no value you can honestly put here — and the SDK handles the browser case for you:
 
 ```typescript
-const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' },
-  ProofportSDK.isMobile() ? { returnScheme: 'https://myapp.com' } : {});
+// Correct. Do not pass returnScheme from a web page.
+await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' });
 ```
 
-`returnScheme` is **not** a return address. It says which app to open, nothing more — the proof still reaches you the usual way, through `waitForProof()` / `waitForResult()`, and the ZKProofport app never posts anything to it.
+##### What the SDK does automatically
 
-Two shapes are accepted, and nothing else:
+With the option omitted, the SDK looks at the page's own user agent and decides:
 
-| Form | Example | Notes |
-|------|---------|-------|
-| Bare custom scheme | `'mydapp://'` | An RFC 3986 scheme followed by exactly `://` |
-| https origin | `'https://myapp.com'`, `'https://myapp.com:8443'` | Host (and optional port) only |
+| Where your page is running | What the SDK sends | What the user sees when the proof is done |
+|---|---|---|
+| **Chrome for iOS** (`CriOS`) | `googlechrome://` | Chrome comes forward on **the tab they were already reading** — no new tab, no reload, page state intact |
+| **Firefox for iOS** (`FxiOS`) | `firefox://` | Same: Firefox comes forward on the tab they were already reading |
+| **Android**, any browser | nothing | The ZKProofport app puts itself in the background and the browser resumes exactly as it was |
+| **Safari, Brave, Arc, Edge, Opera on iOS** | nothing | ZKProofport tells them the proof was delivered and to switch back; the system "‹ Back" breadcrumb is still at the top left |
+| **In-app webviews** (KakaoTalk, Naver, Line, Instagram) | nothing | Same notice. Any scheme would destroy the page they are on |
+| **Desktop** | nothing | This is the QR flow: the proof happens on a different device, and your page updates over the relay socket |
 
-Anything else throws before the SDK makes a single network call — no challenge is consumed, so nothing is wasted on a typo:
+Only Chrome and Firefox are auto-detected, each from a positive UA token, because they are the two iOS browsers whose bare scheme is **verified in their own source** to bring the app forward without navigating anywhere. There is no Safari equivalent. Brave and Arc are indistinguishable from Safari on iOS, so guessing would eject those users into a browser they were not using — worse than doing nothing. Edge and Opera are closed source and stay out until someone can show their bare schemes behave the same way.
 
-- a path, query string or fragment (`'mydapp://transfer?to=0x...'`, `'https://myapp.com/done'`), which is what keeps a request from driving your app to a specific action
+An explicit `returnScheme` always wins; the SDK never overrides a value you set.
+
+##### `https://` origins are not accepted
+
+An https origin such as `'https://myapp.com'` used to be allowed. **It is now rejected** by the SDK, the relay and the ZKProofport app alike.
+
+Opening one does not return anybody anywhere. The OS hands the URL to the browser, and the browser opens a **new tab** on a freshly loaded page — the tab your user actually started in is left behind, along with everything in it, including the socket waiting for the proof you just generated. The round trip the field exists to complete was the thing it broke.
+
+##### What is rejected
+
+These throw before the SDK makes a single network call, so no challenge is consumed and nothing is wasted on a typo:
+
+- **https and http origins** — `'https://myapp.com'`, `'https://myapp.com:8443'` (see above)
+- **bare `https://` and `http://`** — a browser with no page to open is not a return target
+- a host, path, query string or fragment — `'mydapp://transfer?to=0x...'` — which is what stops a request driving your app to a specific action rather than just opening it
 - an empty or whitespace-containing value, or one longer than 128 characters
-- userinfo (`'https://user:pass@myapp.com'`) and non-ASCII hosts (use punycode)
-- `http://` and other schemes the OS treats specially: `about`, `blob`, `content`, `data`, `facetime`, `facetime-audio`, `file`, `ftp`, `intent`, `javascript`, `jar`, `mailto`, `sms`, `tel`, `vbscript`
+- non-ASCII schemes (use punycode if you somehow need one)
+- schemes the OS treats specially: `about`, `blob`, `content`, `data`, `facetime`, `facetime-audio`, `file`, `ftp`, `intent`, `javascript`, `jar`, `mailto`, `sms`, `tel`, `vbscript`
 
 The value is matched case-insensitively and stored lowercased by the relay.
 
-Omit `returnScheme` and nothing changes: the request is created without it and the user stays in the ZKProofport app when the proof is done. There is no auto-switch when proof generation fails either — the error has to be read in the ZKProofport app first.
+##### When nothing happens
+
+There is no auto-switch when proof generation **fails** — the error has to be read in the ZKProofport app first. And when no target is sent and none can be inferred, ZKProofport shows the user a notice saying the proof was delivered and to switch back themselves. That is the intended outcome on iOS outside Chrome, not a bug.
 
 **OIDC Domain Attestation:**
 
@@ -860,7 +884,7 @@ import type {
 | `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |
-| `ProofRequest` | Request object: `requestId`, `circuit`, `inputs`, `createdAt`, plus optional `message`, `dappName`, `dappIcon`, `returnScheme`, `expiresAt` |
+| `ProofRequest` | Request object: `requestId`, `circuit`, `inputs`, `createdAt`, plus optional `message`, `dappName`, `dappIcon`, `returnScheme` (a bare scheme such as `mydapp://`), `expiresAt` |
 | `ProofResponse` | What `verifyResponseOnChain()` takes: `requestId`, `circuit`, `status`, and — when completed — `proof`, `publicInputs`, `verifierAddress`, `chainId`; `error` when it failed. `numPublicInputs` and `timestamp` also exist but the relay never fills them, so omit them. Field by field in [Step 6](#step-6-read-the-result) |
 | `QRCodeOptions` | QR customization: `width`, `margin`, `darkColor`, `lightColor`, `errorCorrectionLevel` |
 | `VerifierContract` | Verifier contract info: `{ address, chainId, abi }` |
@@ -996,12 +1020,12 @@ try {
 
 try {
   await sdk.createRelayRequest('coinbase_attestation', { scope: 'app.com' }, {
-    returnScheme: 'https://myapp.com/done',
+    returnScheme: 'https://myapp.com',
   });
 } catch (err) {
-  // "returnScheme must be a bare custom scheme such as "mydapp://" or an https
-  //  origin such as "https://myapp.com" — paths, query strings and fragments are
-  //  not accepted"  (thrown before any network call)
+  // "returnScheme must be a bare custom scheme such as "mydapp://" — hosts,
+  //  paths, query strings and fragments are not accepted, and an https URL is
+  //  not a return target"  (thrown before any network call)
 }
 
 try {
