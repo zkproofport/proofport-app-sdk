@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.11](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.10...v0.2.11) (2026-08-22)
+
+
+### Features
+
+* **sdk:** pick the return scheme for the caller instead of asking for a URL ([6409f2c](https://github.com/zkproofport/proofport-app-sdk/commit/6409f2c53e338fd85f77045f4de6b395e6fe4db2))
+
 ## [0.2.10](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.9...v0.2.10) (2026-08-22)
 
 
