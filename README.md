@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Supports Coinbase KYC/Country attestations and OIDC domain attestations (Google, Microsoft 365).
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Six circuits are supported: Coinbase KYC and country attestations, OIDC email-domain attestations (Google, Microsoft 365), and the three Korean mobile ID (mDL) circuits.
 
 ## How It Works
 
@@ -21,22 +21,22 @@ TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https
        │  │                                    relay callback
        │  v
        │  ┌──────────────────────────────────────────────────┐
-       │  │  SDK receives result (WebSocket / polling)       │
+       │  │  SDK receives result (WebSocket / polling)        │
        │  │  (proof, publicInputs, status)                    │
        │  └─────────────────────┬────────────────────────────┘
        │                        │
        v                        v
 ┌──────────────┐     ┌──────────────────┐     ┌───────────────────┐
 │  Verify      │────>│  On-chain verify  │────>│  Access granted   │
-│  on-chain    │     │  (Base Mainnet)   │     │  or denied        │
+│  on-chain    │     │  (Base)           │     │  or denied        │
 └──────────────┘     └──────────────────┘     └───────────────────┘
 ```
 
-1. Your app sets a wallet signer and creates a proof request via the SDK
-2. The SDK authenticates with the relay using challenge-signature (EIP-191) and gets a tracked request ID
-3. The SDK displays a QR code (desktop) or opens the deep link (mobile)
-4. The user opens the ZKProofport app, which generates the ZK proof
-5. The proof result flows back through the relay to your app via WebSocket (or polling)
+1. Your app creates a proof request through the SDK
+2. The SDK asks the relay for a one-time challenge and a tracked request ID. For the Coinbase circuits it also signs that challenge with your wallet signer (EIP-191); the OIDC and mDL circuits need no signature
+3. Your app shows the returned deep link as a QR code (desktop) or navigates to it (mobile)
+4. The user opens the ZKProofport app, which generates the ZK proof on-device
+5. The proof result flows back through the relay to your app over WebSocket (HTTP polling as fallback)
 6. Your app verifies the proof on-chain
 
 ## Installation
@@ -51,16 +51,19 @@ npm install @zkproofport-app/sdk
 npm install ethers
 ```
 
+`ethers` v6 is recommended; v5 also works. Real-time delivery uses `socket.io-client`, which ships as a dependency of this package — nothing extra to install.
+
 ## Quick Start
 
 ```typescript
 import { ProofportSDK } from '@zkproofport-app/sdk';
+import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
 import { BrowserProvider } from 'ethers';
 
 // 1. Initialize
 const sdk = ProofportSDK.create();
 
-// 2. Set wallet signer (ethers v6 Signer)
+// 2. Set wallet signer (ethers v6 Signer) — required for the Coinbase circuits
 const provider = new BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
 sdk.setSigner(signer);
@@ -72,31 +75,41 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 
 // 4. Show QR code to user
 const qrDataUrl = await sdk.generateQRCode(relay.deepLink);
-document.getElementById('qr').src = qrDataUrl;
+(document.getElementById('qr') as HTMLImageElement).src = qrDataUrl;
 
 // 5. Wait for proof (WebSocket primary, HTTP polling fallback)
 const result = await sdk.waitForProof(relay.requestId);
 
 if (result.status === 'completed') {
-  // 6. Verify on-chain
-  const verification = await sdk.verifyOnChain(
-    result.circuit,
-    result.proof,
-    result.publicInputs
-  );
+  // 6. Verify on-chain — the relay result carries the verifier to call
+  const response: ProofResponse = {
+    requestId: result.requestId,
+    circuit: result.circuit as CircuitType,
+    status: 'completed',
+    proof: result.proof,
+    publicInputs: result.publicInputs,
+    verifierAddress: result.verifierAddress,
+    chainId: result.chainId,
+  };
+
+  const verification = await sdk.verifyResponseOnChain(response);
   console.log('Valid:', verification.valid);
 }
 ```
 
 ## Supported Circuits
 
+Circuit IDs are canonical and case-sensitive — pass them exactly as written here. `sdk.getSupportedCircuits()` returns the same list at runtime.
+
 ### `coinbase_attestation`
 
-Proves that a user has completed Coinbase KYC identity verification without revealing any personal information.
+Proves that a user has completed Coinbase KYC identity verification without revealing any personal information. Requires a wallet signer.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `scope` | `string` | Yes | Application-specific identifier (e.g., your domain). Ensures proof uniqueness per app. |
+| `userAddress` | `string` | No | Address to prove the attestation for. Omit it and the mobile app asks the user to connect a wallet. |
+| `rawTransaction` | `string` | No | Pre-fetched attestation transaction data. Omit it and the app fetches the attestation itself. |
 
 ```typescript
 const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -106,13 +119,15 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 
 ### `coinbase_country_attestation`
 
-Proves a user's country based on Coinbase verification, supporting inclusion and exclusion checks, without revealing the actual country.
+Proves a user's country based on Coinbase verification, supporting inclusion and exclusion checks, without revealing the actual country. Requires a wallet signer.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `scope` | `string` | Yes | Application-specific identifier |
 | `countryList` | `string[]` | Yes | ISO 3166-1 alpha-2 country codes (e.g., `['US', 'KR']`) |
 | `isIncluded` | `boolean` | Yes | `true` = prove user IS from listed countries; `false` = prove user is NOT |
+| `userAddress` | `string` | No | Address to prove the attestation for (optional, as above) |
+| `rawTransaction` | `string` | No | Pre-fetched attestation transaction data (optional, as above) |
 
 ```typescript
 const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
@@ -124,7 +139,7 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
 
 ### `oidc_domain_attestation`
 
-Prove email domain affiliation via OIDC Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed.
+Prove email domain affiliation via OIDC Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed. No wallet signer is required.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -165,12 +180,12 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 
 ### `mdl_kr_ownership`
 
-Proves the user holds a valid Korean mobile driver's license (모바일 신분증). The license data stays on-device; only the attributes selected by `discloseFlags` are revealed. No wallet signature is required.
+Proves the user holds a valid Korean mobile driver's license (모바일 신분증). The license data stays on-device; only the attributes selected by `discloseFlags` are revealed. No wallet signer is required.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier for proof uniqueness |
-| `discloseFlags` | `number` | No | Attribute disclosure bitmask `0x00`–`0x0F` (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone). Omit or `0` for a fully anonymous ownership proof. |
+| `scope` | `string` | Yes | Application-specific identifier for proof uniqueness. Non-empty, 256 characters or fewer, no control characters. |
+| `discloseFlags` | `number` | No | Attribute disclosure bitmask, integer 0–15 (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone). Omit or `0` for a fully anonymous ownership proof. |
 
 ```typescript
 // Anonymous "holds a valid Korean mobile ID" proof
@@ -181,12 +196,12 @@ const relay = await sdk.createRelayRequest('mdl_kr_ownership', {
 
 ### `mdl_kr_age`
 
-Proves the user is at least `ageThreshold` years old according to their Korean mobile driver's license, without revealing the birth date.
+Proves the user is at least `ageThreshold` years old according to their Korean mobile driver's license, without revealing the birth date. No wallet signer is required.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier |
-| `ageThreshold` | `number` | Yes | Minimum age to prove (integer 1–150, e.g. `19` for Korean adult verification) |
+| `scope` | `string` | Yes | Application-specific identifier (same rules as above) |
+| `ageThreshold` | `number` | Yes | Minimum age to prove — integer between 1 and 150 (e.g. `19` for Korean adult verification) |
 
 ```typescript
 const relay = await sdk.createRelayRequest('mdl_kr_age', {
@@ -197,12 +212,12 @@ const relay = await sdk.createRelayRequest('mdl_kr_age', {
 
 ### `mdl_kr_region`
 
-Proves the user's registered address is in the specified si/do region without revealing the full address.
+Proves the user's registered address is in the specified si/do region without revealing the full address. No wallet signer is required.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier |
-| `targetRegion` | `string` | Yes | Region (si/do) to prove residency in, in Korean (e.g. `'경기도'`, `'서울특별시'`) |
+| `scope` | `string` | Yes | Application-specific identifier (same rules as above) |
+| `targetRegion` | `string` | Yes | Region (si/do) to prove residency in, in Korean (e.g. `'경기도'`, `'서울특별시'`). Non-empty, 256 characters or fewer, no control characters. |
 
 ```typescript
 const relay = await sdk.createRelayRequest('mdl_kr_region', {
@@ -211,7 +226,9 @@ const relay = await sdk.createRelayRequest('mdl_kr_region', {
 });
 ```
 
-> The mDL circuits do not require `setSigner()` — the proof is bound to the license via an on-device nullifier (`nullifier_value` public input), not a wallet address. Use `sdk.extractNullifier(result.publicInputs, result.circuit)` for sybil-resistant user identification.
+> mDL inputs are checked before the request leaves your process: a missing `scope`, an out-of-range `discloseFlags`, a non-integer `ageThreshold` or an empty `targetRegion` throws locally instead of coming back as a relay error.
+
+> The mDL circuits do not require `setSigner()` — the proof is bound to the license via an on-device nullifier (`nullifier_value` public input), not a wallet address. Use `sdk.extractNullifier(publicInputs, circuit)` for sybil-resistant user identification.
 
 ## Integration Guide
 
@@ -223,11 +240,11 @@ import { ProofportSDK } from '@zkproofport-app/sdk';
 const sdk = ProofportSDK.create();
 ```
 
-`ProofportSDK.create()` returns an SDK instance pre-configured with the relay server and verifier contracts. No configuration needed.
+`ProofportSDK.create()` returns an SDK instance pre-configured with the relay server. No configuration needed.
 
 ### Step 2: Set Wallet Signer
 
-The SDK uses challenge-signature authentication (EIP-191). Set a wallet signer that can sign messages:
+The Coinbase circuits (`coinbase_attestation`, `coinbase_country_attestation`) authenticate with a signed challenge (EIP-191). Set a wallet signer that can sign messages:
 
 ```typescript
 import { BrowserProvider } from 'ethers';
@@ -241,14 +258,14 @@ The `WalletSigner` interface requires two methods:
 
 ```typescript
 interface WalletSigner {
-  signMessage(message: string): Promise<string>;
+  signMessage(message: string | Uint8Array): Promise<string>;
   getAddress(): Promise<string>;
 }
 ```
 
 Any ethers v5/v6 `Signer` is compatible.
 
-> **OIDC Domain note:** Wallet signer is not required for OIDC Domain proofs. See Step 3 for OIDC-specific usage.
+> **When you can skip this step:** the OIDC Domain and the three mDL circuits never sign a challenge. Calling `createRelayRequest` for those circuits without a signer works. Calling it for a Coinbase circuit without one throws `Signer not set. Call setSigner() first. Wallet signature is required for this circuit.`
 
 #### About challenge-signature
 
@@ -265,7 +282,7 @@ sdk.setSigner(Wallet.createRandom());
 
 ### Step 3: Create Request (via Relay)
 
-`createRelayRequest` authenticates with the relay (challenge-signature), creates a tracked proof request, and returns a deep link.
+`createRelayRequest` fetches a challenge and request ID from the relay, signs the challenge when the circuit needs it, creates a tracked proof request, and returns a deep link.
 
 ```typescript
 const relay = await sdk.createRelayRequest('coinbase_attestation', {
@@ -275,6 +292,7 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
   dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your identity to continue',
   nonce: 'unique-nonce-123',  // Optional: replay prevention
+  returnScheme: 'mydapp://',  // Optional: mobile-only, see below
 });
 
 // relay.requestId  — Relay-issued UUID
@@ -282,6 +300,51 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 // relay.status     — 'pending'
 // relay.pollUrl    — Relative URL for HTTP polling
 ```
+
+Every field of the third argument is optional: `message`, `dappName` and `dappIcon` are shown to the user in the ZKProofport app, `nonce` is a value of your own choosing that the relay refuses to accept twice, and `returnScheme` is described next.
+
+#### Switching back to your app: `returnScheme`
+
+By default the user stays in the ZKProofport app after generating a proof and switches back to your app themselves. Pass `returnScheme` and the ZKProofport app brings your app to the foreground once the proof has been delivered — the same handoff a wallet performs after a signature.
+
+```typescript
+// Native app: your own registered scheme
+await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+  returnScheme: 'mydapp://',
+});
+
+// Web app: your own origin
+await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+  returnScheme: 'https://myapp.com',
+});
+```
+
+**Only set it in the mobile deep-link flow.** The switch happens on the phone that generated the proof, so it makes sense only when that phone is also where the user started — i.e. when you navigated the browser to `relay.deepLink` on the same device. In the desktop QR flow the user is watching the desktop screen while the proof happens on their phone; opening a page or an app on the phone at that moment surfaces something nobody asked for. Gate it:
+
+```typescript
+const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' },
+  ProofportSDK.isMobile() ? { returnScheme: 'https://myapp.com' } : {});
+```
+
+`returnScheme` is **not** a return address. It says which app to open, nothing more — the proof still reaches you the usual way, through `waitForProof()` / `waitForResult()`, and the ZKProofport app never posts anything to it.
+
+Two shapes are accepted, and nothing else:
+
+| Form | Example | Notes |
+|------|---------|-------|
+| Bare custom scheme | `'mydapp://'` | An RFC 3986 scheme followed by exactly `://` |
+| https origin | `'https://myapp.com'`, `'https://myapp.com:8443'` | Host (and optional port) only |
+
+Anything else throws before the SDK makes a single network call — no challenge is consumed, so nothing is wasted on a typo:
+
+- a path, query string or fragment (`'mydapp://transfer?to=0x...'`, `'https://myapp.com/done'`), which is what keeps a request from driving your app to a specific action
+- an empty or whitespace-containing value, or one longer than 128 characters
+- userinfo (`'https://user:pass@myapp.com'`) and non-ASCII hosts (use punycode)
+- `http://` and other schemes the OS treats specially: `about`, `blob`, `content`, `data`, `facetime`, `facetime-audio`, `file`, `ftp`, `intent`, `javascript`, `jar`, `mailto`, `sms`, `tel`, `vbscript`
+
+The value is matched case-insensitively and stored lowercased by the relay.
+
+Omit `returnScheme` and nothing changes: the request is created without it and the user stays in the ZKProofport app when the proof is done. There is no auto-switch when proof generation fails either — the error has to be read in the ZKProofport app first.
 
 **OIDC Domain Attestation:**
 
@@ -303,7 +366,6 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   provider: 'google',
 }, {
   dappName: 'My DApp',
-  dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your organization membership',
 });
 
@@ -314,7 +376,6 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
   provider: 'microsoft',
 }, {
   dappName: 'My DApp',
-  dappIcon: 'https://myapp.com/icon.png',
   message: 'Verify your organization membership',
 });
 ```
@@ -327,12 +388,14 @@ Generate a QR code from the relay deep link for the user to scan with the ZKProo
 
 ```typescript
 const qrDataUrl = await sdk.generateQRCode(relay.deepLink, {
-  width: 400,
+  width: 400,          // pixels (default: 300)
   darkColor: '#1a1a1a',
   margin: 4,
 });
-document.getElementById('qr').src = qrDataUrl;
+(document.getElementById('qr') as HTMLImageElement).src = qrDataUrl;
 ```
+
+`QRCodeOptions` accepts `width`, `margin`, `darkColor`, `lightColor` and `errorCorrectionLevel` (`'L' | 'M' | 'Q' | 'H'`, default `'M'`).
 
 **Other QR formats:**
 
@@ -343,7 +406,7 @@ const svg = await sdk.generateQRCodeSVG(relay.deepLink);
 // Render to canvas
 await sdk.renderQRCodeToCanvas(canvasElement, relay.deepLink, { width: 400 });
 
-// Check if data fits QR limits
+// Check if data fits QR limits (2953 bytes)
 const { size, withinLimit } = sdk.checkQRCodeSize(relay.deepLink);
 ```
 
@@ -357,7 +420,7 @@ if (ProofportSDK.isMobile()) {
 
 ### Step 5: Wait for Proof
 
-**`waitForProof` (recommended)** — Uses WebSocket (Socket.IO) for instant delivery, with automatic HTTP polling fallback if `socket.io-client` is not installed or connection fails.
+**`waitForProof` (recommended)** — Uses WebSocket (Socket.IO) for instant delivery and falls back to HTTP polling automatically if the socket connection fails.
 
 ```typescript
 const result = await sdk.waitForProof(relay.requestId, {
@@ -367,6 +430,8 @@ const result = await sdk.waitForProof(relay.requestId, {
   },
 });
 ```
+
+`result.status` is `'pending'`, `'completed'` or `'failed'`. On `'failed'`, `result.error` explains why.
 
 **Alternative: Subscribe to real-time updates directly:**
 
@@ -387,7 +452,7 @@ const unsubscribe = await sdk.subscribe(relay.requestId, {
 
 ```typescript
 // Single poll
-const result = await sdk.pollResult(relay.requestId);
+const once = await sdk.pollResult(relay.requestId);
 
 // Poll until terminal state
 const result = await sdk.waitForResult(relay.requestId, {
@@ -397,17 +462,29 @@ const result = await sdk.waitForResult(relay.requestId, {
 });
 ```
 
+When you are done, `sdk.disconnect()` closes any open socket.
+
 ### Step 6: Verify On-Chain
 
 Verify the proof cryptographically by calling the deployed Solidity verifier contract.
 
+The relay result tells you which verifier contract to call (`verifierAddress`, `chainId`), so verification goes through `verifyResponseOnChain`:
+
 ```typescript
+import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
+
 if (result.status === 'completed') {
-  const verification = await sdk.verifyOnChain(
-    result.circuit,
-    result.proof,
-    result.publicInputs
-  );
+  const response: ProofResponse = {
+    requestId: result.requestId,
+    circuit: result.circuit as CircuitType,
+    status: 'completed',
+    proof: result.proof,
+    publicInputs: result.publicInputs,
+    verifierAddress: result.verifierAddress,
+    chainId: result.chainId,
+  };
+
+  const verification = await sdk.verifyResponseOnChain(response);
 
   if (verification.valid) {
     console.log('Proof verified on-chain!');
@@ -417,47 +494,57 @@ if (result.status === 'completed') {
 }
 ```
 
-**Or verify from a `ProofResponse` object:**
+The SDK connects to the right network on its own. Pass your own ethers `Provider` or `Signer` as the second argument if you would rather use your existing connection:
 
 ```typescript
-const verification = await sdk.verifyResponseOnChain(response);
+const verification = await sdk.verifyResponseOnChain(response, myProvider);
 ```
+
+`verifyResponseOnChain` never throws for a bad response: an incomplete one (`status` other than `'completed'`, missing `proof` or `publicInputs`) returns `{ valid: false, error: 'Invalid or incomplete response' }`, and a reverting contract call returns `{ valid: false, error }` with the revert message.
+
+> `sdk.verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` takes the same proof in raw pieces, but those pieces carry no verifier address — it returns `{ valid: false, error: 'No verifier address provided...' }` unless the SDK was constructed with a verifier for that circuit. Prefer `verifyResponseOnChain`.
 
 ### Step 7: Extract Scope, Nullifier, and Domain
 
 After verification, extract data from the public inputs:
 
 ```typescript
-if (result.status === 'completed') {
-  // Extract scope — the keccak256 hash of the scope string you provided
-  const scope = sdk.extractScope(result.publicInputs, result.circuit);
+import type { CircuitType } from '@zkproofport-app/sdk';
+
+if (result.status === 'completed' && result.publicInputs && result.circuit) {
+  const circuit = result.circuit as CircuitType;
+
+  // Extract scope — the bytes32 scope value carried in the public inputs
+  const scope = sdk.extractScope(result.publicInputs, circuit);
 
   // Extract nullifier — a unique, deterministic hash per user + scope
   // Same user with the same scope always produces the same nullifier
-  const nullifier = sdk.extractNullifier(result.publicInputs, result.circuit);
+  const nullifier = sdk.extractNullifier(result.publicInputs, circuit);
 
-  console.log('Scope:', scope);       // '0x7a6b70726f...'
+  console.log('Scope:', scope);         // '0x7a6b70726f...'
   console.log('Nullifier:', nullifier); // '0xabc123...'
 
   // Extract domain — only for OIDC Domain Attestation
-  if (result.circuit === 'oidc_domain_attestation') {
-    const domain = sdk.extractDomain(result.publicInputs, result.circuit);
+  if (circuit === 'oidc_domain_attestation') {
+    const domain = sdk.extractDomain(result.publicInputs, circuit);
     console.log('Domain:', domain); // 'example.com'
   }
 }
 ```
 
+All three return `null` rather than throwing when the public inputs are too short for the circuit's layout.
+
 The **nullifier** serves as a privacy-preserving user identifier:
 - Deterministic: same user + same scope = same nullifier (enables duplicate detection)
-- Privacy-preserving: the wallet address (Coinbase) or email (OIDC) is never revealed
+- Privacy-preserving: the wallet address (Coinbase), the email (OIDC) or the license (mDL) is never revealed
 - Scope-bound: different scopes produce different nullifiers for the same user
 
 > **OIDC Domain:** The nullifier is a hash of the user's email and scope. The same email + scope always produces the same nullifier, enabling Sybil resistance without revealing the email address.
 
 The **domain** (OIDC Domain Attestation only) is the email domain the user proved:
-- Extracted from the circuit's public inputs
+- Decoded from the circuit's public inputs, up to 64 ASCII characters
 - Matches the domain parameter provided during proof request
-- Available only for `oidc_domain_attestation` circuits
+- `extractDomain` returns `null` for every other circuit
 
 **Standalone utility functions** are also available for use outside the SDK class:
 
@@ -468,7 +555,8 @@ import {
   extractDomainFromPublicInputs,
 } from '@zkproofport-app/sdk';
 
-// Works with all circuits: coinbase_attestation, coinbase_country_attestation, oidc_domain_attestation, mdl_kr_ownership, mdl_kr_age, mdl_kr_region
+// Scope and nullifier work for all six circuits — the layout is picked from the
+// circuit id, so always pass it:
 const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
 const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
 
@@ -476,10 +564,15 @@ const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attes
 const oidcScope = extractScopeFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 const oidcNullifier = extractNullifierFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 
+// The three mDL circuits share one layout
+const mdlNullifier = extractNullifierFromPublicInputs(publicInputs, 'mdl_kr_age');
+
 // Extract domain from OIDC Domain Attestation
 const domain = extractDomainFromPublicInputs(publicInputs, 'oidc_domain_attestation');
-// domain: 'example.com' or null if circuit doesn't match or inputs insufficient
+// domain: 'example.com', or null if the circuit doesn't match or inputs are insufficient
 ```
+
+Omitting the circuit argument falls back to the `coinbase_attestation` layout, which is why the examples above always pass it explicitly.
 
 ## Complete Example
 
@@ -487,6 +580,7 @@ End-to-end integration using the relay flow:
 
 ```typescript
 import { ProofportSDK } from '@zkproofport-app/sdk';
+import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
 import { BrowserProvider } from 'ethers';
 
 async function verifyUser() {
@@ -508,30 +602,38 @@ async function verifyUser() {
 
   // Display QR code
   const qrDataUrl = await sdk.generateQRCode(relay.deepLink, { width: 400 });
-  document.getElementById('qr-image').src = qrDataUrl;
-  document.getElementById('status').textContent = 'Scan the QR code with ZKProofport';
+  (document.getElementById('qr-image') as HTMLImageElement).src = qrDataUrl;
+  document.getElementById('status')!.textContent = 'Scan the QR code with ZKProofport';
 
   // Wait for proof result
   const result = await sdk.waitForProof(relay.requestId, {
     onStatusChange: (update) => {
-      document.getElementById('status').textContent = `Status: ${update.status}`;
+      document.getElementById('status')!.textContent = `Status: ${update.status}`;
     },
   });
 
   if (result.status === 'completed') {
     // Verify on-chain
-    const verification = await sdk.verifyOnChain(
-      result.circuit,
-      result.proof,
-      result.publicInputs
-    );
+    const response: ProofResponse = {
+      requestId: result.requestId,
+      circuit: result.circuit as CircuitType,
+      status: 'completed',
+      proof: result.proof,
+      publicInputs: result.publicInputs,
+      verifierAddress: result.verifierAddress,
+      chainId: result.chainId,
+    };
+
+    const verification = await sdk.verifyResponseOnChain(response);
 
     if (verification.valid) {
-      document.getElementById('status').textContent = 'Identity verified!';
+      document.getElementById('status')!.textContent = 'Identity verified!';
       // Grant access to your application
+    } else {
+      document.getElementById('status')!.textContent = `Invalid proof: ${verification.error}`;
     }
   } else {
-    document.getElementById('status').textContent = `Failed: ${result.error}`;
+    document.getElementById('status')!.textContent = `Failed: ${result.error}`;
   }
 
   // Cleanup
@@ -541,11 +643,11 @@ async function verifyUser() {
 
 ## Configuration
 
-`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed — relay URLs, verifier contracts, and chain settings are all built-in.
+`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed — the relay endpoint and the network used for verification are built in.
 
 ## Types Reference
 
-All 15 exported types:
+Types you can import:
 
 ```typescript
 import type {
@@ -554,6 +656,9 @@ import type {
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
   OidcDomainInputs,
+  MdlKrOwnershipInputs,
+  MdlKrAgeInputs,
+  MdlKrRegionInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,
@@ -569,21 +674,24 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitType` | `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation'` |
-| `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` |
-| `CoinbaseKycInputs` | Inputs for `coinbase_attestation` (`{ scope, userAddress?, rawTransaction? }`) |
-| `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation` (`{ scope, countryList, isIncluded, ... }`) |
-| `OidcDomainInputs` | Inputs for `oidc_domain_attestation` (`{ domain, scope, provider? }`) |
-| `CircuitInputs` | Union: `CoinbaseKycInputs \| CoinbaseCountryInputs \| OidcDomainInputs` |
-| `ProofRequest` | Proof request object with `requestId`, `circuit`, `inputs`, metadata, and expiry |
-| `ProofResponse` | Proof response with `status`, `proof`, `publicInputs`, `verifierAddress`, `chainId` |
+| `CircuitType` | `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'` |
+| `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
+| `CoinbaseKycInputs` | Inputs for `coinbase_attestation`: `{ scope, userAddress?, rawTransaction? }` |
+| `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
+| `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
+| `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
+| `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
+| `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
+| `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |
+| `ProofRequest` | Request object: `requestId`, `circuit`, `inputs`, `createdAt`, plus optional `message`, `dappName`, `dappIcon`, `returnScheme`, `expiresAt` |
+| `ProofResponse` | Proof response: `requestId`, `circuit`, `status`, and — when completed — `proof`, `publicInputs`, `numPublicInputs`, `verifierAddress`, `chainId`, `timestamp`; `error` when it failed |
 | `QRCodeOptions` | QR customization: `width`, `margin`, `darkColor`, `lightColor`, `errorCorrectionLevel` |
 | `VerifierContract` | Verifier contract info: `{ address, chainId, abi }` |
-| `ProofportConfig` | SDK configuration (internal use — `ProofportSDK.create()` handles defaults) |
-| `ChallengeResponse` | Challenge from relay: `{ challenge, expiresAt }` |
-| `WalletSigner` | Signer interface: `{ signMessage(msg), getAddress() }` |
-| `RelayProofRequest` | Relay response: `{ requestId, deepLink, status, pollUrl }` |
-| `RelayProofResult` | Relay result: `{ requestId, status, proof?, publicInputs?, circuit?, error? }` |
+| `ProofportConfig` | Constructor configuration — `ProofportSDK.create()` fills it in for you |
+| `ChallengeResponse` | Challenge from the relay: `{ requestId, challenge, expiresAt }` |
+| `WalletSigner` | Signer interface: `{ signMessage(message), getAddress() }` |
+| `RelayProofRequest` | Result of `createRelayRequest()`: `{ requestId, deepLink, status, pollUrl }` |
+| `RelayProofResult` | Result of `waitForProof()` / `waitForResult()` / `pollResult()`: `{ requestId, status: 'pending' \| 'completed' \| 'failed', deepLink?, createdAt?, updatedAt?, proof?, publicInputs?, verifierAddress?, chainId?, circuit?, error? }` |
 
 The `OidcDomainInputs` interface:
 
@@ -595,6 +703,8 @@ interface OidcDomainInputs {
 }
 ```
 
+Note that `RelayProofResult` (what you get back from the relay) and `ProofResponse` (what `verifyResponseOnChain` takes) are different types: the relay result's `status` uses `'failed'`, and its `circuit` is a plain `string`. Step 6 shows the conversion.
+
 ## Public Input Layout Constants
 
 The SDK exports constants defining the field positions in each circuit's public inputs array. These are useful when working with standalone extraction functions or building custom verification logic.
@@ -604,24 +714,25 @@ import {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  MDL_KR_PUBLIC_INPUT_LAYOUT,
 } from '@zkproofport-app/sdk';
 ```
 
-**Coinbase KYC Attestation** (128 fields total):
+**Coinbase KYC Attestation** (128 fields):
 ```typescript
 COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
-  SIGNAL_HASH_START: 0,      // RSA modulus limbs (Coinbase signer)
+  SIGNAL_HASH_START: 0,      // Signal hash
   SIGNAL_HASH_END: 31,
-  MERKLE_ROOT_START: 32,     // Merkle root of signers
+  MERKLE_ROOT_START: 32,     // Merkle root of the attestation signer list
   MERKLE_ROOT_END: 63,
-  SCOPE_START: 64,           // keccak256 hash of scope string
+  SCOPE_START: 64,           // Scope value
   SCOPE_END: 95,
   NULLIFIER_START: 96,       // Unique identifier per user+scope
   NULLIFIER_END: 127,
 }
 ```
 
-**Coinbase Country Attestation** (150 fields total):
+**Coinbase Country Attestation** (150 fields):
 ```typescript
 COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -639,7 +750,7 @@ COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
 }
 ```
 
-**OIDC Domain Attestation** (148 fields total):
+**OIDC Domain Attestation** (148 fields):
 ```typescript
 OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   PUBKEY_MODULUS_START: 0,   // RSA modulus limbs (JWT issuer key)
@@ -647,15 +758,38 @@ OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   DOMAIN_STORAGE_START: 18,  // Domain bytes (up to 64 ASCII characters)
   DOMAIN_STORAGE_END: 81,
   DOMAIN_LEN: 82,            // Domain string length
-  SCOPE_START: 83,           // keccak256 hash of scope string
+  SCOPE_START: 83,           // Scope value
   SCOPE_END: 114,
   NULLIFIER_START: 115,      // Unique identifier per user+scope
   NULLIFIER_END: 146,
   PROVIDER: 147,             // OIDC provider code (0=none, 1=Google, 2=Microsoft)
 
-  // Deprecated aliases (use new names above)
+  // Deprecated aliases (use the names above)
   DOMAIN_START: 18,          // @deprecated Use DOMAIN_STORAGE_START
   DOMAIN_END: 82,            // @deprecated Use DOMAIN_LEN
+}
+```
+
+**Korea Mobile ID (mDL)** — one layout shared by the three mDL circuits. The prefix is identical everywhere; the suffix depends on which predicate the circuit proves (`mdl_kr_ownership` 97 fields, `mdl_kr_age` 66, `mdl_kr_region` 96):
+```typescript
+MDL_KR_PUBLIC_INPUT_LAYOUT = {
+  SCOPE_START: 0,                   // Scope value
+  SCOPE_END: 31,
+  NULLIFIER_START: 32,              // nullifier_value
+  NULLIFIER_END: 63,
+
+  // mdl_kr_ownership only
+  OWNERSHIP_DISCLOSE_FLAGS: 64,
+  OWNERSHIP_OWNER_COMMIT_START: 65,
+  OWNERSHIP_OWNER_COMMIT_END: 96,
+
+  // mdl_kr_age only
+  AGE_THRESHOLD: 64,
+  AGE_CURRENT_YEAR: 65,
+
+  // mdl_kr_region only
+  REGION_CODE_START: 64,
+  REGION_CODE_END: 95,
 }
 ```
 
@@ -663,13 +797,30 @@ OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
 
 ## Error Handling
 
-All async SDK methods throw standard `Error` objects:
+Async SDK methods throw standard `Error` objects. The messages are stable enough to log, not to switch on:
 
 ```typescript
 try {
+  // Coinbase circuit without a signer
   await sdk.createRelayRequest('coinbase_attestation', { scope: 'app.com' });
 } catch (err) {
-  // "Signer not set. Call setSigner() first."
+  // "Signer not set. Call setSigner() first. Wallet signature is required for this circuit."
+}
+
+try {
+  await sdk.createRelayRequest('mdl_kr_age', { scope: 'app.com', ageThreshold: 0 });
+} catch (err) {
+  // "ageThreshold is required and must be an integer between 1 and 150 (circuit: mdl_kr_age)"
+}
+
+try {
+  await sdk.createRelayRequest('coinbase_attestation', { scope: 'app.com' }, {
+    returnScheme: 'https://myapp.com/done',
+  });
+} catch (err) {
+  // "returnScheme must be a bare custom scheme such as "mydapp://" or an https
+  //  origin such as "https://myapp.com" — paths, query strings and fragments are
+  //  not accepted"  (thrown before any network call)
 }
 
 try {
@@ -678,6 +829,10 @@ try {
   // "Waiting for proof timed out after 60000ms"
 }
 ```
+
+A relay rejection surfaces as its message, e.g. `Duplicate nonce (replay detected)` for a reused `nonce`, or `Request not found or expired` from `pollResult()`.
+
+Verification is the exception: `verifyResponseOnChain` and `verifyOnChain` report failures as `{ valid: false, error }` instead of throwing.
 
 ## Networks
 

@@ -220,6 +220,11 @@ export interface ProofRequest {
   dappName?: string;
   /** Optional: DApp icon URL displayed in mobile app UI */
   dappIcon?: string;
+  /**
+   * Optional: which app the ZKProofport app should bring back to the foreground
+   * once it has finished. Not a URL — see {@link ProofportSDK.createRelayRequest}.
+   */
+  returnScheme?: string;
   /** Unix timestamp (ms) when request was created */
   createdAt: number;
   /** Optional: Unix timestamp (ms) when request expires */

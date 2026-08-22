@@ -29,6 +29,7 @@ import {
   parseProofResponseUrl,
   validateProofRequest,
   validateMdlInputs,
+  validateReturnScheme,
   isProofportDeepLink,
 } from './deeplink';
 import {
@@ -1088,9 +1089,29 @@ export class ProofportSDK {
    *
    * @param circuit - Circuit type identifier
    * @param inputs - Circuit-specific inputs
-   * @param options - Request options (message, dappName, dappIcon, nonce)
+   * @param options - Request options (message, dappName, dappIcon, nonce, returnScheme)
+   * @param options.returnScheme - Which app the ZKProofport app should switch back
+   *   to once it has finished. Put **your own** deep link scheme here — the bare
+   *   scheme your app registers, e.g. `'mydapp://'`. A web app can instead pass its
+   *   own https origin, e.g. `'https://myapp.com'`.
+   *
+   *   This is intentionally **not** a URL and not a return address: no path, query
+   *   string or fragment is accepted, and the ZKProofport app never sends the proof
+   *   there. The proof still comes back to you the same way it always did — over the
+   *   relay, via `waitForProof()` / `waitForResult()`. `returnScheme` only answers
+   *   "which app should come back to the foreground", exactly like the
+   *   `redirect.native` value a wallet uses to hand control back after signing.
+   *
+   *   **Omit it and nothing changes** — the user simply stays in the ZKProofport app
+   *   after the proof and switches back manually. There is no auto-switch on proof
+   *   failure either; only on success and on the user declining the request.
+   *
+   *   Rejected with an error before the request is sent: empty or whitespace values,
+   *   anything longer than 128 characters, values containing a path/query/fragment,
+   *   and the `http:`, `file:`, `data:`, `javascript:`, `intent:`, `tel:`, `sms:`,
+   *   `mailto:` families.
    * @returns Promise resolving to RelayProofRequest with requestId, deepLink, pollUrl
-   * @throws Error if signer not set or relay request fails
+   * @throws Error if signer not set, returnScheme is malformed, or the relay request fails
    *
    * @example
    * ```typescript
@@ -1099,7 +1120,7 @@ export class ProofportSDK {
    *
    * const relay = await sdk.createRelayRequest('coinbase_attestation', {
    *   scope: 'myapp.com'
-   * }, { dappName: 'My DApp' });
+   * }, { dappName: 'My DApp', returnScheme: 'mydapp://' });
    *
    * // Generate QR code from relay deep link
    * const qr = await sdk.generateQRCode(relay.deepLink);
@@ -1122,6 +1143,7 @@ export class ProofportSDK {
       dappName?: string;
       dappIcon?: string;
       nonce?: string;
+      returnScheme?: string;
     } = {}
   ): Promise<RelayProofRequest> {
     if (!this.relayUrl) {
@@ -1140,6 +1162,15 @@ export class ProofportSDK {
       const mdlError = validateMdlInputs(circuit, inputs);
       if (mdlError) {
         throw new Error(`${mdlError} (circuit: ${circuit})`);
+      }
+    }
+
+    // Return target: validated before we burn a challenge, so a typo surfaces
+    // as a local error instead of a relay 400 on the second round trip.
+    if (options.returnScheme !== undefined) {
+      const returnSchemeError = validateReturnScheme(options.returnScheme);
+      if (returnSchemeError) {
+        throw new Error(returnSchemeError);
       }
     }
 
@@ -1162,6 +1193,7 @@ export class ProofportSDK {
     if (options.dappName) body.dappName = options.dappName;
     if (options.dappIcon) body.dappIcon = options.dappIcon;
     if (options.nonce) body.nonce = options.nonce;
+    if (options.returnScheme) body.returnScheme = options.returnScheme;
 
     const response = await fetch(`${this.relayUrl}/api/v1/proof/request`, {
       method: 'POST',

@@ -451,6 +451,81 @@ export function validateMdlInputs(
   return null;
 }
 
+/**
+ * Longest accepted `returnScheme` value.
+ * Kept in sync with proofport-relay `src/returnScheme.ts`.
+ */
+export const MAX_RETURN_SCHEME_LENGTH = 128;
+
+/** RFC 3986 scheme (`ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`) followed by exactly `://`. */
+const BARE_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\/$/;
+
+/** `https://host[:port]` with no userinfo, path, query or fragment. */
+const HTTPS_ORIGIN_RE =
+  /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$/;
+
+const DENIED_RETURN_SCHEMES = new Set([
+  'about',
+  'blob',
+  'content',
+  'data',
+  'facetime',
+  'facetime-audio',
+  'file',
+  'ftp',
+  'http',
+  'intent',
+  'javascript',
+  'jar',
+  'mailto',
+  'sms',
+  'tel',
+  'vbscript',
+]);
+
+/**
+ * Validates a `returnScheme` before it is sent to the relay, so a malformed
+ * value fails fast in the integrator's own code instead of coming back as a
+ * relay 400. The relay re-validates and is the authority.
+ *
+ * @param value - Candidate return target
+ * @returns `null` when acceptable, otherwise a human-readable error message
+ *
+ * @internal
+ */
+export function validateReturnScheme(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return 'returnScheme must be a string';
+  }
+  if (value.length === 0) {
+    return 'returnScheme must not be empty';
+  }
+  // Length is checked before any regex so a huge string never reaches the matcher.
+  if (value.length > MAX_RETURN_SCHEME_LENGTH) {
+    return `returnScheme must be at most ${MAX_RETURN_SCHEME_LENGTH} characters`;
+  }
+  if (/\s/.test(value)) {
+    return 'returnScheme must not contain whitespace';
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (HTTPS_ORIGIN_RE.test(normalized)) {
+    return null;
+  }
+
+  if (!BARE_SCHEME_RE.test(normalized)) {
+    return 'returnScheme must be a bare custom scheme such as "mydapp://" or an https origin such as "https://myapp.com" — paths, query strings and fragments are not accepted';
+  }
+
+  const schemeName = normalized.slice(0, normalized.indexOf(':'));
+  if (DENIED_RETURN_SCHEMES.has(schemeName)) {
+    return `returnScheme "${schemeName}" is not allowed`;
+  }
+
+  return null;
+}
+
 export function validateProofRequest(request: ProofRequest): { valid: boolean; error?: string } {
   if (!request.requestId) {
     return { valid: false, error: 'Missing requestId' };
