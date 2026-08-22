@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.8...v0.2.9) (2026-08-22)
+
+
+### Features
+
+* **sdk:** pass returnScheme through, and refresh the README against the source ([33bb9a1](https://github.com/zkproofport/proofport-app-sdk/commit/33bb9a1d1cc46d80f1f438601b65a2726ed90588))
+
 ## [0.2.8](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.7...v0.2.8) (2026-07-24)
 
 
