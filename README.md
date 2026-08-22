@@ -37,7 +37,7 @@ TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https
 3. Your app shows the returned deep link as a QR code (desktop) or navigates to it (mobile)
 4. The user opens the ZKProofport app, which generates the ZK proof on-device
 5. The proof result flows back through the relay to your app over WebSocket (HTTP polling as fallback)
-6. Your app verifies the proof on-chain
+6. Your app verifies the proof on-chain, then reads its public inputs to confirm it answers the question that was asked
 
 ## Installation
 
@@ -269,9 +269,9 @@ Any ethers v5/v6 `Signer` is compatible.
 
 #### About challenge-signature
 
-The challenge-signature mechanism was developed **for relay nonce replay prevention**. Each challenge is one-time use and consumed immediately. The signer's recovered address is recorded as `clientId` in relay server logs, which helps the relay operator track requests.
+The challenge-signature mechanism exists **for replay prevention**. Each challenge is one-time use and is consumed immediately. The relay recovers the signer's address from the signature and logs it; the address is not fed into the circuit, and it does not have to be the address that holds the attestation — the mobile app decides that, from `userAddress` or from the wallet the user connects.
 
-For server-side or headless environments, using an ephemeral random wallet is fine. A persistent wallet (fixed private key) is **not recommended** as it adds unnecessary key management overhead with no functional benefit.
+So for server-side or headless environments an ephemeral random wallet is fine. A persistent wallet (fixed private key) is **not recommended**: it adds key management for no functional benefit.
 
 ```typescript
 import { Wallet } from 'ethers';
@@ -350,7 +350,7 @@ Omit `returnScheme` and nothing changes: the request is created without it and t
 
 ```typescript
 // Email domain verification
-const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+const relayDomain = await sdk.createRelayRequest('oidc_domain_attestation', {
   domain: 'company.com',
   scope: 'myapp.com',
 }, {
@@ -360,7 +360,7 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 });
 
 // Organization membership verification (Google Workspace)
-const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+const relayGoogle = await sdk.createRelayRequest('oidc_domain_attestation', {
   domain: 'company.com',
   scope: 'myapp.com',
   provider: 'google',
@@ -370,7 +370,7 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 });
 
 // Organization membership verification (Microsoft 365)
-const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
+const relayMicrosoft = await sdk.createRelayRequest('oidc_domain_attestation', {
   domain: 'company.com',
   scope: 'myapp.com',
   provider: 'microsoft',
@@ -390,12 +390,12 @@ Generate a QR code from the relay deep link for the user to scan with the ZKProo
 const qrDataUrl = await sdk.generateQRCode(relay.deepLink, {
   width: 400,          // pixels (default: 300)
   darkColor: '#1a1a1a',
-  margin: 4,
+  margin: 4,           // quiet zone in modules (default: 2)
 });
 (document.getElementById('qr') as HTMLImageElement).src = qrDataUrl;
 ```
 
-`QRCodeOptions` accepts `width`, `margin`, `darkColor`, `lightColor` and `errorCorrectionLevel` (`'L' | 'M' | 'Q' | 'H'`, default `'M'`).
+`QRCodeOptions` accepts `width` (default `300`), `margin` (default `2`), `darkColor` (default `'#000000'`), `lightColor` (default `'#ffffff'`) and `errorCorrectionLevel` (`'L' | 'M' | 'Q' | 'H'`, default `'M'`).
 
 **Other QR formats:**
 
@@ -409,6 +409,8 @@ await sdk.renderQRCodeToCanvas(canvasElement, relay.deepLink, { width: 400 });
 // Check if data fits QR limits (2953 bytes)
 const { size, withinLimit } = sdk.checkQRCodeSize(relay.deepLink);
 ```
+
+All three generators throw `QR code data too large (… bytes). Maximum is 2953 bytes.` rather than emitting an unscannable image. Relay deep links are far below that; the check matters if you build your own link.
 
 **Mobile:** On mobile browsers, redirect directly to the deep link instead of showing a QR code:
 
@@ -431,7 +433,7 @@ const result = await sdk.waitForProof(relay.requestId, {
 });
 ```
 
-`result.status` is `'pending'`, `'completed'` or `'failed'`. On `'failed'`, `result.error` explains why.
+`waitForProof` settles once the request reaches a terminal state. Step 6 walks through the object it hands back, field by field, and through the states that are not terminal.
 
 **Alternative: Subscribe to real-time updates directly:**
 
@@ -464,11 +466,119 @@ const result = await sdk.waitForResult(relay.requestId, {
 
 When you are done, `sdk.disconnect()` closes any open socket.
 
-### Step 6: Verify On-Chain
+### Step 6: Read the Result
+
+`waitForProof()`, `waitForResult()` and `pollResult()` all hand back the same object, a `RelayProofResult`. A completed one looks like this (long values elided):
+
+```typescript
+{
+  requestId: '9f1c8a02-4e2b-4f0a-9c3e-1d5a7b0e2f44',
+  status: 'completed',
+  circuit: 'coinbase_attestation',
+  proof: '0x1f8b0a…',                       // proof bytes, opaque
+  publicInputs: ['0x00…2f', '0x00…a1', …],  // ordered — 128 entries for this circuit
+  verifierAddress: '0x…',                   // contract that can check this proof
+  chainId: …,                               // network that contract lives on
+  deepLink: 'zkproofport://proof-request?data=…',
+  createdAt: '2026-02-07T09:14:02.101Z',
+  updatedAt: '2026-02-07T09:14:48.902Z',
+}
+```
+
+| Field | Type | Present when | What it is |
+|-------|------|--------------|------------|
+| `requestId` | `string` | always | The relay-issued id you waited on. Echoed back so one handler can serve many requests. |
+| `status` | `string` | always | Lifecycle state — see below. |
+| `circuit` | `string` | terminal results | Which circuit produced the proof, as reported by the mobile app. You need it to read `publicInputs`, because the layout is per circuit. Undefined while the request is still pending. |
+| `proof` | `string` | `'completed'` | The proof bytes as a `0x` hex string. Opaque: the only thing to do with it is hand it to a verifier. |
+| `publicInputs` | `string[]` | `'completed'` | The circuit's public inputs **in circuit order**. This is the part that carries meaning — what each index holds is in [Public Input Layout Constants](#public-input-layout-constants). |
+| `verifierAddress` | `string` | `'completed'` | Address of the Solidity verifier contract that can check this exact proof. It comes from the mobile app — forward it, do not hardcode one. |
+| `chainId` | `number` | `'completed'` | The chain that `verifierAddress` lives on. Same rule: forward it. |
+| `error` | `string` | failures | Human-readable reason from the mobile app or the relay. |
+| `deepLink` | `string` | polling path only | The deep link the request was created with. |
+| `createdAt`, `updatedAt` | `string` | polling path only | ISO timestamps of creation and last update. |
+
+The last three come from the relay's polling endpoint. `waitForProof()` normally resolves over the WebSocket, whose payload does not carry them, so do not build logic on their presence.
+
+#### What `status` can be
+
+| `status` | Terminal | What happened | What you do |
+|----------|----------|---------------|-------------|
+| `'pending'` | no | The request exists; no proof yet | Keep waiting — `waitForProof()` does that for you |
+| `'completed'` | yes | A proof came back | `proof`, `publicInputs`, `verifierAddress` and `chainId` are set. Verify it (Step 7) before trusting anything in it |
+| `'error'` | yes | The app could not produce a proof — no attestation on that address, sign-in refused, generation failed | Read `error`, show it, let the user start over |
+| `'failed'` | yes | Same meaning and same handling as `'error'` | Handle the pair; the type declares `'failed'`, the app sends `'error'` |
+| `'cancelled'` | see below | The user declined the request in the ZKProofport app | Reset your UI |
+
+`RelayProofResult` declares `status` as `'pending' | 'completed' | 'failed'`, which is narrower than what the relay can deliver, so TypeScript rejects a direct comparison against `'error'`. Widen it once and branch on the string:
+
+```typescript
+const status: string = result.status;
+
+if (status === 'completed') {
+  // verify it
+} else if (status === 'error' || status === 'failed') {
+  showError(result.error ?? 'Proof generation failed');
+}
+```
+
+`waitForProof()` settles on `'completed'`, `'error'` and `'failed'`. It does **not** settle on `'cancelled'` — a cancellation arrives as a status update, and if you ignore it the call sits there until `timeoutMs` expires. Watch for it if you want to drop the QR dialog the moment the user says no:
+
+```typescript
+const result = await sdk.waitForProof(relay.requestId, {
+  onStatusChange: (update) => {
+    if (update.status === 'cancelled') {
+      // The user declined in the app. This promise will not settle on its own.
+      hideQrDialog();
+    }
+  },
+});
+```
+
+`waitForResult()`, the polling path, is narrower still: it returns only on `'completed'` and `'failed'`, and keeps polling through `'error'` and `'cancelled'` until `timeoutMs`. Prefer `waitForProof()`, or drive `pollResult()` in a loop of your own if you want to decide what counts as terminal.
+
+#### What is not on the result
+
+- **No `nullifier` field.** The nullifier is inside `publicInputs`. Read it with `sdk.extractNullifier()` — Step 8.
+- **No `numPublicInputs` field.** It is `publicInputs.length`.
+- **A `'completed'` result can arrive with `proof` and `publicInputs` missing.** That means the relay's buffered copy of the result has expired — results are kept for a short window only. There is nothing left to fetch for that `requestId`; the user has to make a new request.
+
+#### Retry, or show the user?
+
+| Situation | Retry automatically | Show the user |
+|-----------|--------------------|----------------|
+| `createRelayRequest()` throws `Too many requests. Please try again later.` | Yes, with backoff | No |
+| Network failure reaching the relay | Yes | No |
+| `pollResult()` throws `Request not found or expired` | No — that id is gone | Yes, ask them to start again |
+| `status: 'error'` / `'failed'` | No — a retry re-runs the same failing thing | Yes: `error` says what went wrong, and it is usually the user's move (connect the right wallet, sign in, use the device holding the licence) |
+| `status: 'cancelled'` | No | Nothing to say — they just declined |
+| `waitForProof()` timeout | Only if the user asks for it | Yes |
+| `verifyResponseOnChain()` returns `{ valid: false }` | No | Treat it as a rejected proof, not an outage — Step 7 |
+
+#### `ProofResponse` — the shape on-chain verification takes
+
+`verifyResponseOnChain()` does not take the relay result directly. It takes a `ProofResponse`, which you build from it:
+
+| `ProofResponse` field | Type | Required | Where it comes from |
+|-----------------------|------|----------|---------------------|
+| `requestId` | `string` | Yes | `result.requestId` |
+| `circuit` | `CircuitType` | Yes | `result.circuit`, narrowed — the relay types it as a plain `string` |
+| `status` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` | Yes | `'completed'`. Anything else and verification returns `{ valid: false, error: 'Invalid or incomplete response' }` without touching the chain. Note the relay says `'failed'` where this type says `'error'` |
+| `proof` | `string` | When completed | `result.proof` |
+| `publicInputs` | `string[]` | When completed | `result.publicInputs` |
+| `verifierAddress` | `string` | When completed | `result.verifierAddress`. Without it there is no contract to call and verification fails with `No verifier address provided…` |
+| `chainId` | `number` | When completed | `result.chainId`. Used to pick a network when you pass no provider of your own |
+| `numPublicInputs` | `number` | No | Never delivered by the relay, and never read during verification — `publicInputs.length` is used instead. Omit it |
+| `timestamp` | `number` | No | Not delivered by the relay. Omit it |
+| `error` | `string` | On failure | `result.error`. Carried for your own logging; verification ignores it |
+
+There is no `nullifier` field here either.
+
+### Step 7: Verify On-Chain
 
 Verify the proof cryptographically by calling the deployed Solidity verifier contract.
 
-The relay result tells you which verifier contract to call (`verifierAddress`, `chainId`), so verification goes through `verifyResponseOnChain`:
+The relay result tells you which contract to call (`verifierAddress`) and on which chain (`chainId`), so verification goes through `verifyResponseOnChain`, which reads both off the response:
 
 ```typescript
 import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
@@ -500,13 +610,17 @@ The SDK connects to the right network on its own. Pass your own ethers `Provider
 const verification = await sdk.verifyResponseOnChain(response, myProvider);
 ```
 
-`verifyResponseOnChain` never throws for a bad response: an incomplete one (`status` other than `'completed'`, missing `proof` or `publicInputs`) returns `{ valid: false, error: 'Invalid or incomplete response' }`, and a reverting contract call returns `{ valid: false, error }` with the revert message.
+`verifyResponseOnChain` reports failures instead of throwing them. An incomplete response (`status` other than `'completed'`, or a missing `proof` / `publicInputs`) returns `{ valid: false, error: 'Invalid or incomplete response' }` without making a network call; a missing `verifierAddress` returns `{ valid: false, error: 'No verifier address provided…' }`; and a reverting contract call returns `{ valid: false, error }` carrying the revert message. It does throw in one case: a response carrying a `chainId` the SDK has no built-in endpoint for, when you passed no provider of your own. Pass your own provider if you ever hit that.
 
-> `sdk.verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` takes the same proof in raw pieces, but those pieces carry no verifier address — it returns `{ valid: false, error: 'No verifier address provided...' }` unless the SDK was constructed with a verifier for that circuit. Prefer `verifyResponseOnChain`.
+`valid: true` means the verifier contract accepted the proof: it is a real proof for that circuit, and its public inputs are the ones it was proved against. It does **not** yet mean the proof answers *your* question — that it was bound to your scope, or that the domain or country in it is the one you asked for. Those live in the public inputs, and reading them is Step 8. `valid: false` is a rejected proof, not an outage: do not retry it, refuse the user.
 
-### Step 7: Extract Scope, Nullifier, and Domain
+> **Why not `verifyOnChain`?** `sdk.verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` takes the same proof in raw pieces. Those pieces carry no verifier address, and it never looks at a response for one — it consults only the `verifiers` map the SDK was constructed with, which `ProofportSDK.create()` leaves empty. Out of the box it therefore returns `{ valid: false, error: 'No verifier address provided. Configure via SDK or ensure proof response includes verifierAddress.' }`. Use `verifyResponseOnChain`.
 
-After verification, extract data from the public inputs:
+### Step 8: Extract Scope, Nullifier, and Domain
+
+A verified proof tells you the public inputs are genuine. It does not tell you what they say. Reading them is a separate step, and it is the step that decides whether the proof answers the question you asked.
+
+Do it **after** `verifyResponseOnChain()` returns `valid: true`. These helpers are plain parsers — they will happily decode an array that no verifier has ever seen.
 
 ```typescript
 import type { CircuitType } from '@zkproofport-app/sdk';
@@ -532,19 +646,65 @@ if (result.status === 'completed' && result.publicInputs && result.circuit) {
 }
 ```
 
-All three return `null` rather than throwing when the public inputs are too short for the circuit's layout.
+All three return `null` rather than throwing when the public inputs are too short for the circuit's layout. Pass the wrong circuit id and you get no error at all, just the wrong 32 entries decoded into a plausible-looking value — always pass the `circuit` the result came with.
 
-The **nullifier** serves as a privacy-preserving user identifier:
-- Deterministic: same user + same scope = same nullifier (enables duplicate detection)
-- Privacy-preserving: the wallet address (Coinbase), the email (OIDC) or the license (mDL) is never revealed
-- Scope-bound: different scopes produce different nullifiers for the same user
+#### Check the scope
+
+Every circuit publishes `scope` as `keccak256` of the scope string you sent. Comparing it is how you find out that the proof was made for *your* request and not replayed from someone else's app:
+
+```typescript
+import { keccak256, toUtf8Bytes } from 'ethers';
+
+const expectedScope = keccak256(toUtf8Bytes('myapp.com'));
+
+if (sdk.extractScope(publicInputs, circuit) !== expectedScope) {
+  throw new Error('Proof was generated for a different scope');
+}
+```
+
+#### Use the nullifier
+
+The nullifier is a deterministic hash over the user's credential and the scope:
+
+- **Deterministic** — same user, same scope, same nullifier, every time. That is what makes duplicate detection possible.
+- **Privacy-preserving** — the wallet address (Coinbase), the email (OIDC) and the licence (mDL) stay hidden. There is no way back from the nullifier to the person.
+- **Scope-bound** — the same user proving to a different scope produces an unrelated nullifier, so your users cannot be correlated across apps.
+
+On your side, it is the primary key of a verified user. Store it once verification succeeds, with a unique constraint, and check it before granting anything:
+
+```typescript
+const nullifier = sdk.extractNullifier(publicInputs, circuit);
+if (!nullifier) throw new Error('Public inputs too short for this circuit');
+
+// One claim per user, forever: the insert is the double-proof check.
+const inserted = await db.verifiedUsers.insertIfAbsent({
+  nullifier,          // '0xabc123…'
+  circuit,
+  claimedAt: new Date(),
+});
+
+if (!inserted) {
+  // This credential has already been used for this scope.
+  throw new Error('Already claimed');
+}
+```
+
+Keep the scope you used fixed for the lifetime of that record. Change the scope string and every returning user looks brand new, because every nullifier changes with it.
 
 > **OIDC Domain:** The nullifier is a hash of the user's email and scope. The same email + scope always produces the same nullifier, enabling Sybil resistance without revealing the email address.
 
-The **domain** (OIDC Domain Attestation only) is the email domain the user proved:
-- Decoded from the circuit's public inputs, up to 64 ASCII characters
-- Matches the domain parameter provided during proof request
-- `extractDomain` returns `null` for every other circuit
+#### Check the domain
+
+`extractDomain()` (OIDC Domain Attestation only) returns the email domain the proof was made for, decoded from the public inputs — up to 64 ASCII characters. It returns `null` for every other circuit.
+
+The circuit binds it to the signed token: the part of the email after `@` has to equal this domain, exactly, to the end of the address. What the circuit does not decide is *which* domain — the prover picks it. So compare it with what you asked for:
+
+```typescript
+const domain = sdk.extractDomain(publicInputs, 'oidc_domain_attestation');
+if (domain !== 'company.com') {
+  throw new Error(`Proof is for ${domain}, not company.com`);
+}
+```
 
 **Standalone utility functions** are also available for use outside the SDK class:
 
@@ -581,7 +741,9 @@ End-to-end integration using the relay flow:
 ```typescript
 import { ProofportSDK } from '@zkproofport-app/sdk';
 import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
-import { BrowserProvider } from 'ethers';
+import { BrowserProvider, keccak256, toUtf8Bytes } from 'ethers';
+
+const SCOPE = 'myapp.com';
 
 async function verifyUser() {
   // Initialize
@@ -594,7 +756,7 @@ async function verifyUser() {
 
   // Create proof request via relay
   const relay = await sdk.createRelayRequest('coinbase_attestation', {
-    scope: 'myapp.com',
+    scope: SCOPE,
   }, {
     dappName: 'My DApp',
     message: 'Verify your identity',
@@ -613,25 +775,40 @@ async function verifyUser() {
   });
 
   if (result.status === 'completed') {
+    const circuit = result.circuit as CircuitType;
+    const publicInputs = result.publicInputs ?? [];
+
     // Verify on-chain
     const response: ProofResponse = {
       requestId: result.requestId,
-      circuit: result.circuit as CircuitType,
+      circuit,
       status: 'completed',
       proof: result.proof,
-      publicInputs: result.publicInputs,
+      publicInputs,
       verifierAddress: result.verifierAddress,
       chainId: result.chainId,
     };
 
     const verification = await sdk.verifyResponseOnChain(response);
 
-    if (verification.valid) {
-      document.getElementById('status')!.textContent = 'Identity verified!';
-      // Grant access to your application
-    } else {
+    if (!verification.valid) {
       document.getElementById('status')!.textContent = `Invalid proof: ${verification.error}`;
+      sdk.disconnect();
+      return;
     }
+
+    // A real proof is not yet a proof of what you asked: check the scope.
+    if (sdk.extractScope(publicInputs, circuit) !== keccak256(toUtf8Bytes(SCOPE))) {
+      document.getElementById('status')!.textContent = 'Proof was made for another scope';
+      sdk.disconnect();
+      return;
+    }
+
+    // Key the user on the nullifier — same person + same scope, same value
+    const nullifier = sdk.extractNullifier(publicInputs, circuit);
+    document.getElementById('status')!.textContent = 'Identity verified!';
+    console.log('Verified user:', nullifier);
+    // Grant access to your application
   } else {
     document.getElementById('status')!.textContent = `Failed: ${result.error}`;
   }
@@ -643,7 +820,7 @@ async function verifyUser() {
 
 ## Configuration
 
-`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed — the relay endpoint and the network used for verification are built in.
+`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed: the relay endpoint is built in, and the verifier contract and network to check a proof against arrive with the proof itself (`verifierAddress`, `chainId`).
 
 ## Types Reference
 
@@ -684,14 +861,14 @@ import type {
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |
 | `ProofRequest` | Request object: `requestId`, `circuit`, `inputs`, `createdAt`, plus optional `message`, `dappName`, `dappIcon`, `returnScheme`, `expiresAt` |
-| `ProofResponse` | Proof response: `requestId`, `circuit`, `status`, and — when completed — `proof`, `publicInputs`, `numPublicInputs`, `verifierAddress`, `chainId`, `timestamp`; `error` when it failed |
+| `ProofResponse` | What `verifyResponseOnChain()` takes: `requestId`, `circuit`, `status`, and — when completed — `proof`, `publicInputs`, `verifierAddress`, `chainId`; `error` when it failed. `numPublicInputs` and `timestamp` also exist but the relay never fills them, so omit them. Field by field in [Step 6](#step-6-read-the-result) |
 | `QRCodeOptions` | QR customization: `width`, `margin`, `darkColor`, `lightColor`, `errorCorrectionLevel` |
 | `VerifierContract` | Verifier contract info: `{ address, chainId, abi }` |
 | `ProofportConfig` | Constructor configuration — `ProofportSDK.create()` fills it in for you |
 | `ChallengeResponse` | Challenge from the relay: `{ requestId, challenge, expiresAt }` |
 | `WalletSigner` | Signer interface: `{ signMessage(message), getAddress() }` |
 | `RelayProofRequest` | Result of `createRelayRequest()`: `{ requestId, deepLink, status, pollUrl }` |
-| `RelayProofResult` | Result of `waitForProof()` / `waitForResult()` / `pollResult()`: `{ requestId, status: 'pending' \| 'completed' \| 'failed', deepLink?, createdAt?, updatedAt?, proof?, publicInputs?, verifierAddress?, chainId?, circuit?, error? }` |
+| `RelayProofResult` | Result of `waitForProof()` / `waitForResult()` / `pollResult()`: `{ requestId, status, deepLink?, createdAt?, updatedAt?, proof?, publicInputs?, verifierAddress?, chainId?, circuit?, error? }`. `status` is declared as `'pending' \| 'completed' \| 'failed'` but the relay also delivers `'error'` and `'cancelled'` — [Step 6](#step-6-read-the-result) |
 
 The `OidcDomainInputs` interface:
 
@@ -703,11 +880,11 @@ interface OidcDomainInputs {
 }
 ```
 
-Note that `RelayProofResult` (what you get back from the relay) and `ProofResponse` (what `verifyResponseOnChain` takes) are different types: the relay result's `status` uses `'failed'`, and its `circuit` is a plain `string`. Step 6 shows the conversion.
+Note that `RelayProofResult` (what you get back from the relay) and `ProofResponse` (what `verifyResponseOnChain` takes) are different types: the relay result's `status` uses `'failed'`, and its `circuit` is a plain `string`. Step 6 shows both shapes side by side and Step 7 does the conversion.
 
 ## Public Input Layout Constants
 
-The SDK exports constants defining the field positions in each circuit's public inputs array. These are useful when working with standalone extraction functions or building custom verification logic.
+`publicInputs` is an **ordered array whose layout is fixed by the circuit**. Index 64 in one circuit has nothing to do with index 64 in another. Reading it with the wrong layout does not fail loudly — it returns a well-formed value that means something else, which is how a proof ends up verifying a claim nobody asked for. Prefer `sdk.extractScope()` / `extractNullifier()` / `extractDomain()`, and reach for these constants only for the fields those do not cover.
 
 ```typescript
 import {
@@ -718,82 +895,86 @@ import {
 } from '@zkproofport-app/sdk';
 ```
 
-**Coinbase KYC Attestation** (128 fields):
+Two rules hold for every table below:
+
+- **Every number is an index into `publicInputs`, and `_END` is inclusive.** Slice with `slice(START, END + 1)`.
+- **One entry is one field element, not one 32-byte value.** A `bytes32` such as a scope or a nullifier is spread over 32 consecutive entries, each holding a single byte in its low byte: `publicInputs[64] === '0x00…2f'` is the byte `0x2f`. Rebuild it by concatenating those 32 low bytes. The one exception is the OIDC RSA modulus, whose 18 entries each hold a 128-bit limb.
+
 ```typescript
-COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
-  SIGNAL_HASH_START: 0,      // Signal hash
-  SIGNAL_HASH_END: 31,
-  MERKLE_ROOT_START: 32,     // Merkle root of the attestation signer list
-  MERKLE_ROOT_END: 63,
-  SCOPE_START: 64,           // Scope value
-  SCOPE_END: 95,
-  NULLIFIER_START: 96,       // Unique identifier per user+scope
-  NULLIFIER_END: 127,
-}
+const L = COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT;
+
+// Rebuild a bytes32 value from 32 single-byte entries.
+const toBytes32 = (fields: string[]): string =>
+  '0x' + fields.map((f) => (BigInt(f) & 0xffn).toString(16).padStart(2, '0')).join('');
+
+const signalHash = toBytes32(publicInputs.slice(L.SIGNAL_HASH_START, L.SIGNAL_HASH_END + 1));
 ```
 
-**Coinbase Country Attestation** (150 fields):
+### `coinbase_attestation` — 128 entries
+
+| Index | Constants | Circuit field | What it is |
+|-------|-----------|---------------|------------|
+| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge for the request |
+| 32–63 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` root of the Coinbase attestation-signer list the proof was checked against |
+| 64–95 | `SCOPE_START` / `_END` | `scope` | `bytes32` — `keccak256` of your scope string. Compare it (Step 8) |
+| 96–127 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per user and scope |
+
+### `coinbase_country_attestation` — 150 entries
+
+| Index | Constants | Circuit field | What it is |
+|-------|-----------|---------------|------------|
+| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge |
+| 32–63 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` signer-list root |
+| 64–83 | `COUNTRY_LIST_START` / `_END` | `country_list` | 10 slots of 2 ASCII bytes, one byte per entry — entries 64–65 are the first code, 66–67 the second, and so on, in the order you sent them. Only the first `country_list_length` slots are meaningful; the rest are zero |
+| 84 | `COUNTRY_LIST_LENGTH` | `country_list_length` | How many of those 10 slots count |
+| 85 | `IS_INCLUDED` | `is_included` | `1` = the user **is** in the list, `0` = the user is **not** |
+| 86–117 | `SCOPE_START` / `_END` | `scope` | `bytes32` scope hash |
+| 118–149 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per user and scope |
+
+The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. Read indices 64–85 back and confirm they are the list and the direction you asked for; a valid proof against a different list is still a valid proof.
+
+### `oidc_domain_attestation` — 148 entries
+
+| Index | Constants | Circuit field | What it is |
+|-------|-----------|---------------|------------|
+| 0–17 | `PUBKEY_MODULUS_START` / `_END` | `pubkey_modulus_limbs` | The RSA modulus of the OIDC issuer's signing key, as 18 × 128-bit limbs. Not single bytes |
+| 18–81 | `DOMAIN_STORAGE_START` / `_END` | `domain` storage | The domain as ASCII, one byte per entry. Entries past the length at index 82 are zero |
+| 82 | `DOMAIN_LEN` | `domain` length | How many of those 64 bytes are the domain. `extractDomain()` does this decoding for you |
+| 83–114 | `SCOPE_START` / `_END` | `scope` | `bytes32` scope hash |
+| 115–146 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32` over the user's email and the scope |
+| 147 | `PROVIDER` | `provider` | `0` = Google, `1` = Microsoft. The circuit accepts no other value |
+
+`DOMAIN_START` and `DOMAIN_END` are kept as deprecated aliases of `DOMAIN_STORAGE_START` and `DOMAIN_LEN`. Use the current names — the old pair reads as a range and is not one.
+
+Index 147 tells you which issuer signed the token, not whether the account belongs to an organisation. Workspace and Microsoft 365 membership is checked on-device only when you set `provider` in the request; if you did not set it, do not read a membership guarantee out of this field.
+
+### Korea Mobile ID (mDL) — one layout, three circuits
+
+All three mDL circuits share the same first 64 entries and differ after that. Entries are single bytes, except `age_threshold` and `current_year`, which each hold their whole value in one entry.
+
+| Index | Constants | Circuit field | Applies to |
+|-------|-----------|---------------|------------|
+| 0–31 | `SCOPE_START` / `_END` | `scope` | all three |
+| 32–63 | `NULLIFIER_START` / `_END` | `nullifier_value` | all three |
+| 64 | `OWNERSHIP_DISCLOSE_FLAGS` | `disclose_flags` | `mdl_kr_ownership` (97 entries) — the bitmask that was actually proved (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone) |
+| 65–96 | `OWNERSHIP_OWNER_COMMIT_START` / `_END` | `owner_commit` | `mdl_kr_ownership` — `bytes32` commitment to the disclosed attributes. All zero when `disclose_flags` is `0`, which is the anonymous case |
+| 64 | `AGE_THRESHOLD` | `age_threshold` | `mdl_kr_age` (66 entries) — the age the proof actually clears. Read it back; it is a public input, so confirm it is the threshold you asked for |
+| 65 | `AGE_CURRENT_YEAR` | `current_year` | `mdl_kr_age` — the year the comparison was made in |
+| 64–95 | `REGION_CODE_START` / `_END` | `region_code` | `mdl_kr_region` (96 entries) — `bytes32`, not a readable region name. See below |
+
+`region_code` is `keccak256` over the region name, UTF-8 and zero-padded to 64 bytes. The circuit proves that the region on the licence hashes to this value, but the value itself is a public input — so recompute it from the region you asked for and compare, exactly as you do with the scope:
+
 ```typescript
-COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
-  SIGNAL_HASH_START: 0,
-  SIGNAL_HASH_END: 31,
-  MERKLE_ROOT_START: 32,
-  MERKLE_ROOT_END: 63,
-  COUNTRY_LIST_START: 64,    // Packed country codes
-  COUNTRY_LIST_END: 83,
-  COUNTRY_LIST_LENGTH: 84,   // Number of countries
-  IS_INCLUDED: 85,           // Boolean: user in list or not
-  SCOPE_START: 86,
-  SCOPE_END: 117,
-  NULLIFIER_START: 118,
-  NULLIFIER_END: 149,
-}
+import { keccak256 } from 'ethers';
+
+const regionCodeFor = (region: string): string => {
+  const padded = new Uint8Array(64);
+  padded.set(new TextEncoder().encode(region));
+  return keccak256(padded);
+};
+
+// regionCodeFor('경기도') — compare against indices 64–95, rebuilt with toBytes32()
 ```
-
-**OIDC Domain Attestation** (148 fields):
-```typescript
-OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
-  PUBKEY_MODULUS_START: 0,   // RSA modulus limbs (JWT issuer key)
-  PUBKEY_MODULUS_END: 17,
-  DOMAIN_STORAGE_START: 18,  // Domain bytes (up to 64 ASCII characters)
-  DOMAIN_STORAGE_END: 81,
-  DOMAIN_LEN: 82,            // Domain string length
-  SCOPE_START: 83,           // Scope value
-  SCOPE_END: 114,
-  NULLIFIER_START: 115,      // Unique identifier per user+scope
-  NULLIFIER_END: 146,
-  PROVIDER: 147,             // OIDC provider code (0=none, 1=Google, 2=Microsoft)
-
-  // Deprecated aliases (use the names above)
-  DOMAIN_START: 18,          // @deprecated Use DOMAIN_STORAGE_START
-  DOMAIN_END: 82,            // @deprecated Use DOMAIN_LEN
-}
-```
-
-**Korea Mobile ID (mDL)** — one layout shared by the three mDL circuits. The prefix is identical everywhere; the suffix depends on which predicate the circuit proves (`mdl_kr_ownership` 97 fields, `mdl_kr_age` 66, `mdl_kr_region` 96):
-```typescript
-MDL_KR_PUBLIC_INPUT_LAYOUT = {
-  SCOPE_START: 0,                   // Scope value
-  SCOPE_END: 31,
-  NULLIFIER_START: 32,              // nullifier_value
-  NULLIFIER_END: 63,
-
-  // mdl_kr_ownership only
-  OWNERSHIP_DISCLOSE_FLAGS: 64,
-  OWNERSHIP_OWNER_COMMIT_START: 65,
-  OWNERSHIP_OWNER_COMMIT_END: 96,
-
-  // mdl_kr_age only
-  AGE_THRESHOLD: 64,
-  AGE_CURRENT_YEAR: 65,
-
-  // mdl_kr_region only
-  REGION_CODE_START: 64,
-  REGION_CODE_END: 95,
-}
-```
-
-> **Note on field positions:** Each position in the public inputs array corresponds to a field element in the circuit. For bytes32 values (scope, nullifier, signal hash), 32 consecutive fields are concatenated to form the final value.
 
 ## Error Handling
 
@@ -833,6 +1014,8 @@ try {
 A relay rejection surfaces as its message, e.g. `Duplicate nonce (replay detected)` for a reused `nonce`, or `Request not found or expired` from `pollResult()`.
 
 Verification is the exception: `verifyResponseOnChain` and `verifyOnChain` report failures as `{ valid: false, error }` instead of throwing.
+
+A proof that fails on the phone is not an exception either — it comes back as a result with `status: 'error'` and an `error` string. Step 6 covers those, and which of them are worth retrying.
 
 ## Networks
 
