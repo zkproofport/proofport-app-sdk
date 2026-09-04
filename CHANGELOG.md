@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.16](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.15...v0.2.16) (2026-09-04)
+
+
+### Bug Fixes
+
+* **sdk:** verification key paths named a directory, not the key ([3ace9b9](https://github.com/zkproofport/proofport-app-sdk/commit/3ace9b91f1bd063a5a637dc9a3be5008a8ec4414))
+
 ## [0.2.15](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.14...v0.2.15) (2026-09-04)
 
 
