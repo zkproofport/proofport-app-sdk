@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.14](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.13...v0.2.14) (2026-09-04)
+
+
+### Bug Fixes
+
+* **sdk:** ship the proof verifier instead of asking callers to install it ([bd99a54](https://github.com/zkproofport/proofport-app-sdk/commit/bd99a54abc15d0aebf590566e6c3b643051872d8))
+
 ## [0.2.13](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.12...v0.2.13) (2026-09-04)
 
 
