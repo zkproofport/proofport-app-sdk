@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.12](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.11...v0.2.12) (2026-09-04)
+
+
+### Features
+
+* **circuits:** export canonical circuit ids as one source of truth ([18d4daf](https://github.com/zkproofport/proofport-app-sdk/commit/18d4dafff9188375f33c76f5cb23dff7c38b14c8))
+
+
+### Bug Fixes
+
+* **metadata:** correct the coinbase public input counts ([d8f6868](https://github.com/zkproofport/proofport-app-sdk/commit/d8f6868fa46a25bf99a20ae68b1b08d5dd6eb44b))
+
 ## [0.2.11](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.10...v0.2.11) (2026-08-22)
 
 
