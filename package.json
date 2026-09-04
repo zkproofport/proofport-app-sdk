@@ -10,7 +10,13 @@
       "import": "./dist/index.esm.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./circuits": {
+      "types": "./dist/circuits.d.ts",
+      "import": "./dist/circuits.esm.js",
+      "require": "./dist/circuits.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",

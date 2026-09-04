@@ -2,22 +2,25 @@
  * ZKProofport SDK Types
  */
 
+import type { CircuitId } from './circuits';
+
 /**
- * Supported zero-knowledge circuit types.
+ * Zero-knowledge circuit identifiers.
  * Uses canonical circuit names matching Nargo.toml circuit definitions.
+ *
+ * Alias of {@link CircuitId}, which is defined in `./circuits` — the single
+ * source of truth for circuit identifiers. Adding a circuit there widens this
+ * type automatically, so the two can never disagree.
+ *
+ * Note that this union includes circuits marked `planned` in
+ * `CIRCUIT_SUPPORT_STATUS`; being assignable is not a support guarantee.
  *
  * @example
  * ```typescript
  * const circuit: CircuitType = 'coinbase_attestation';
  * ```
  */
-export type CircuitType =
-  | 'coinbase_attestation'
-  | 'coinbase_country_attestation'
-  | 'oidc_domain_attestation'
-  | 'mdl_kr_ownership'
-  | 'mdl_kr_age'
-  | 'mdl_kr_region';
+export type CircuitType = CircuitId;
 
 /**
  * Proof request lifecycle status.

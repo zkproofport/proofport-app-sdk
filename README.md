@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Six circuits are supported: Coinbase KYC and country attestations, OIDC email-domain attestations (Google, Microsoft 365), and the three Korean mobile ID (mDL) circuits.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Four more identifiers are reserved and planned: GIWA attestation and the three Korean mobile ID (mDL) circuits. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -97,9 +97,73 @@ if (result.status === 'completed') {
 }
 ```
 
+## Circuit Identifiers
+
+Circuit IDs are canonical, lowercase and case-sensitive: each one is the `name` field of that circuit's `Nargo.toml`, verbatim. Hyphenated spellings such as `coinbase-kyc` or `mdl-kr-age` are route and directory names from elsewhere — they are not circuit IDs, and passing one does not fail with a clear error. It produces a nullifier mismatch or a verifier lookup that finds nothing.
+
+This SDK is the single source of truth for that list. Import the constants rather than typing the strings, and a rename becomes a compile error instead of a runtime surprise:
+
+```typescript
+import { CIRCUIT_IDS } from '@zkproofport-app/sdk';
+
+const relay = await sdk.createRelayRequest(CIRCUIT_IDS.COINBASE_ATTESTATION, {
+  scope: 'myapp.com',
+});
+```
+
+The same names are also published on their own subpath, which holds nothing but the list — no `ethers`, no `socket.io-client`, no SDK code. A server, a worker or a build script can read it without pulling the SDK in:
+
+```typescript
+import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circuits';
+```
+
+### Status
+
+| Constant | Circuit ID | Status |
+|----------|-----------|--------|
+| `CIRCUIT_IDS.COINBASE_ATTESTATION` | `coinbase_attestation` | **Supported** |
+| `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
+| `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
+| `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | Planned |
+| `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
+| `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
+| `CIRCUIT_IDS.MDL_KR_REGION` | `mdl_kr_region` | Planned |
+
+**Supported** means generally available — build a product on it. **Planned** means the identifier is reserved and the circuit exists, but it is not officially supported yet: availability, inputs and public-input layout can change without a major version bump.
+
+Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, planned ones included, so being assignable is not a support guarantee. Gate on the status, not on the type:
+
+```typescript
+import { CIRCUIT_SUPPORT_STATUS, isSupportedCircuitId } from '@zkproofport-app/sdk';
+
+CIRCUIT_SUPPORT_STATUS.coinbase_attestation; // 'supported'
+CIRCUIT_SUPPORT_STATUS.mdl_kr_age;           // 'planned'
+
+isSupportedCircuitId('oidc_domain_attestation'); // true
+isSupportedCircuitId('mdl_kr_age');              // false
+isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
+```
+
+### Exports
+
+| Export | Type | What it is |
+|--------|------|------------|
+| `CIRCUIT_IDS` | object | Every canonical ID, keyed by a stable constant name |
+| `ALL_CIRCUIT_IDS` | `readonly CircuitId[]` | Every ID, in the order of the table above |
+| `SUPPORTED_CIRCUIT_IDS` | `readonly CircuitId[]` | Only the officially supported ones |
+| `PLANNED_CIRCUIT_IDS` | `readonly CircuitId[]` | Only the planned ones |
+| `CIRCUIT_SUPPORT_STATUS` | `Readonly<Record<CircuitId, CircuitSupportStatus>>` | The status of each circuit |
+| `isCircuitId(value)` | `value is CircuitId` | Narrows an unknown value; `false` for hyphenated names |
+| `isSupportedCircuitId(value)` | `value is CircuitId` | The same, and additionally requires `supported` |
+| `getCircuitSupportStatus(id)` | `CircuitSupportStatus` | Status of one ID; throws on an unknown one |
+| `CircuitId` | type | Union of the seven IDs. `CircuitType` is an alias of it |
+| `CircuitSupportStatus` | type | `'supported' \| 'planned'` |
+
+Both objects and all three arrays are frozen. `ALL_CIRCUIT_IDS`, `SUPPORTED_CIRCUIT_IDS` and `PLANNED_CIRCUIT_IDS` are derived from `CIRCUIT_SUPPORT_STATUS` at load time, so they cannot disagree with it.
+
 ## Supported Circuits
 
-Circuit IDs are canonical and case-sensitive — pass them exactly as written here. `sdk.getSupportedCircuits()` returns the same list at runtime.
+The circuits below are officially supported. Pass their IDs exactly as written, or use the `CIRCUIT_IDS` constants. `sdk.getSupportedCircuits()` returns every known ID at runtime, planned ones included — see [Circuit Identifiers](#circuit-identifiers).
 
 ### `coinbase_attestation`
 
@@ -177,6 +241,14 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 ```
 
 > When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim). Without `provider`, only the email domain is verified.
+
+## Planned Circuits
+
+The identifiers below are reserved and exported, and the circuits exist — but they are **not officially supported yet**. Availability, input shape and public-input layout can change without a major version bump, so treat anything here as provisional. `CIRCUIT_SUPPORT_STATUS` reports each of them as `planned`.
+
+### `giwa_attestation`
+
+Reserved identifier for GIWA attestation. It is a fork of `coinbase_attestation` and carries the same four public inputs, but there is no dedicated input type for it and no supported request flow. The ID is exported so that every layer spells it the same way; do not build on it yet.
 
 ### `mdl_kr_ownership`
 
@@ -852,6 +924,8 @@ Types you can import:
 
 ```typescript
 import type {
+  CircuitId,
+  CircuitSupportStatus,
   CircuitType,
   ProofRequestStatus,
   CoinbaseKycInputs,
@@ -875,7 +949,9 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitType` | `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'` |
+| `CircuitId` | Union of the seven canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `CircuitSupportStatus` | `'supported' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
+| `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation`: `{ scope, userAddress?, rawTransaction? }` |
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |

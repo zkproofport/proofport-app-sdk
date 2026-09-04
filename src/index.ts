@@ -36,6 +36,20 @@ export {
   extractDomainFromPublicInputs,
 } from './verifier';
 
+// Canonical circuit identifiers — the single source of truth.
+// Also available on its own, with no runtime dependencies, via
+// `import { CIRCUIT_IDS } from '@zkproofport-app/sdk/circuits'`.
+export {
+  CIRCUIT_IDS,
+  CIRCUIT_SUPPORT_STATUS,
+  ALL_CIRCUIT_IDS,
+  SUPPORTED_CIRCUIT_IDS,
+  PLANNED_CIRCUIT_IDS,
+  isCircuitId,
+  isSupportedCircuitId,
+  getCircuitSupportStatus,
+} from './circuits';
+
 // Public input layout constants
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
@@ -43,6 +57,8 @@ export {
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   MDL_KR_PUBLIC_INPUT_LAYOUT,
 } from './constants';
+
+export type { CircuitId, CircuitSupportStatus } from './circuits';
 
 // Types
 export type {
