@@ -29,7 +29,8 @@
     "test": "vitest run",
     "demo": "cd demo && node server.js",
     "docs": "typedoc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:vk-live": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
     "@aztec/bb.js": "1.0.0-nightly.20250723",
