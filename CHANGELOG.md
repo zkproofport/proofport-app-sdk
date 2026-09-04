@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.15](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.14...v0.2.15) (2026-09-04)
+
+
+### Bug Fixes
+
+* **sdk:** off-chain verification failed in every browser ([9104005](https://github.com/zkproofport/proofport-app-sdk/commit/91040050e7850a3bb22e1b4d121f22a3558ede32))
+
 ## [0.2.14](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.13...v0.2.14) (2026-09-04)
 
 
