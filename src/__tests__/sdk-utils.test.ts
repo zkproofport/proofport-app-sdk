@@ -51,7 +51,7 @@ describe('ProofportSDK - Utility Methods', () => {
     expect(metadata).toEqual({
       name: 'Coinbase KYC',
       description: 'Prove Coinbase identity verification',
-      publicInputsCount: 2,
+      publicInputsCount: 128,
       publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
     });
   });
@@ -63,7 +63,7 @@ describe('ProofportSDK - Utility Methods', () => {
     expect(metadata).toEqual({
       name: 'Coinbase Country',
       description: 'Prove Coinbase country verification',
-      publicInputsCount: 14,
+      publicInputsCount: 150,
       publicInputNames: [
         'signal_hash',
         'signer_list_merkle_root',
@@ -82,6 +82,7 @@ describe('ProofportSDK - Utility Methods', () => {
       'coinbase_attestation',
       'coinbase_country_attestation',
       'oidc_domain_attestation',
+      'giwa_attestation',
       'mdl_kr_ownership',
       'mdl_kr_age',
       'mdl_kr_region',

@@ -58,7 +58,7 @@ export const DEEP_LINK_HOSTS = {
  * ```typescript
  * const metadata = CIRCUIT_METADATA['coinbase_attestation'];
  * console.log(metadata.name); // "Coinbase KYC"
- * console.log(metadata.publicInputsCount); // 2
+ * console.log(metadata.publicInputsCount); // 128
  * ```
  */
 export const CIRCUIT_METADATA: Record<CircuitType, {
@@ -70,13 +70,19 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   coinbase_attestation: {
     name: 'Coinbase KYC',
     description: 'Prove Coinbase identity verification',
-    publicInputsCount: 2,
+    // 4 x `pub [u8; 32]` in coinbase-attestation/src/main.nr, flattened to
+    // bytes: signal_hash, signer_list_merkle_root, scope, nullifier.
+    // Read 2 here until 2026-09-04, which was wrong under any reading —
+    // the circuit has never had two public inputs, logical or flattened.
+    publicInputsCount: 128,
     publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
   },
   coinbase_country_attestation: {
     name: 'Coinbase Country',
     description: 'Prove Coinbase country verification',
-    publicInputsCount: 14,
+    // 32 + 32 + (10 x 2) + 1 + 1 + 32 + 32 = 150, counted off
+    // coinbase-country-attestation/src/main.nr. Read 14 until 2026-09-04.
+    publicInputsCount: 150,
     publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included'],
   },
   oidc_domain_attestation: {
@@ -85,8 +91,22 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 148,
     publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider'],
   },
-  // Korea Mobile ID (mDL) circuits. Counts are byte-flattened field totals
-  // from the compiled circuit ABIs: [u8; 32] arrays contribute 32 inputs each.
+  // Planned circuit — the identifier is reserved and the circuit exists, but it
+  // is not officially supported yet. See CIRCUIT_SUPPORT_STATUS in ./circuits.
+  // Forked from coinbase_attestation and shares its four public inputs, so the
+  // count is the byte-flattened total (4 x [u8; 32] = 128), matching the
+  // COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT indices below. The
+  // coinbase_attestation entry above reports a legacy logical count of 2 and is
+  // left as-is for backwards compatibility.
+  giwa_attestation: {
+    name: 'GIWA Attestation',
+    description: 'Prove GIWA identity verification (planned — not officially supported yet)',
+    publicInputsCount: 128,
+    publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'scope', 'nullifier'],
+  },
+  // Korea Mobile ID (mDL) circuits. Planned — not officially supported yet.
+  // Counts are byte-flattened field totals from the compiled circuit ABIs:
+  // [u8; 32] arrays contribute 32 inputs each.
   mdl_kr_ownership: {
     name: 'Korea Mobile ID — Ownership',
     description: "Prove valid Korean mobile driver's license ownership with selective disclosure",
