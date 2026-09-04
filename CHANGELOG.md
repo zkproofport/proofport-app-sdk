@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.13](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.12...v0.2.13) (2026-09-04)
+
+
+### Features
+
+* **sdk:** add real off-chain proof verification ([c341c4b](https://github.com/zkproofport/proofport-app-sdk/commit/c341c4be4edda607512652555c72347e21fcbcb9))
+
 ## [0.2.12](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.11...v0.2.12) (2026-09-04)
 
 
