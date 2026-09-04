@@ -48,7 +48,17 @@ export {
   isCircuitId,
   isSupportedCircuitId,
   getCircuitSupportStatus,
+  CIRCUIT_VK_PATHS,
 } from './circuits';
+
+// Off-chain verification — checking a proof against its verification key, with
+// no chain involved. Needs the optional peer dependency @aztec/bb.js at the
+// pinned version; see offChainVerifier.ts for why the version matters.
+export { verifyProofOffChain } from './offChainVerifier';
+export type {
+  OffChainVerifyResult,
+  OffChainVerifyOptions,
+} from './offChainVerifier';
 
 // Public input layout constants
 export {

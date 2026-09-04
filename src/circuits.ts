@@ -100,6 +100,29 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
   } as const);
 
 /**
+ * Where each circuit's verification key lives inside the `zkproofport/circuits`
+ * repository, relative to its root.
+ *
+ * Off-chain verification needs the verification key and nothing else — no
+ * circuit bytecode, no witness. The key is public by nature: it is what anyone
+ * checking a proof must already have, and the Solidity verifiers deployed
+ * on-chain embed the same key.
+ *
+ * Exhaustive over {@link CircuitId} on purpose. A new circuit whose key path is
+ * not listed here fails to compile rather than failing at verification time,
+ * where the only symptom would be a proof that cannot be checked.
+ */
+export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.freeze({
+  coinbase_attestation: 'coinbase-attestation/target/vk',
+  coinbase_country_attestation: 'coinbase-country-attestation/target/vk',
+  oidc_domain_attestation: 'oidc-domain-attestation/target/vk',
+  giwa_attestation: 'giwa-attestation/target/vk',
+  mdl_kr_ownership: 'mdl/kr-ownership/target/vk',
+  mdl_kr_age: 'mdl/kr-age/target/vk',
+  mdl_kr_region: 'mdl/kr-region/target/vk',
+} as const);
+
+/**
  * Every canonical circuit identifier, in declaration order.
  *
  * Includes circuits that are still `planned`. Use {@link SUPPORTED_CIRCUIT_IDS}

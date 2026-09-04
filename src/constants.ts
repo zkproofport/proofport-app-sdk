@@ -152,6 +152,13 @@ export const VERIFIER_ABI = [
  * Supported networks:
  * - 84532: Base Sepolia (testnet)
  * - 8453: Base Mainnet (production)
+ * - 91342: GIWA Sepolia (testnet) — where the GIWA account circuit verifies
+ *
+ * A chain missing from this map is not a quiet degradation: `getDefaultProvider`
+ * throws "No RPC endpoint configured for chain N". That is what a caller saw
+ * when verifying a GIWA proof on chain 91342 — the verifier contract had been
+ * deployed and the proof was valid, but the SDK had no way to reach the chain
+ * to ask. Deploying a verifier to a new network means adding it here too.
  *
  * @example
  * ```typescript
@@ -163,6 +170,7 @@ export const VERIFIER_ABI = [
 export const RPC_ENDPOINTS: Record<number, string> = {
   84532: 'https://sepolia.base.org', // Base Sepolia
   8453: 'https://mainnet.base.org', // Base Mainnet
+  91342: 'https://sepolia-rpc.giwa.io', // GIWA Sepolia
 };
 
 /**

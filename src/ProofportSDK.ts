@@ -50,6 +50,10 @@ import {
   extractDomainFromPublicInputs,
 } from './verifier';
 import {
+  verifyProofOffChain,
+  type OffChainVerifyOptions,
+} from './offChainVerifier';
+import {
   DEFAULT_SCHEME,
   DEFAULT_REQUEST_EXPIRY_MS,
   CIRCUIT_METADATA,
@@ -798,6 +802,47 @@ export class ProofportSDK {
       chainId: response.chainId,
     };
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, customVerifier, responseVerifier);
+  }
+
+  /**
+   * Verifies a proof response off-chain, against the circuit's verification key.
+   *
+   * No chain, no RPC, no gas, and no verifier contract — so this works for a
+   * circuit whose verifier has not been deployed anywhere, and it does not
+   * depend on a network being reachable. What it does not give you is the
+   * chain's own opinion: use {@link verifyResponseOnChain} when the answer has
+   * to be one a contract will agree with.
+   *
+   * Requires the optional peer dependency:
+   * `npm install @aztec/bb.js@1.0.0-nightly.20250723`. The version is exact —
+   * verification keys are not portable across bb releases, so a different build
+   * rejects valid proofs.
+   *
+   * @param response - Proof response from the relay
+   * @param options - Optional verification key (skips the fetch) and timeout
+   * @returns `{ valid }`, or `{ valid: false, error }` if the check could not run
+   *
+   * @example
+   * ```typescript
+   * const result = await sdk.verifyResponseOffChain(response);
+   * if (result.valid) {
+   *   console.log('Valid, and nothing was asked of any chain');
+   * }
+   * ```
+   */
+  async verifyResponseOffChain(
+    response: ProofResponse,
+    options?: OffChainVerifyOptions
+  ): Promise<{ valid: boolean; error?: string }> {
+    if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
+      return { valid: false, error: 'Invalid or incomplete response' };
+    }
+    return verifyProofOffChain(
+      response.circuit,
+      response.proof,
+      response.publicInputs,
+      options
+    );
   }
 
   // ============ Utility Methods ============

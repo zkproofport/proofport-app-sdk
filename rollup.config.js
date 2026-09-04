@@ -2,6 +2,15 @@ import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 
+// @aztec/bb.js is EXTERNAL everywhere, deliberately.
+//
+// It is the off-chain verifier's WebAssembly Barretenberg — 16MB installed, and
+// an optional peer dependency, because most callers verify on-chain and should
+// not pay for it. Bundling it also does not work: rollup follows it into
+// thread-stream's package.json and stops with "Expected ';', '}' or <eof>",
+// which reads like a syntax error in this repo and is not one.
+const BB = '@aztec/bb.js';
+
 export default [
   // CJS for Node.js — qrcode stays external
   {
@@ -11,7 +20,7 @@ export default [
       format: 'cjs',
       sourcemap: true,
     },
-    external: ['ethers', 'qrcode', 'socket.io-client'],
+    external: ['ethers', 'qrcode', 'socket.io-client', BB],
     plugins: [
       resolve(),
       commonjs(),
@@ -37,7 +46,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['ethers', 'socket.io-client'],
+    external: ['ethers', 'socket.io-client', BB],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
       commonjs(),
