@@ -99,6 +99,18 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
     expect(result.valid).toBe(false);
   }, 120_000);
 
+  // NOT COVERED HERE: the browser Buffer gap.
+  //
+  // bb.js's browser build converts field elements through `Buffer.alloc` and
+  // `writeBigUInt64BE`; its node build does not reach that code during a
+  // verification, so the failure the demo page hit — "r.writeBigUInt64BE is not
+  // a function" — cannot be reproduced from Node at all. A case that crippled
+  // the global Buffer was written and then deleted: removing the fix it was
+  // meant to guard left it green, which is worse than having no case.
+  //
+  // The fix (`ensureBufferForBarretenberg`) is verified in a real browser
+  // against the deployed demo, and that is the only place it can be.
+
   it('never says valid when checked against a different circuit key', async () => {
     // Deliberately NOT requiring a clean `false` here, unlike the cases above.
     // A key from another circuit is a caller mistake, not a verdict about this

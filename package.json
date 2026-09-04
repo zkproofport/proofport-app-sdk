@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@aztec/bb.js": "1.0.0-nightly.20250723",
+    "buffer": "^6.0.3",
     "qrcode": "^1.5.3",
     "socket.io-client": "^4.8.0"
   },

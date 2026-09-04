@@ -11,6 +11,12 @@ import commonjs from '@rollup/plugin-commonjs';
 // which reads like a syntax error in this repo and is not one.
 const BB = '@aztec/bb.js';
 
+// The browser Buffer polyfill, external for the same reason: it is a declared
+// dependency the consumer resolves, and bundling a dynamic import of it forces
+// rollup into multi-chunk output, which this config's single-file outputs
+// cannot express ("output.dir must be used, not output.file").
+const BUFFER = 'buffer/';
+
 export default [
   // CJS for Node.js — qrcode stays external
   {
@@ -20,7 +26,7 @@ export default [
       format: 'cjs',
       sourcemap: true,
     },
-    external: ['ethers', 'qrcode', 'socket.io-client', BB],
+    external: ['ethers', 'qrcode', 'socket.io-client', BB, BUFFER],
     plugins: [
       resolve(),
       commonjs(),
@@ -46,7 +52,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['ethers', 'socket.io-client', BB],
+    external: ['ethers', 'socket.io-client', BB, BUFFER],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
       commonjs(),

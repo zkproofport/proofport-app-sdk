@@ -67,6 +67,38 @@ export interface OffChainVerifyOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Make sure a Node-shaped `Buffer` exists before Barretenberg is loaded.
+ *
+ * WHY THE SDK DOES THIS RATHER THAN THE CALLER. bb.js's own BROWSER build —
+ * not just its node build — converts field elements through `Buffer.alloc` and
+ * `buf.writeBigUInt64BE`. Browsers have no Buffer, and bundlers stopped
+ * polyfilling Node globals years ago, so in a browser the first verification
+ * dies with "r.writeBigUInt64BE is not a function" — a message that names
+ * nothing a caller could act on. Measured on the demo page, 2026-09-04, against
+ * a real GIWA proof.
+ *
+ * Leaving it to callers would mean every browser customer editing their
+ * bundler config to make an SDK method work, which is the configuration this
+ * SDK promises not to require.
+ *
+ * Deliberately narrow:
+ *  - It only fills a GAP. A real Buffer (Node, or a page that already has one)
+ *    is left alone, so nothing is shadowed by a lesser implementation.
+ *  - It checks for the METHOD, not just the global. A partial Buffer — which is
+ *    what several bundlers leave behind, and what the demo page actually had —
+ *    passes a `typeof Buffer` test and then fails inside Barretenberg.
+ */
+async function ensureBufferForBarretenberg(): Promise<void> {
+  const existing = (globalThis as { Buffer?: { alloc?: (n: number) => unknown } }).Buffer;
+  if (existing?.alloc) {
+    const probe = existing.alloc(8) as { writeBigUInt64BE?: unknown };
+    if (typeof probe.writeBigUInt64BE === 'function') return;
+  }
+  const { Buffer } = await import('buffer/');
+  (globalThis as { Buffer?: unknown }).Buffer = Buffer;
+}
+
 /** @internal Hex string (with or without 0x) to bytes. */
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
@@ -193,6 +225,9 @@ export async function verifyProofOffChain(
   //
   // The dynamic import is what keeps the cost off everyone else — a bundler
   // splits it out, and a caller who never verifies off-chain never loads it.
+  // Before bb.js, not after: its module-level code already reaches for Buffer.
+  await ensureBufferForBarretenberg();
+
   let bb: typeof import('@aztec/bb.js');
   try {
     bb = await import('@aztec/bb.js');
