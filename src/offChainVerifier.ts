@@ -11,19 +11,22 @@
  * (through mopro's native Barretenberg); it was only the JavaScript side that
  * had no such thing.
  *
- * HOW IT WORKS. `bb` proofs are checked by `acirVerifyUltraKeccakHonk(proof,
- * vk)` — the keccak variant, matching how these proofs are produced. Two things
+ * HOW IT WORKS. Proofs here are made with `--oracle_hash keccak` and ZK on, so
+ * the matching check is `acirVerifyUltraKeccakZkHonk(proof, vk)`. Two things
  * have to line up:
  *
- *   The version. The verification key format is not stable across bb releases:
- *   the pinned build emits a 1816-byte key where bb 0.87.0 and 1.2.0 emit 1760.
- *   `@aztec/bb.js@1.0.0-nightly.20250723` is the WASM build of the same bb the
- *   circuits were compiled with. A different one will reject valid proofs.
+ *   The version. `@aztec/bb.js@1.0.0-nightly.20250723` is the WASM build of the
+ *   same bb the circuits are compiled with. Versions are not interchangeable:
+ *   measured on the Korea Mobile ID age circuit, the pinned bb writes a 16256-
+ *   byte proof where bb 1.2.0 writes 16224 for the identical circuit and
+ *   witness — and the verification key comes out the SAME either way, so the
+ *   key cannot warn you. A mismatch shows up only as verification failing.
  *
- *   The oracle hash. Proofs are generated with `--oracle_hash keccak` so the
- *   Solidity verifiers can check them, so the poseidon-flavoured verify — which
- *   is what `BarretenbergVerifier.verifyUltraHonkProof` uses — says false for a
- *   perfectly good proof.
+ *   The flavour. There are four verify entry points and picking the wrong one
+ *   is not a polite false. `acirVerifyUltraZKHonk` (poseidon) answers false for
+ *   a perfectly good proof, and `acirVerifyUltraKeccakHonk` — keccak without ZK
+ *   — TRAPS the WebAssembly with a bare "unreachable", which looks exactly like
+ *   a corrupt proof, a mismatched key, or a missing SRS.
  *
  * THE PROOF ARRIVES IN TWO PIECES. The mobile app splits what Barretenberg
  * produced into `proof` and `publicInputs` before sending it, because the
@@ -153,9 +156,8 @@ async function fetchVerificationKey(
 /**
  * Verify a proof off-chain, against its verification key.
  *
- * Needs `@aztec/bb.js` at the pinned version. It is an optional peer dependency
- * — the WASM is large and most callers verify on-chain — so the failure to have
- * it installed says so plainly rather than surfacing as a module-not-found.
+ * Needs no setup from the caller: the verifier ships with this SDK and is
+ * loaded on first use.
  *
  * @param circuit - Canonical circuit identifier
  * @param proof - Proof bytes as hex, WITHOUT public inputs (as the relay sends it)
@@ -181,15 +183,29 @@ export async function verifyProofOffChain(
 ): Promise<OffChainVerifyResult> {
   const timeoutMs = options.timeoutMs ?? 30000;
 
+  // A REQUIRED dependency, loaded lazily.
+  //
+  // It was briefly an optional peer dependency, on the reasoning that the WASM
+  // is 16MB and most callers verify on-chain. That was wrong: it would have
+  // meant a customer calling this method got an error telling them to install
+  // something, and "works with zero customer configuration" is the SDK's rule.
+  // A caller should never have to know this is implemented with Barretenberg.
+  //
+  // The dynamic import is what keeps the cost off everyone else — a bundler
+  // splits it out, and a caller who never verifies off-chain never loads it.
   let bb: typeof import('@aztec/bb.js');
   try {
     bb = await import('@aztec/bb.js');
-  } catch {
+  } catch (error) {
+    // Reaching here means the install is broken, not that something is missing
+    // by design. Say so, rather than sending the caller off to install a
+    // package they should never have had to hear about.
     return {
       valid: false,
       error:
-        'Off-chain verification needs @aztec/bb.js. Install the pinned version: ' +
-        'npm install @aztec/bb.js@1.0.0-nightly.20250723',
+        'Could not load the proof verifier (@aztec/bb.js), which ships with this ' +
+        'SDK. This usually means a broken or partial install — try reinstalling ' +
+        `@zkproofport-app/sdk. Underlying error: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 

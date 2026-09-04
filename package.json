@@ -32,6 +32,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@aztec/bb.js": "1.0.0-nightly.20250723",
     "qrcode": "^1.5.3",
     "socket.io-client": "^4.8.0"
   },
@@ -45,18 +46,13 @@
     "tslib": "^2.8.1",
     "typedoc": "^0.28.16",
     "typescript": "^5.3.3",
-    "vitest": "^4.0.18",
-    "@aztec/bb.js": "1.0.0-nightly.20250723"
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
-    "ethers": "^5.7.0 || ^6.0.0",
-    "@aztec/bb.js": "1.0.0-nightly.20250723"
+    "ethers": "^5.7.0 || ^6.0.0"
   },
   "peerDependenciesMeta": {
     "ethers": {
-      "optional": true
-    },
-    "@aztec/bb.js": {
       "optional": true
     }
   },

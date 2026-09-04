@@ -813,10 +813,8 @@ export class ProofportSDK {
    * chain's own opinion: use {@link verifyResponseOnChain} when the answer has
    * to be one a contract will agree with.
    *
-   * Requires the optional peer dependency:
-   * `npm install @aztec/bb.js@1.0.0-nightly.20250723`. The version is exact —
-   * verification keys are not portable across bb releases, so a different build
-   * rejects valid proofs.
+   * Needs no setup: the verifier ships with this SDK. It is loaded on first
+   * use, so a caller who only verifies on-chain never pays for it.
    *
    * @param response - Proof response from the relay
    * @param options - Optional verification key (skips the fetch) and timeout

@@ -52,8 +52,7 @@ export {
 } from './circuits';
 
 // Off-chain verification — checking a proof against its verification key, with
-// no chain involved. Needs the optional peer dependency @aztec/bb.js at the
-// pinned version; see offChainVerifier.ts for why the version matters.
+// no chain involved. Everything it needs ships with this package.
 export { verifyProofOffChain } from './offChainVerifier';
 export type {
   OffChainVerifyResult,
