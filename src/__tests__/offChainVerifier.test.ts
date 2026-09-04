@@ -153,3 +153,62 @@ describe('off-chain verification input handling', () => {
     expect(result.error).toMatch(/at most 32/);
   });
 });
+
+/**
+ * The same check across every circuit that has a real proof committed.
+ *
+ * The cases above prove the mechanism on one circuit. This proves the mechanism
+ * is not specific to it — same verification key format, same proof shape, same
+ * entry point — which is the question "does off-chain verification cover every
+ * circuit" actually asks.
+ *
+ * Only the three Korea Mobile ID circuits have a proof in the repository;
+ * Coinbase, OIDC and GIWA have an empty proof directory (their witnesses are
+ * built from live attestation data, not committed). Those three go through the
+ * identical code path and their verification keys are fetched by the live check
+ * next door, but they are NOT exercised end to end here, and this comment says
+ * so rather than letting a reader assume seven.
+ */
+const CIRCUITS_WITH_COMMITTED_PROOFS = [
+  {circuit: 'mdl_kr_age' as const, dir: ['mdl', 'kr-age']},
+  {circuit: 'mdl_kr_ownership' as const, dir: ['mdl', 'kr-ownership']},
+  {circuit: 'mdl_kr_region' as const, dir: ['mdl', 'kr-region']},
+];
+
+describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)(
+  'off-chain verification for $circuit',
+  ({circuit, dir}) => {
+    const target = join(process.cwd(), '..', 'circuits', ...dir, 'target');
+    const proofFile = join(target, 'proof', 'proof');
+    const inputsFile = join(target, 'proof', 'public_inputs');
+    const keyFile = join(target, 'vk', 'vk');
+    const present = existsSync(proofFile) && existsSync(inputsFile) && existsSync(keyFile);
+
+    it.skipIf(!present)('accepts its own proof', async () => {
+      const result = await verifyProofOffChain(
+        circuit,
+        toHex(new Uint8Array(readFileSync(proofFile))),
+        splitPublicInputs(new Uint8Array(readFileSync(inputsFile))),
+        {verificationKey: new Uint8Array(readFileSync(keyFile))},
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.valid).toBe(true);
+    }, 120_000);
+
+    it.skipIf(!present)('rejects another circuit\'s proof against its key', async () => {
+      // Each key must reject a proof it did not sign. Without this, a verifier
+      // that ignored the key would pass every case above.
+      const other = CIRCUITS_WITH_COMMITTED_PROOFS.find(c => c.circuit !== circuit)!;
+      const otherProof = join(process.cwd(), '..', 'circuits', ...other.dir, 'target', 'proof');
+      if (!existsSync(join(otherProof, 'proof'))) return;
+
+      const result = await verifyProofOffChain(
+        circuit,
+        toHex(new Uint8Array(readFileSync(join(otherProof, 'proof')))),
+        splitPublicInputs(new Uint8Array(readFileSync(join(otherProof, 'public_inputs')))),
+        {verificationKey: new Uint8Array(readFileSync(keyFile))},
+      );
+      expect(result.valid).toBe(false);
+    }, 120_000);
+  },
+);
