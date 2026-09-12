@@ -124,12 +124,17 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.COINBASE_ATTESTATION` | `coinbase_attestation` | **Supported** |
 | `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
+| `CIRCUIT_IDS.ARC_ELIGIBILITY` | `arc_eligibility` | _Experimental_ |
 | `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | Planned |
 | `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
 | `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
 | `CIRCUIT_IDS.MDL_KR_REGION` | `mdl_kr_region` | Planned |
 
-**Supported** means generally available — build a product on it. **Planned** means the identifier is reserved and the circuit exists, but it is not officially supported yet: availability, inputs and public-input layout can change without a major version bump.
+**Supported** means generally available — build a product on it.
+
+**Experimental** means you can prove it today and it verifies, but only against a testnet deployment. Inputs, public-input layout and the verifier address can change without a major version bump, and there is no mainnet to point at. Try it; do not ship on it.
+
+**Planned** means the identifier is reserved and the circuit exists, but it is not officially supported yet: availability, inputs and public-input layout can change without a major version bump.
 
 Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, planned ones included, so being assignable is not a support guarantee. Gate on the status, not on the type:
 
@@ -137,9 +142,11 @@ Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, planned o
 import { CIRCUIT_SUPPORT_STATUS, isSupportedCircuitId } from '@zkproofport-app/sdk';
 
 CIRCUIT_SUPPORT_STATUS.coinbase_attestation; // 'supported'
+CIRCUIT_SUPPORT_STATUS.arc_eligibility;      // 'experimental'
 CIRCUIT_SUPPORT_STATUS.mdl_kr_age;           // 'planned'
 
 isSupportedCircuitId('oidc_domain_attestation'); // true
+isSupportedCircuitId('arc_eligibility');         // false — experimental is not supported
 isSupportedCircuitId('mdl_kr_age');              // false
 isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
 ```
@@ -241,6 +248,65 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 ```
 
 > When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim). Without `provider`, only the email domain is verified.
+
+## Experimental Circuits
+
+### `arc_eligibility`
+
+Proves the same Coinbase attestation as `coinbase_attestation`, with one thing
+changed: the wallet signs a named EIP-712 action instead of an opaque signal
+hash. The proof's public inputs then carry the action's domain separator and
+struct hash, so a verifier checks **which** action was authorised — not merely
+that somebody eligible signed something.
+
+That matters once an agent moves money. `personal_sign` over 32 opaque bytes
+shows a person a hex string, so they approve without seeing what they approve;
+a typed action is rendered field by field in the wallet.
+
+```typescript
+import { CIRCUIT_IDS, validateTypedAction } from '@zkproofport-app/sdk';
+
+const action = {
+  domain: {
+    name: 'MyVault',
+    version: '1',
+    chainId: 5042002,                 // Arc Testnet
+    verifyingContract: '0xYourContract',
+  },
+  types: {
+    Deposit: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'Deposit',
+  message: { amount: '1000000', nonce: '1' },
+};
+
+// Optional: catch a malformed action before sending it. The circuit hashes the
+// action without reading it, so a broken one produces a valid proof of the
+// wrong thing rather than failing.
+const problem = validateTypedAction(action);
+if (problem) throw new Error(problem);
+
+const relay = await sdk.createRelayRequest(CIRCUIT_IDS.ARC_ELIGIBILITY, {
+  scope: 'myapp.com',
+  action,
+});
+```
+
+`action` is required. A request without one is refused rather than proved
+against some default, because the signature is the whole point.
+
+**Testnet only.** The verifier is deployed on Arc Testnet (chain `5042002`) and
+nowhere else. Circle has not published a mainnet chain id, so there is nothing
+to point a production build at. The mobile app keeps the whole Arc network
+behind Developer Mode for the same reason.
+
+The public inputs are `signal_hash`, `domain_separator`, `action_hash`,
+`signer_list_merkle_root`, `scope`, `nullifier` — a different order from every
+other circuit, which is why `extractScopeFromPublicInputs` and
+`extractNullifierFromPublicInputs` require the circuit id and refuse to guess.
 
 ## Planned Circuits
 
@@ -949,7 +1015,8 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitId` | Union of the seven canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `CircuitId` | Union of the eight canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'arc_eligibility' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `TypedAction` | The EIP-712 action an `arc_eligibility` proof binds to: `{ domain, types, primaryType, message }` — the same object `eth_signTypedData_v4` takes |
 | `CircuitSupportStatus` | `'supported' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
 | `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
@@ -957,6 +1024,7 @@ import type {
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
 | `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
+| `ArcEligibilityInputs` | Inputs for `arc_eligibility`: `{ scope, action, userAddress?, rawTransaction? }` — `action` is required |
 | `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |

@@ -91,6 +91,16 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 148,
     publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider'],
   },
+  arc_eligibility: {
+    name: 'Arc Eligibility',
+    description: 'Prove eligibility and authorize one EIP-712 action, for an Arc gate',
+    // 6 x `pub [u8; 32]` in arc-eligibility/src/main.nr, flattened to bytes.
+    // Read off the compiled ABI rather than counted: signal_hash 0-31,
+    // domain_separator 32-63, action_hash 64-95, signer_list_merkle_root
+    // 96-127, scope 128-159, nullifier 160-191.
+    publicInputsCount: 192,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root'],
+  },
   // Planned circuit — the identifier is reserved and the circuit exists, but it
   // is not officially supported yet. See CIRCUIT_SUPPORT_STATUS in ./circuits.
   // Forked from coinbase_attestation and shares its four public inputs, so the
