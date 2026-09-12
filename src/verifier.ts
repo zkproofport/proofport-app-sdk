@@ -7,6 +7,7 @@
 import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
 import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './constants';
+import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 
 // ethers v5/v6 compatibility shims
 const _ethers = ethers as any;
@@ -102,7 +103,7 @@ export function getDefaultProvider(chainId: number) {
  * This function resolves the verifier contract from SDK config or proof response,
  * connects to the blockchain, and calls the verify() method with the proof and public inputs.
  *
- * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param circuit - The canonical circuit identifier. REQUIRED.
  * @param parsedProof - Parsed proof object containing proofHex and publicInputsHex
  * @param providerOrSigner - Optional ethers.js Provider or Signer instance. If not provided, uses default RPC for the chain
  * @param customVerifier - Optional custom verifier contract config (takes priority over responseVerifier)
@@ -222,7 +223,7 @@ function requireVerifier(circuit: CircuitType, verifier?: VerifierContract): Ver
 /**
  * Get verifier contract address for a circuit.
  *
- * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param circuit - The canonical circuit identifier. REQUIRED.
  * @param customVerifier - Optional custom verifier contract config
  * @returns Verifier contract address as hex string
  * @throws Error if no verifier is configured for the circuit
@@ -243,7 +244,7 @@ export function getVerifierAddress(
 /**
  * Get chain ID for a circuit's verifier contract.
  *
- * @param circuit - The canonical circuit identifier (e.g., "coinbase_attestation")
+ * @param circuit - The canonical circuit identifier. REQUIRED.
  * @param customVerifier - Optional custom verifier contract config
  * @returns Chain ID number (e.g., 11155111 for Sepolia, 84532 for Base Sepolia)
  * @throws Error if no verifier is configured for the circuit
@@ -259,6 +260,62 @@ export function getVerifierChainId(
   customVerifier?: VerifierContract
 ): number {
   return requireVerifier(circuit, customVerifier).chainId;
+}
+
+
+/**
+ * Where `scope` and `nullifier` sit in each circuit's public inputs.
+ *
+ * Keyed by `CircuitId`, which is the point: adding a circuit to the SDK makes
+ * this object a compile error until somebody opens that circuit's `fn main`
+ * and writes its offsets down. Nothing here can be inferred from the proof —
+ * the public inputs are a flat array of bytes with no framing.
+ *
+ * It replaced an `if / else if / else` chain whose final `else` handed every
+ * unrecognised circuit — and every call that named no circuit at all —
+ * Coinbase's offsets. For `arc_eligibility` that is not a near miss: its
+ * public inputs are signal_hash, domain_separator, action_hash, merkle root,
+ * scope, nullifier, so the nullifier slot under Coinbase's offsets holds the
+ * MERKLE ROOT, a value identical for every user. Duplicate detection built on
+ * it would report one person.
+ */
+const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number, number]; nullifier: readonly [number, number] }>> = Object.freeze({
+  // signal_hash, signer_list_merkle_root, scope, nullifier
+  coinbase_attestation: { scope: [64, 95], nullifier: [96, 127] },
+  // Same four fields in the same order as Coinbase.
+  giwa_attestation: { scope: [64, 95], nullifier: [96, 127] },
+  // country_list, country_list_length and is_included sit before scope.
+  coinbase_country_attestation: { scope: [86, 117], nullifier: [118, 149] },
+  // pubkey_modulus_limbs and the bounded domain sit before scope.
+  oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
+  // signal_hash, domain_separator, action_hash, merkle root, then the pair.
+  arc_eligibility: { scope: [128, 159], nullifier: [160, 191] },
+  // The Korea mDL circuits open with the pair; signal_hash is commented out.
+  mdl_kr_ownership: { scope: [0, 31], nullifier: [32, 63] },
+  mdl_kr_age: { scope: [0, 31], nullifier: [32, 63] },
+  mdl_kr_region: { scope: [0, 31], nullifier: [32, 63] },
+});
+
+/**
+ * The offsets for a circuit, or an error naming what was asked for.
+ *
+ * Throwing is the whole point. A caller that omits the circuit, or names one
+ * this SDK has never heard of, is asking a question with no answer; returning
+ * a guess produced a scope and a nullifier that belong to different bytes and
+ * looked exactly like real ones.
+ */
+function offsetsFor(circuit: string | undefined): { scope: readonly [number, number]; nullifier: readonly [number, number] } {
+  if (circuit === undefined) {
+    throw new Error(
+      `A circuit id is required to read public inputs: the layout differs per circuit and cannot be inferred from the proof. Pass one of: ${ALL_CIRCUIT_IDS.join(', ')}`,
+    );
+  }
+  if (!isCircuitId(circuit)) {
+    throw new Error(
+      `Unknown circuit '${circuit}'. Expected one of: ${ALL_CIRCUIT_IDS.join(', ')}`,
+    );
+  }
+  return PUBLIC_INPUT_OFFSETS[circuit];
 }
 
 /**
@@ -279,19 +336,9 @@ export function getVerifierChainId(
  */
 export function extractScopeFromPublicInputs(
   publicInputsHex: string[],
-  circuit?: string,
+  circuit: string,
 ): string | null {
-  let start: number, end: number;
-  if (circuit === 'coinbase_country_attestation') {
-    start = 86; end = 117;
-  } else if (circuit === 'oidc_domain_attestation') {
-    start = 83; end = 114;
-  } else if (circuit !== undefined && circuit.startsWith('mdl_kr_')) {
-    // All Korea mDL circuits: scope [0..31], nullifier_value [32..63]
-    start = 0; end = 31;
-  } else {
-    start = 64; end = 95;
-  }
+  const [start, end] = offsetsFor(circuit).scope;
   if (publicInputsHex.length <= end) return null;
   const scopeFields = publicInputsHex.slice(start, end + 1);
   return reconstructBytes32FromFields(scopeFields);
@@ -306,7 +353,10 @@ export function extractScopeFromPublicInputs(
  * detection without revealing the wallet address.
  *
  * @param publicInputsHex - Array of hex-encoded field elements
- * @param circuit - Circuit type (defaults to coinbase_attestation)
+ * @param circuit - Circuit id. REQUIRED: the layout differs per circuit and
+ *   cannot be inferred from the proof. It used to default to
+ *   `coinbase_attestation`, which returned the right-shaped bytes read from
+ *   the wrong place for every other circuit.
  * @returns Nullifier as hex string (bytes32), or null if publicInputs too short
  *
  * @example
@@ -317,19 +367,9 @@ export function extractScopeFromPublicInputs(
  */
 export function extractNullifierFromPublicInputs(
   publicInputsHex: string[],
-  circuit?: string,
+  circuit: string,
 ): string | null {
-  let start: number, end: number;
-  if (circuit === 'coinbase_country_attestation') {
-    start = 118; end = 149;
-  } else if (circuit === 'oidc_domain_attestation') {
-    start = 115; end = 146;
-  } else if (circuit !== undefined && circuit.startsWith('mdl_kr_')) {
-    // All Korea mDL circuits: scope [0..31], nullifier_value [32..63]
-    start = 32; end = 63;
-  } else {
-    start = 96; end = 127;
-  }
+  const [start, end] = offsetsFor(circuit).nullifier;
   if (publicInputsHex.length <= end) return null;
   const nullifierFields = publicInputsHex.slice(start, end + 1);
   return reconstructBytes32FromFields(nullifierFields);

@@ -533,13 +533,28 @@ Extracts the nullifier (bytes32) from a public inputs array.
 
 **Parameters:**
 - `publicInputsHex` - Array of public input hex strings
-- `circuit` - Circuit type (optional, for validation)
+- `circuit` - Circuit id. **Required.** The layout differs per circuit and cannot be
+  inferred from the proof, so omitting it throws rather than guessing. It used to
+  default to Coinbase's offsets, which returned the right-shaped bytes from the
+  wrong place.
 
-**Returns:** Nullifier as hex string with `0x` prefix, or null if not found
+**Returns:** Nullifier as hex string with `0x` prefix, or null if the public
+inputs are too short. Throws on a missing or unknown circuit id.
 
-**Circuit-Specific Byte Offsets:**
-- `coinbase_attestation`: fields at byte offsets 96-127 (32 consecutive field elements)
-- `coinbase_country_attestation`: fields at byte offsets 118-149 (32 consecutive field elements)
+**Circuit-Specific Field Offsets** (one field element per byte):
+
+| Circuit | Nullifier |
+|---|---|
+| `coinbase_attestation` | 96–127 |
+| `giwa_attestation` | 96–127 (its `fn main` is identical to Coinbase's) |
+| `coinbase_country_attestation` | 118–149 |
+| `oidc_domain_attestation` | 115–146 |
+| `arc_eligibility` | 160–191 |
+| `mdl_kr_ownership` / `mdl_kr_age` / `mdl_kr_region` | 32–63 |
+
+Arc's are 64 fields further along because `domain_separator` and `action_hash`
+sit between `signal_hash` and the Merkle root. Read under Coinbase's offsets,
+its nullifier slot holds the **Merkle root** — the same value for every user.
 
 ```typescript
 import { extractNullifierFromPublicInputs } from '@zkproofport-app/sdk';
@@ -553,13 +568,21 @@ Extracts the scope (bytes32) from a public inputs array.
 
 **Parameters:**
 - `publicInputsHex` - Array of public input hex strings
-- `circuit` - Circuit type (optional, for validation)
+- `circuit` - Circuit id. **Required**, for the same reason as above.
 
-**Returns:** Scope as hex string with `0x` prefix, or null if not found
+**Returns:** Scope as hex string with `0x` prefix, or null if the public inputs
+are too short. Throws on a missing or unknown circuit id.
 
-**Circuit-Specific Byte Offsets:**
-- `coinbase_attestation`: fields at byte offsets 64-95 (32 consecutive field elements)
-- `coinbase_country_attestation`: fields at byte offsets 86-117 (32 consecutive field elements)
+**Circuit-Specific Field Offsets:**
+
+| Circuit | Scope |
+|---|---|
+| `coinbase_attestation` | 64–95 |
+| `giwa_attestation` | 64–95 |
+| `coinbase_country_attestation` | 86–117 |
+| `oidc_domain_attestation` | 83–114 |
+| `arc_eligibility` | 128–159 |
+| `mdl_kr_ownership` / `mdl_kr_age` / `mdl_kr_region` | 0–31 |
 
 #### `isNullifierRegistered(nullifier: string, registryAddress: string, provider: Provider): Promise<boolean>`
 
