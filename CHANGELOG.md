@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.0...v0.3.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* reach Arc Testnet, the one chain with a verifier and no RPC ([9fd26bb](https://github.com/zkproofport/proofport-app-sdk/commit/9fd26bb9fc02dc0fcef26db0805f73dfc91a4587))
+
 ## [0.3.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.16...v0.3.0) (2026-09-12)
 
 
