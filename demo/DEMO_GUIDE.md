@@ -16,7 +16,7 @@ The demo showcases:
 Start the demo server:
 
 ```bash
-cd /Users/nhn/Workspace/proofport-app-dev/proofport-app-sdk/demo
+cd <repo>/proofport-app-sdk/demo
 node server.js
 ```
 
