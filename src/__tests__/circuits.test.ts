@@ -14,6 +14,7 @@ import {
   ALL_CIRCUIT_IDS,
   CIRCUIT_IDS,
   CIRCUIT_SUPPORT_STATUS,
+  EXPERIMENTAL_CIRCUIT_IDS,
   PLANNED_CIRCUIT_IDS,
   SUPPORTED_CIRCUIT_IDS,
   getCircuitSupportStatus,
@@ -29,6 +30,7 @@ const NARGO_CIRCUIT_NAMES = [
   'coinbase_attestation',
   'coinbase_country_attestation',
   'oidc_domain_attestation',
+  'arc_eligibility',
   'giwa_attestation',
   'mdl_kr_ownership',
   'mdl_kr_age',
@@ -100,8 +102,8 @@ describe('circuit support status', () => {
     expect(Object.keys(CIRCUIT_SUPPORT_STATUS).sort()).toEqual([...ALL_CIRCUIT_IDS].sort());
   });
 
-  it('only uses the two declared status values', () => {
-    const allowed: CircuitSupportStatus[] = ['supported', 'planned'];
+  it('only uses the three declared status values', () => {
+    const allowed: CircuitSupportStatus[] = ['supported', 'experimental', 'planned'];
     for (const id of ALL_CIRCUIT_IDS) {
       expect(allowed).toContain(CIRCUIT_SUPPORT_STATUS[id]);
     }
@@ -115,6 +117,16 @@ describe('circuit support status', () => {
     ]);
   });
 
+  // Arc used to sit in the list above, which told a reader to build on a
+  // circuit whose only verifier is on a testnet Circle has not given a mainnet
+  // chain id for. Neither existing word was true of it, so a third was added
+  // rather than picking the closer lie.
+  it('marks Arc experimental — provable, testnet only, layout still open', () => {
+    expect([...EXPERIMENTAL_CIRCUIT_IDS]).toEqual(['arc_eligibility']);
+    expect(isSupportedCircuitId('arc_eligibility')).toBe(false);
+    expect(isCircuitId('arc_eligibility')).toBe(true);
+  });
+
   it('marks GIWA and the three mDL circuits as planned', () => {
     expect([...PLANNED_CIRCUIT_IDS]).toEqual([
       'giwa_attestation',
@@ -124,8 +136,8 @@ describe('circuit support status', () => {
     ]);
   });
 
-  it('partitions every circuit into exactly one of the two buckets', () => {
-    const union = [...SUPPORTED_CIRCUIT_IDS, ...PLANNED_CIRCUIT_IDS];
+  it('partitions every circuit into exactly one of the three buckets', () => {
+    const union = [...SUPPORTED_CIRCUIT_IDS, ...EXPERIMENTAL_CIRCUIT_IDS, ...PLANNED_CIRCUIT_IDS];
     expect(union.sort()).toEqual([...ALL_CIRCUIT_IDS].sort());
     expect(new Set(union).size).toBe(ALL_CIRCUIT_IDS.length);
   });

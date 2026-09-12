@@ -31,7 +31,7 @@
  *   not officially supported yet. Availability, inputs and public-input layout
  *   may change without a major version bump.
  */
-export type CircuitSupportStatus = 'supported' | 'planned';
+export type CircuitSupportStatus = 'supported' | 'experimental' | 'planned';
 
 /**
  * Canonical circuit identifiers, keyed by a stable constant name.
@@ -55,6 +55,8 @@ export const CIRCUIT_IDS = Object.freeze({
   COINBASE_COUNTRY_ATTESTATION: 'coinbase_country_attestation',
   /** OIDC email-domain attestation. Officially supported. */
   OIDC_DOMAIN_ATTESTATION: 'oidc_domain_attestation',
+  /** Arc eligibility: one EIP-712 action, authorized. Officially supported. */
+  ARC_ELIGIBILITY: 'arc_eligibility',
   /** GIWA attestation. Planned — not officially supported yet. */
   GIWA_ATTESTATION: 'giwa_attestation',
   /** Korea Mobile ID ownership. Planned — not officially supported yet. */
@@ -93,6 +95,7 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     coinbase_attestation: 'supported',
     coinbase_country_attestation: 'supported',
     oidc_domain_attestation: 'supported',
+    arc_eligibility: 'experimental',
     giwa_attestation: 'planned',
     mdl_kr_ownership: 'planned',
     mdl_kr_age: 'planned',
@@ -123,6 +126,7 @@ export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.free
   coinbase_attestation: 'coinbase-attestation/target/vk/vk',
   coinbase_country_attestation: 'coinbase-country-attestation/target/vk/vk',
   oidc_domain_attestation: 'oidc-domain-attestation/target/vk/vk',
+  arc_eligibility: 'arc-eligibility/target/vk/vk',
   giwa_attestation: 'giwa-attestation/target/vk/vk',
   mdl_kr_ownership: 'mdl/kr-ownership/target/vk/vk',
   mdl_kr_age: 'mdl/kr-age/target/vk/vk',
@@ -155,6 +159,20 @@ export const SUPPORTED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
  *
  * Derived from {@link CIRCUIT_SUPPORT_STATUS}, so it cannot fall out of sync.
  */
+/**
+ * Circuits you can prove today, on a testnet, with everything subject to change.
+ *
+ * `arc_eligibility` is the reason this status exists. Calling it `planned`
+ * would be wrong — the circuit compiles, the verifier is deployed and a proof
+ * verifies against it — and calling it `supported` would be worse, because the
+ * only deployment is Arc Testnet, Circle has not published a mainnet chain id,
+ * and the public-input layout is still open. Neither existing word was true, so
+ * the honest move was a third word rather than picking the closer lie.
+ */
+export const EXPERIMENTAL_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
+  ALL_CIRCUIT_IDS.filter(id => CIRCUIT_SUPPORT_STATUS[id] === 'experimental'),
+);
+
 export const PLANNED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
   ALL_CIRCUIT_IDS.filter((id) => CIRCUIT_SUPPORT_STATUS[id] === 'planned')
 );
@@ -208,3 +226,30 @@ export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatu
   }
   return CIRCUIT_SUPPORT_STATUS[circuit];
 }
+
+/**
+ * Whether a circuit's relay request must carry a wallet signature.
+ *
+ * The SDK checks this to fail fast — "Signer not set" locally beats a 401 from
+ * the relay two round trips later, with nothing saying which circuit needed
+ * what. The relay declares its OWN copy on purpose and does not import this
+ * one: it is a security boundary, and an auth policy that a published package
+ * can change is not a policy. A test in the relay asserts the two agree.
+ *
+ * `satisfies` and not an annotation, so a circuit added above is a compile
+ * error here until somebody decides which it is.
+ */
+export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
+  coinbase_attestation: true,
+  coinbase_country_attestation: true,
+  // Same Coinbase-attested wallet as above; what changes is that it signs an
+  // EIP-712 action rather than signal_hash.
+  arc_eligibility: true,
+  // The signature is inside the OIDC identity token, checked by the prover.
+  oidc_domain_attestation: false,
+  // Web2 (OmniOne CX) flows with no wallet binding at all.
+  mdl_kr_ownership: false,
+  mdl_kr_age: false,
+  mdl_kr_region: false,
+  giwa_attestation: false,
+} satisfies Record<CircuitId, boolean>;
