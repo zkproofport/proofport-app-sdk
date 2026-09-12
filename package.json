@@ -16,6 +16,11 @@
       "import": "./dist/circuits.esm.js",
       "require": "./dist/circuits.js"
     },
+    "./typedAction": {
+      "types": "./dist/typedAction.d.ts",
+      "import": "./dist/typedAction.esm.js",
+      "require": "./dist/typedAction.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

@@ -178,11 +178,72 @@ export interface MdlKrRegionInputs {
 export interface EmptyInputs {}
 
 /**
+ * The EIP-712 action an `arc_eligibility` proof binds the wallet's signature to.
+ *
+ * Exactly what `eth_signTypedData_v4` takes, because that is what the wallet is
+ * shown and what it signs. The app does not build this — the dapp does — so the
+ * user reads the dapp's own field names and values in their wallet instead of
+ * an opaque hash.
+ *
+ * @example
+ * ```typescript
+ * const action: TypedAction = {
+ *   domain: { name: 'MyVault', version: '1', chainId: 5042002,
+ *             verifyingContract: '0x…' },
+ *   types: { Deposit: [ { name: 'amount', type: 'uint256' },
+ *                       { name: 'nonce',  type: 'uint256' } ] },
+ *   primaryType: 'Deposit',
+ *   message: { amount: '1000000', nonce: '7' },
+ * };
+ * ```
+ */
+export interface TypedAction {
+  domain: {
+    name: string;
+    version: string;
+    chainId: number;
+    /** The contract that will verify this signature. */
+    verifyingContract: string;
+  };
+  /** EIP-712 struct definitions. `EIP712Domain` is added by the wallet. */
+  types: Record<string, Array<{ name: string; type: string }>>;
+  /** Which struct in `types` the message is. */
+  primaryType: string;
+  message: Record<string, unknown>;
+}
+
+/**
+ * Input parameters for the Arc eligibility circuit.
+ *
+ * Proves the same Coinbase attestation as `coinbase_attestation`, with the
+ * wallet signing a typed action instead of an opaque signal hash. The proof's
+ * public inputs then carry the action's domain separator and struct hash, so a
+ * verifier checks WHICH action was authorised — not merely that somebody
+ * eligible signed something.
+ *
+ * `action` is REQUIRED. There is no version of this circuit without one: its
+ * public inputs have the two slots and nothing else can fill them. Ask for
+ * `coinbase_attestation` when there is no action to bind.
+ *
+ * @property scope - Scope string for nullifier derivation
+ * @property action - The EIP-712 action the wallet signs
+ * @property userAddress - Ethereum address to prove ownership of (optional)
+ * @property rawTransaction - Raw attestation transaction data (optional)
+ */
+export interface ArcEligibilityInputs {
+  scope: string;
+  action: TypedAction;
+  userAddress?: string;
+  rawTransaction?: string;
+}
+
+/**
  * Union type of all circuit-specific input types.
  * Each circuit type has a corresponding input interface.
  */
 export type CircuitInputs =
   | CoinbaseKycInputs
+  | ArcEligibilityInputs
   | CoinbaseCountryInputs
   | OidcDomainInputs
   | MdlKrOwnershipInputs

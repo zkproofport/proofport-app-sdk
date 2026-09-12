@@ -14,8 +14,11 @@ import type {
   MdlKrRegionInputs,
   DeepLinkComponents,
   CircuitType,
+  ArcEligibilityInputs,
 } from './types';
 import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
+import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
+import { validateTypedAction } from './typedAction';
 
 /**
  * Generates a unique request ID for proof requests.
@@ -246,9 +249,23 @@ export function parseProofResponseUrl(url: string): ProofResponse | null {
       return null;
     }
 
+    // A missing or unrecognised circuit is a REJECTION, not a default.
+    //
+    // This used to fall back to `coinbase_attestation`. A callback carrying a
+    // country or OIDC proof, or a circuit this build has never heard of, was
+    // then handed to the caller labelled Coinbase KYC -- the parse succeeded,
+    // the label was wrong, and nothing downstream could tell. Whoever reads
+    // `response.circuit` decides which verifier and which public-input layout
+    // to use, so the wrong label is a proof checked against another circuit's
+    // bytes.
+    const circuit = urlObj.searchParams.get('circuit');
+    if (!circuit || !isCircuitId(circuit)) {
+      return null;
+    }
+
     const response: ProofResponse = {
       requestId,
-      circuit: urlObj.searchParams.get('circuit') as CircuitType || 'coinbase_attestation',
+      circuit,
       status,
     };
 
@@ -629,17 +646,15 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     return { valid: false, error: 'Missing circuit type' };
   }
 
-  if (
-    ![
-      'coinbase_attestation',
-      'coinbase_country_attestation',
-      'oidc_domain_attestation',
-      'mdl_kr_ownership',
-      'mdl_kr_age',
-      'mdl_kr_region',
-    ].includes(request.circuit)
-  ) {
-    return { valid: false, error: `Invalid circuit type: ${request.circuit}` };
+  // The list is the SDK's own, not a copy. The copy that used to sit here
+  // named six circuits and had missed two — `giwa_attestation` and
+  // `arc_eligibility` — so a link for either was refused as an invalid type
+  // while every other layer accepted it.
+  if (!isCircuitId(request.circuit)) {
+    return {
+      valid: false,
+      error: `Invalid circuit type: ${request.circuit}. Expected one of: ${ALL_CIRCUIT_IDS.join(', ')}`,
+    };
   }
 
   if (!request.callbackUrl) {
@@ -687,6 +702,15 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     const mdlError = validateMdlInputs(request.circuit, request.inputs);
     if (mdlError) {
       return { valid: false, error: mdlError };
+    }
+  } else if (request.circuit === 'arc_eligibility') {
+    const inputs = request.inputs as Partial<ArcEligibilityInputs>;
+    if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
+      return { valid: false, error: 'Invalid userAddress format' };
+    }
+    const actionError = validateTypedAction(inputs.action);
+    if (actionError) {
+      return { valid: false, error: actionError };
     }
   }
 

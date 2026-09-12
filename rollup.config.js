@@ -94,4 +94,37 @@ export default [
       }),
     ],
   },
+  // "./typedAction" subpath — checking the EIP-712 action an arc_eligibility
+  // proof binds to, on its own. Same reason as "./circuits" above: the mobile
+  // app validates an action before asking a wallet to sign, and importing it
+  // from the package ROOT drags qrcode, ethers and @babel/runtime into a React
+  // Native bundle and into jest. Its only import is a TYPE, which is erased.
+  {
+    input: 'src/typedAction.ts',
+    output: [
+      {
+        file: 'dist/typedAction.js',
+        format: 'cjs',
+        sourcemap: true,
+      },
+      {
+        file: 'dist/typedAction.esm.js',
+        format: 'esm',
+        sourcemap: true,
+      },
+      {
+        file: 'dist/typedAction.mjs',
+        format: 'esm',
+        sourcemap: true,
+      },
+    ],
+    plugins: [
+      resolve(),
+      commonjs(),
+      typescript({
+        tsconfig: './tsconfig.json',
+        declaration: false,
+      }),
+    ],
+  },
 ];

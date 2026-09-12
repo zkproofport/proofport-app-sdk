@@ -59,6 +59,8 @@ import {
   CIRCUIT_METADATA,
   RELAY_URLS,
 } from './constants';
+import { CIRCUIT_NEEDS_WALLET_SIGNATURE, type CircuitId } from './circuits';
+import { validateTypedAction } from './typedAction';
 import type { SDKEnvironment } from './types';
 
 
@@ -1187,11 +1189,13 @@ export class ProofportSDK {
    * const result = await sdk.waitForProof(relay.requestId);
    * ```
    */
-  // Circuits that require wallet signature (used as circuit input)
-  private static readonly WALLET_SIGNATURE_CIRCUITS: CircuitType[] = [
-    'coinbase_attestation',
-    'coinbase_country_attestation',
-  ];
+  // Which circuits need a wallet signature, from the one record in
+  // src/circuits.ts. The typed-out pair that used to sit here had missed
+  // arc_eligibility, so a dapp calling createRelayRequest() for it with no
+  // signer got no local error and a relay 401 two round trips later.
+  private static needsWalletSignature(circuit: CircuitType): boolean {
+    return CIRCUIT_NEEDS_WALLET_SIGNATURE[circuit as CircuitId] === true;
+  }
 
   async createRelayRequest(
     circuit: CircuitType,
@@ -1208,7 +1212,7 @@ export class ProofportSDK {
       throw new Error('relayUrl is required. Set it in ProofportSDK config.');
     }
 
-    const needsSignature = ProofportSDK.WALLET_SIGNATURE_CIRCUITS.includes(circuit);
+    const needsSignature = ProofportSDK.needsWalletSignature(circuit);
 
     if (needsSignature && !this.signer) {
       throw new Error('Signer not set. Call setSigner() first. Wallet signature is required for this circuit.');
@@ -1220,6 +1224,18 @@ export class ProofportSDK {
       const mdlError = validateMdlInputs(circuit, inputs);
       if (mdlError) {
         throw new Error(`${mdlError} (circuit: ${circuit})`);
+      }
+    }
+
+    // arc_eligibility: the action is what the proof binds to, so a request
+    // without a usable one cannot be honoured. Checked here, before a
+    // challenge is burned, because the alternative is a refusal from inside
+    // the mobile app -- a screen the dapp developer never sees, reached after
+    // the person has already scanned a QR code.
+    if (circuit === 'arc_eligibility') {
+      const actionError = validateTypedAction((inputs as { action?: unknown }).action);
+      if (actionError) {
+        throw new Error(`${actionError} (circuit: ${circuit})`);
       }
     }
 
