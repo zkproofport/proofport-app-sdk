@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.16...v0.3.0) (2026-09-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* `CircuitSupportStatus` gains `'experimental'`, and `isSupportedCircuitId('arc_eligibility')` now returns false. A caller that gates on the status sees Arc drop out of the supported set, which is the intent: try it, do not ship on it.
+* `circuit` is required on both extractors. It was typed optional while the body threw, so a caller found out at run time; now the compiler says so. Callers that relied on the old default were reading Coinbase's offsets for whatever circuit they actually had.
+
+### Features
+
+* arc_eligibility support -- typed actions, checked before they are sent ([8dba791](https://github.com/zkproofport/proofport-app-sdk/commit/8dba791febbbdd73f1f95804f22f345b436c45b1))
+* describe arc_eligibility, and document it as experimental ([ed8cab3](https://github.com/zkproofport/proofport-app-sdk/commit/ed8cab379bda50137101a9538ee6cfcbfd476f61))
+* mark Arc experimental, a third support status ([abe45ae](https://github.com/zkproofport/proofport-app-sdk/commit/abe45aeb772ae4d2e34726619e4af7faed47ee44))
+* read public inputs per circuit, and refuse to guess which ([b2bbb8f](https://github.com/zkproofport/proofport-app-sdk/commit/b2bbb8f430a75b5ab3e4230c0737a7fe77e8ec1b))
+
 ## [0.2.16](https://github.com/zkproofport/proofport-app-sdk/compare/v0.2.15...v0.2.16) (2026-09-04)
 
 
