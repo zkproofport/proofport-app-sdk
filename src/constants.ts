@@ -181,6 +181,11 @@ export const RPC_ENDPOINTS: Record<number, string> = {
   84532: 'https://sepolia.base.org', // Base Sepolia
   8453: 'https://mainnet.base.org', // Base Mainnet
   91342: 'https://sepolia-rpc.giwa.io', // GIWA Sepolia
+  // Arc Testnet. The arc_eligibility verifier is deployed here and nowhere
+  // else, and this line was missing on 2026-09-12 — the circuit shipped, a
+  // phone produced a valid proof, and on-chain verification answered "No RPC
+  // endpoint configured for chain 5042002", which reads like the proof's fault.
+  5042002: 'https://rpc.testnet.arc.io', // Arc Testnet
 };
 
 /**
