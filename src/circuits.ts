@@ -55,7 +55,7 @@ export const CIRCUIT_IDS = Object.freeze({
   COINBASE_COUNTRY_ATTESTATION: 'coinbase_country_attestation',
   /** OIDC email-domain attestation. Officially supported. */
   OIDC_DOMAIN_ATTESTATION: 'oidc_domain_attestation',
-  /** Arc eligibility: one EIP-712 action, authorized. Officially supported. */
+  /** Arc eligibility: exact EIP-712 action authorization. Experimental on Arc Testnet. */
   ARC_ELIGIBILITY: 'arc_eligibility',
   /** GIWA attestation. Planned — not officially supported yet. */
   GIWA_ATTESTATION: 'giwa_attestation',

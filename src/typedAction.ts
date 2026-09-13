@@ -20,6 +20,11 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 /**
  * The reason the value is not a usable action, or `null` when it is one.
  *
+ * Structural validation only, not application authorization policy. Consumers
+ * (e.g. EligibilityGate) must independently enforce the expected chain, verifying
+ * contract, actor, action parameters, nonce and deadline as applicable.
+ * EIP-712 signs only fields declared in types, not extra message properties.
+ *
  * A string rather than a boolean because every caller shows it to somebody —
  * a dapp developer reading a validation error, or a person looking at the
  * mobile app's demo screen.
