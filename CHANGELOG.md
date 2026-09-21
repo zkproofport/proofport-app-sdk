@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.1...v0.3.2) (2026-09-21)
+
+
+### Features
+
+* **sdk:** one table decides whether a circuit binds an action ([2aaca2e](https://github.com/zkproofport/proofport-app-sdk/commit/2aaca2e2f02d648da2447420eec1661dead0af1b))
+
 ## [0.3.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.0...v0.3.1) (2026-09-12)
 
 
