@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.2...v0.3.3) (2026-09-21)
+
+
+### Bug Fixes
+
+* **sdk:** keep 'required' a usable action state ([7bf5382](https://github.com/zkproofport/proofport-app-sdk/commit/7bf5382825a2f674fee569febd34300b803c2b16))
+
 ## [0.3.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.1...v0.3.2) (2026-09-21)
 
 
