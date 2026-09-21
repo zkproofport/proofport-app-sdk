@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Four more identifiers are reserved and planned: GIWA attestation and the three Korean mobile ID (mDL) circuits. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against testnet deployments and are marked experimental: Arc eligibility and GIWA attestation. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -125,7 +125,7 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
 | `CIRCUIT_IDS.ARC_ELIGIBILITY` | `arc_eligibility` | _Experimental_ |
-| `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | Planned |
+| `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | _Experimental_ |
 | `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
 | `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
 | `CIRCUIT_IDS.MDL_KR_REGION` | `mdl_kr_region` | Planned |
@@ -295,8 +295,20 @@ const relay = await sdk.createRelayRequest(CIRCUIT_IDS.ARC_ELIGIBILITY, {
 });
 ```
 
-`action` is required. A request without one is refused rather than proved
-against some default, because the signature is the whole point.
+`action` is optional, as of 2026-09-22. Send one and the wallet signs the
+typed data; send none and it personal_signs the request's signal hash, exactly
+as Coinbase KYC does. The circuit branches, and it refuses a request that
+tries to be both: with an action `signal_hash` must be empty, without one the
+EIP-712 pair must be.
+
+It used to be required, and not by choice: the circuit had no second path, so
+a request without an action produced a proof attempt that failed inside the
+prover. `CIRCUIT_ACTION_BINDING` now reports `'optional'` for it.
+
+One more thing worth knowing if you count people: its nullifier is
+`keccak(keccak(wallet ++ keccak("arc_eligibility")) ++ scope)` -- the wallet
+and a constant compiled into the circuit. It used to come from `signal_hash`,
+which nothing constrains and, in action mode, nobody signs.
 
 **Testnet only.** The verifier is deployed on Arc Testnet (chain `5042002`) and
 nowhere else. Circle has not published a mainnet chain id, so there is nothing
@@ -308,13 +320,81 @@ The public inputs are `signal_hash`, `domain_separator`, `action_hash`,
 other circuit, which is why `extractScopeFromPublicInputs` and
 `extractNullifierFromPublicInputs` require the circuit id and refuse to guess.
 
+### `giwa_attestation`
+
+The same attestation shape as Coinbase KYC, against GIWA's attester on GIWA
+Sepolia. A request needs a scope and nothing else; the app connects the wallet.
+
+```typescript
+const { deepLink } = await sdk.createRelayRequest(
+  CIRCUIT_IDS.GIWA_ATTESTATION,
+  { scope: 'myapp.com' },
+  { dappName: 'My App' },
+);
+```
+
+**An action is optional here, as it is for Arc.** Send one
+and the wallet signs EIP-712 typed data, so the person reads named fields and
+the proof carries what they approved. Send none and the wallet signs the
+request's signal hash, exactly as Coinbase KYC does. The circuit itself
+branches, and it refuses a request that tries to be both: with an action the
+signal hash must be empty, without one the EIP-712 pair must be.
+
+```typescript
+await sdk.createRelayRequest(
+  CIRCUIT_IDS.GIWA_ATTESTATION,
+  {
+    scope: 'myapp.com',
+    action: {
+      domain: { name: 'My Vault', version: '1', chainId: 91342, verifyingContract: '0x…' },
+      types: { Deposit: [{ name: 'amount', type: 'uint256' }] },
+      primaryType: 'Deposit',
+      message: { amount: '1000000' },
+    },
+  },
+  { dappName: 'My App' },
+);
+```
+
+Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
+`signer_list_merkle_root`, `scope`, `nullifier` — the same order as Arc, and
+64 bytes longer than the Coinbase layout it used to share. Anything holding the
+old offsets reads the Merkle root where the nullifier is.
+
+One more difference worth knowing if you count people: its nullifier is
+`keccak(keccak(wallet ++ keccak("giwa_attestation")) ++ scope)`. The wallet and
+a constant compiled into the circuit, so one wallet in one scope has exactly
+one nullifier and there is no input a prover can vary.
+
+**Testnet only.** The verifier lives on GIWA Sepolia (chain `91342`) and
+nowhere else, so the mobile app keeps it behind Developer Mode. A mainnet
+deployment is planned; until it exists, do not ship on this.
+
+### Which circuits take an action
+
+`CIRCUIT_ACTION_BINDING` is the one table, so you do not have to learn which
+circuit names are special:
+
+| What the circuit does with an action | Circuits |
+|---|---|
+| Signs it when present, signs the signal hash when not | `arc_eligibility`, `giwa_attestation` |
+| Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain, the three mDL circuits |
+
+```typescript
+import { circuitActionBinding } from '@zkproofport-app/sdk';
+
+circuitActionBinding('arc_eligibility');   // 'optional'
+circuitActionBinding('giwa_attestation');  // 'optional'
+circuitActionBinding('coinbase_attestation'); // 'none'
+```
+
+Sending an action to a circuit that cannot prove one is an error rather than a
+silent drop: a dropped action would leave you believing a proof authorized
+something the circuit never saw.
+
 ## Planned Circuits
 
 The identifiers below are reserved and exported, and the circuits exist — but they are **not officially supported yet**. Availability, input shape and public-input layout can change without a major version bump, so treat anything here as provisional. `CIRCUIT_SUPPORT_STATUS` reports each of them as `planned`.
-
-### `giwa_attestation`
-
-Reserved identifier for GIWA attestation. It is a fork of `coinbase_attestation` and carries the same four public inputs, but there is no dedicated input type for it and no supported request flow. The ID is exported so that every layer spells it the same way; do not build on it yet.
 
 ### `mdl_kr_ownership`
 
@@ -997,6 +1077,8 @@ import type {
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
   OidcDomainInputs,
+  ActionBoundInputs,
+  TypedAction,
   MdlKrOwnershipInputs,
   MdlKrAgeInputs,
   MdlKrRegionInputs,
@@ -1024,7 +1106,9 @@ import type {
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
 | `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
-| `ArcEligibilityInputs` | Inputs for `arc_eligibility`: `{ scope, action, userAddress?, rawTransaction? }` — `action` is required |
+| `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — required for `arc_eligibility`, optional for `giwa_attestation` |
+| `ArcEligibilityInputs` | Deprecated alias of `ActionBoundInputs`. It declared `action` as required, which was true of the circuit and not of the shape |
+| `GiwaAttestationInputs` | Alias of `ActionBoundInputs`, for `giwa_attestation` |
 | `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |

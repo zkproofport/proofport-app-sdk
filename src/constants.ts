@@ -103,16 +103,22 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   },
   // Planned circuit — the identifier is reserved and the circuit exists, but it
   // is not officially supported yet. See CIRCUIT_SUPPORT_STATUS in ./circuits.
-  // Forked from coinbase_attestation and shares its four public inputs, so the
-  // count is the byte-flattened total (4 x [u8; 32] = 128), matching the
-  // COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT indices below. The
-  // coinbase_attestation entry above reports a legacy logical count of 2 and is
-  // left as-is for backwards compatibility.
+  // Forked from coinbase_attestation, then given the EIP-712 pair and a
+  // branch: with an action the wallet signs the typed data and signal_hash is
+  // zero; without one it signs signal_hash and the pair is zero. Read off the
+  // compiled ABI (6 x [u8; 32] = 192): signal_hash 0-31, domain_separator
+  // 32-63, action_hash 64-95, signer_list_merkle_root 96-127, scope 128-159,
+  // nullifier 160-191 -- the same order as arc_eligibility.
+  //
+  // Unlike Arc, signal_hash is NOT part of this circuit's nullifier. That one
+  // derives its nullifier from a public input nobody signs and nothing
+  // constrains, so one wallet can mint as many nullifiers as it likes; here
+  // the secret is the address plus a constant compiled into the circuit.
   giwa_attestation: {
     name: 'GIWA Attestation',
-    description: 'Prove GIWA identity verification (planned — not officially supported yet)',
-    publicInputsCount: 128,
-    publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'scope', 'nullifier'],
+    description: 'Prove GIWA identity verification, optionally authorizing one EIP-712 action (planned — not officially supported yet)',
+    publicInputsCount: 192,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier'],
   },
   // Korea Mobile ID (mDL) circuits. Planned — not officially supported yet.
   // Counts are byte-flattened field totals from the compiled circuit ABIs:

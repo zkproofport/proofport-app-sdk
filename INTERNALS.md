@@ -546,15 +546,20 @@ inputs are too short. Throws on a missing or unknown circuit id.
 | Circuit | Nullifier |
 |---|---|
 | `coinbase_attestation` | 96–127 |
-| `giwa_attestation` | 96–127 (its `fn main` is identical to Coinbase's) |
+| `giwa_attestation` | 160–191 (same layout as Arc since 2026-09-22) |
 | `coinbase_country_attestation` | 118–149 |
 | `oidc_domain_attestation` | 115–146 |
 | `arc_eligibility` | 160–191 |
 | `mdl_kr_ownership` / `mdl_kr_age` / `mdl_kr_region` | 32–63 |
 
-Arc's are 64 fields further along because `domain_separator` and `action_hash`
-sit between `signal_hash` and the Merkle root. Read under Coinbase's offsets,
-its nullifier slot holds the **Merkle root** — the same value for every user.
+Arc's and GIWA's are 64 fields further along because `domain_separator` and
+`action_hash` sit between `signal_hash` and the Merkle root. Read under
+Coinbase's offsets, their nullifier slot holds the **Merkle root** — the same
+value for every user.
+
+GIWA shared Coinbase's layout until 2026-09-22, when it gained the same
+EIP-712 pair. Anything caching the old offsets reads a per-user value where a
+shared one is, and counts every user as one person.
 
 ```typescript
 import { extractNullifierFromPublicInputs } from '@zkproofport-app/sdk';
@@ -578,7 +583,7 @@ are too short. Throws on a missing or unknown circuit id.
 | Circuit | Scope |
 |---|---|
 | `coinbase_attestation` | 64–95 |
-| `giwa_attestation` | 64–95 |
+| `giwa_attestation` | 128–159 |
 | `coinbase_country_attestation` | 86–117 |
 | `oidc_domain_attestation` | 83–114 |
 | `arc_eligibility` | 128–159 |

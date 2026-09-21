@@ -43,10 +43,18 @@ describe('a dapp hears about a bad action from the SDK', () => {
   });
   afterEach(() => vi.clearAllMocks());
 
-  it('refuses arc_eligibility with no action, before any network call', async () => {
+  it('refuses an action on a circuit that cannot prove one, before any network call', async () => {
+    // Arc stopped being the example here on 2026-09-22: its circuit gained a
+    // branch, so a request with no action is now a plain attestation rather
+    // than a refusal. What must still fail early is the opposite mistake --
+    // an action sent to a circuit with no slots for it, which would otherwise
+    // be dropped and leave the dapp believing something was authorized.
     await expect(
-      sdk().createRelayRequest('arc_eligibility', { scope: 'myapp.com' } as never),
-    ).rejects.toThrow(/action is required for arc_eligibility/);
+      sdk().createRelayRequest('coinbase_attestation', {
+        scope: 'myapp.com',
+        action: GOOD_ACTION,
+      } as never),
+    ).rejects.toThrow(/no action inputs/);
     // Nothing was fetched, so no challenge was burned.
     expect(global.fetch).not.toHaveBeenCalled();
   });
@@ -76,10 +84,16 @@ describe('a dapp hears about a bad action from the SDK', () => {
   });
 
   it('names the circuit in the message, so a multi-circuit dapp knows which call', async () => {
+    // Arc with no action is a valid request since its circuit gained the
+    // branch, so the example is now the refusal that remains: an action sent
+    // where nothing can prove it.
     const err = await sdk()
-      .createRelayRequest('arc_eligibility', { scope: 'myapp.com' } as never)
+      .createRelayRequest('coinbase_attestation', {
+        scope: 'myapp.com',
+        action: GOOD_ACTION,
+      } as never)
       .catch((e: Error) => e.message);
-    expect(err).toContain('arc_eligibility');
+    expect(err).toContain('coinbase_attestation');
   });
 
   it('lets a complete action through to the relay', async () => {

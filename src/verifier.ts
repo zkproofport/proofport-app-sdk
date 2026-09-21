@@ -282,8 +282,10 @@ export function getVerifierChainId(
 const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number, number]; nullifier: readonly [number, number] }>> = Object.freeze({
   // signal_hash, signer_list_merkle_root, scope, nullifier
   coinbase_attestation: { scope: [64, 95], nullifier: [96, 127] },
-  // Same four fields in the same order as Coinbase.
-  giwa_attestation: { scope: [64, 95], nullifier: [96, 127] },
+  // No longer Coinbase's layout. The GIWA circuit gained the EIP-712 pair, so
+  // it reads like Arc: signal_hash, domain_separator, action_hash, merkle
+  // root, then scope and nullifier 64 bytes further along than Coinbase.
+  giwa_attestation: { scope: [128, 159], nullifier: [160, 191] },
   // country_list, country_list_length and is_included sit before scope.
   coinbase_country_attestation: { scope: [86, 117], nullifier: [118, 149] },
   // pubkey_modulus_limbs and the bounded domain sit before scope.

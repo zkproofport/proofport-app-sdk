@@ -230,12 +230,35 @@ export interface TypedAction {
  * @property userAddress - Ethereum address to prove ownership of (optional)
  * @property rawTransaction - Raw attestation transaction data (optional)
  */
-export interface ArcEligibilityInputs {
+export interface ActionBoundInputs {
   scope: string;
-  action: TypedAction;
   userAddress?: string;
   rawTransaction?: string;
+  /**
+   * The EIP-712 action this proof authorizes.
+   *
+   * Optional in the TYPE and not in every circuit: `arc_eligibility` proves
+   * nothing without one, `giwa_attestation` signs its signal hash instead when
+   * none is given. That difference lives in `CIRCUIT_ACTION_BINDING` and is
+   * enforced by `createRelayRequest` and the deep-link validator, so it is not
+   * written a second time here -- two copies of one rule drift, and the copy
+   * that drifts is the one nobody is looking at.
+   */
+  action?: TypedAction;
 }
+
+/**
+ * @deprecated Use {@link ActionBoundInputs}. Kept because it is published API.
+ *
+ * It declared `action` as REQUIRED, which was true of the circuit and not of
+ * the shape: `giwa_attestation` takes the same fields and may omit the action.
+ * The requirement moved to `CIRCUIT_ACTION_BINDING`, which both doors into the
+ * SDK consult.
+ */
+export type ArcEligibilityInputs = ActionBoundInputs;
+
+/** The same shape, for the circuit whose action is optional. */
+export type GiwaAttestationInputs = ActionBoundInputs;
 
 /**
  * Union type of all circuit-specific input types.
@@ -243,7 +266,7 @@ export interface ArcEligibilityInputs {
  */
 export type CircuitInputs =
   | CoinbaseKycInputs
-  | ArcEligibilityInputs
+  | ActionBoundInputs
   | CoinbaseCountryInputs
   | OidcDomainInputs
   | MdlKrOwnershipInputs

@@ -121,15 +121,26 @@ describe('circuit support status', () => {
   // circuit whose only verifier is on a testnet Circle has not given a mainnet
   // chain id for. Neither existing word was true of it, so a third was added
   // rather than picking the closer lie.
-  it('marks Arc experimental — provable, testnet only, layout still open', () => {
-    expect([...EXPERIMENTAL_CIRCUIT_IDS]).toEqual(['arc_eligibility']);
-    expect(isSupportedCircuitId('arc_eligibility')).toBe(false);
-    expect(isCircuitId('arc_eligibility')).toBe(true);
+  it('marks Arc and GIWA experimental — provable, testnet only', () => {
+    // Both prove today and neither is offered to everyone: their verifiers
+    // live on testnets, so the app keeps them behind Developer Mode and reads
+    // their circuit files from main instead of a release tag.
+    //
+    // GIWA moved here from 'planned' on 2026-09-22, when its circuit gained
+    // the optional EIP-712 action and its verifier was redeployed on GIWA
+    // Sepolia. 'planned' had stopped being true: the demo already requests it.
+    expect([...EXPERIMENTAL_CIRCUIT_IDS].sort()).toEqual([
+      'arc_eligibility',
+      'giwa_attestation',
+    ]);
+    for (const id of ['arc_eligibility', 'giwa_attestation'] as const) {
+      expect(isSupportedCircuitId(id)).toBe(false);
+      expect(isCircuitId(id)).toBe(true);
+    }
   });
 
-  it('marks GIWA and the three mDL circuits as planned', () => {
+  it('marks the three mDL circuits as planned', () => {
     expect([...PLANNED_CIRCUIT_IDS]).toEqual([
-      'giwa_attestation',
       'mdl_kr_ownership',
       'mdl_kr_age',
       'mdl_kr_region',

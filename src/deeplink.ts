@@ -19,6 +19,7 @@ import type {
 import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
 import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
 import { validateTypedAction } from './typedAction';
+import { circuitActionBinding } from './circuits';
 
 /**
  * Generates a unique request ID for proof requests.
@@ -708,9 +709,26 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
       return { valid: false, error: 'Invalid userAddress format' };
     }
-    const actionError = validateTypedAction(inputs.action);
-    if (actionError) {
-      return { valid: false, error: actionError };
+  }
+
+  // The action, decided by the circuit's own entry rather than by naming a
+  // circuit here. This used to be part of the arc_eligibility branch above,
+  // which is why a second action-capable circuit had nowhere to be checked.
+  {
+    const action = (request.inputs as { action?: unknown } | undefined)?.action;
+    const binding = circuitActionBinding(request.circuit);
+    if (binding === 'none') {
+      if (action !== undefined) {
+        return {
+          valid: false,
+          error: `${request.circuit} has no action inputs, so an action sent with it would not be proved. Refusing rather than dropping it.`,
+        };
+      }
+    } else if (binding === 'required' || action !== undefined) {
+      const actionError = validateTypedAction(action);
+      if (actionError) {
+        return { valid: false, error: actionError };
+      }
     }
   }
 

@@ -59,7 +59,7 @@ import {
   CIRCUIT_METADATA,
   RELAY_URLS,
 } from './constants';
-import { CIRCUIT_NEEDS_WALLET_SIGNATURE, type CircuitId } from './circuits';
+import { CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, type CircuitId } from './circuits';
 import { validateTypedAction } from './typedAction';
 import type { SDKEnvironment } from './types';
 
@@ -1227,15 +1227,28 @@ export class ProofportSDK {
       }
     }
 
-    // arc_eligibility: the action is what the proof binds to, so a request
-    // without a usable one cannot be honoured. Checked here, before a
-    // challenge is burned, because the alternative is a refusal from inside
-    // the mobile app -- a screen the dapp developer never sees, reached after
-    // the person has already scanned a QR code.
-    if (circuit === 'arc_eligibility') {
-      const actionError = validateTypedAction((inputs as { action?: unknown }).action);
-      if (actionError) {
-        throw new Error(`${actionError} (circuit: ${circuit})`);
+    // The action, per the circuit's entry in CIRCUIT_ACTION_BINDING. Checked
+    // here, before a challenge is burned, because the alternative is a refusal
+    // from inside the mobile app -- a screen the dapp developer never sees,
+    // reached after the person has already scanned a QR code.
+    //
+    // This named arc_eligibility directly until giwa_attestation became the
+    // second circuit that can carry an action; the id belongs in the table,
+    // not in the check.
+    {
+      const action = (inputs as { action?: unknown }).action;
+      const binding = circuitActionBinding(circuit);
+      if (binding === 'none' && action !== undefined) {
+        throw new Error(
+          `${circuit} has no action inputs, so an action sent with it would not be proved. ` +
+          'Remove it, or use a circuit that binds one.'
+        );
+      }
+      if (binding === 'required' || (binding === 'optional' && action !== undefined)) {
+        const actionError = validateTypedAction(action);
+        if (actionError) {
+          throw new Error(`${actionError} (circuit: ${circuit})`);
+        }
       }
     }
 

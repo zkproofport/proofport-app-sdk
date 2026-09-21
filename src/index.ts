@@ -69,13 +69,22 @@ export {
 } from './constants';
 
 export type { CircuitId, CircuitSupportStatus } from './circuits';
+// Whether a circuit binds an EIP-712 action, and whether it must. One table,
+// so a dapp does not have to learn which circuit names are special.
+export {
+  CIRCUIT_ACTION_BINDING,
+  circuitActionBinding,
+} from './circuits';
+export type { CircuitActionBinding } from './circuits';
 
 // Types
 export type {
   CircuitType,
   ProofRequestStatus,
   CoinbaseKycInputs,
+  ActionBoundInputs,
   ArcEligibilityInputs,
+  GiwaAttestationInputs,
   TypedAction,
   CoinbaseCountryInputs,
   OidcDomainInputs,

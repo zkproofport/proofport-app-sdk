@@ -78,14 +78,40 @@ describe('public inputs are read per circuit', () => {
     }
   });
 
-  it('gives Coinbase and GIWA the same layout, on purpose', () => {
-    // Their `fn main` signatures are identical: signal_hash, merkle root,
-    // scope, nullifier. Recorded so a future edit to one is a visible choice
-    // about the other rather than an accident.
+  it('reads Coinbase at signal_hash, merkle root, scope, nullifier', () => {
     const fields = fieldsWith({ ...block(64, 0x55), ...block(96, 0x66) });
-    for (const id of ['coinbase_attestation', 'giwa_attestation'] as const) {
-      expect(extractScopeFromPublicInputs(fields, id)).toBe('0x' + '55'.repeat(32));
-      expect(extractNullifierFromPublicInputs(fields, id)).toBe('0x' + '66'.repeat(32));
+    expect(extractScopeFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '55'.repeat(32));
+    expect(extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '66'.repeat(32));
+  });
+
+  it('reads GIWA two fields further along, because it gained the EIP-712 pair', () => {
+    // GIWA and Coinbase shared a layout until GIWA gained an optional signed
+    // action. Its `fn main` now reads signal_hash, domain_separator,
+    // action_hash, merkle root, scope, nullifier -- Arc's order -- so scope
+    // and nullifier sit at 128 and 160 rather than Coinbase's 64 and 96.
+    //
+    // This assertion IS the check on that move. The test it replaces pinned
+    // the two circuits to one layout so that changing either would be a
+    // visible decision, and this is the decision.
+    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
+    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + '77'.repeat(32));
+    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + '88'.repeat(32));
+  });
+
+  it('reads GIWA and Arc at the same offsets, which they now share', () => {
+    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
+    for (const id of ['giwa_attestation', 'arc_eligibility'] as const) {
+      expect(extractScopeFromPublicInputs(fields, id)).toBe('0x' + '77'.repeat(32));
+      expect(extractNullifierFromPublicInputs(fields, id)).toBe('0x' + '88'.repeat(32));
     }
+  });
+
+  it('does not read GIWA at Coinbase offsets any more', () => {
+    // The failure that matters: reading a GIWA proof with the old offsets
+    // returns the merkle ROOT where the nullifier should be -- a value
+    // identical for every user, which duplicate detection would read as one
+    // person. Same class of bug as the Arc layout mix-up.
+    const fields = fieldsWith({ ...block(64, 0x55), ...block(128, 0x77), ...block(160, 0x88) });
+    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + '55'.repeat(32));
   });
 });

@@ -96,7 +96,11 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     coinbase_country_attestation: 'supported',
     oidc_domain_attestation: 'supported',
     arc_eligibility: 'experimental',
-    giwa_attestation: 'planned',
+    // Experimental, not planned: the circuit is built, its verifier is
+    // deployed on GIWA Sepolia and the demo requests it. What keeps it out of
+    // 'supported' is that it is testnet-only, so the app offers it behind
+    // Developer Mode and reads its files from main rather than a release tag.
+    giwa_attestation: 'experimental',
     mdl_kr_ownership: 'planned',
     mdl_kr_age: 'planned',
     mdl_kr_region: 'planned',
@@ -239,6 +243,61 @@ export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatu
  * `satisfies` and not an annotation, so a circuit added above is a compile
  * error here until somebody decides which it is.
  */
+/**
+ * Whether a circuit's proof can bind an EIP-712 action, and whether it must.
+ *
+ * ONE TABLE, because the answer was becoming a chain of `circuit === '...'`
+ * tests. It was asked in the deep-link validator and again in
+ * `createRelayRequest`, both spelling out `arc_eligibility`, and a second
+ * action-capable circuit would have made each of them a two-branch chain that
+ * ends on whatever the last test happens to be.
+ *
+ *   'required'  the circuit proves nothing without an action -- the wallet
+ *               signs the typed data and there is no other message.
+ *   'optional'  the circuit signs the action when one is supplied and
+ *               personal_signs its signal hash when one is not. The circuit
+ *               itself branches; see giwa-attestation/src/main.nr.
+ *   'none'      the circuit has no action inputs. An action sent anyway is a
+ *               caller misunderstanding, and is refused rather than dropped:
+ *               silently ignoring it would let a dapp believe a proof
+ *               authorized something it never mentioned.
+ */
+export const CIRCUIT_ACTION_BINDING = {
+  coinbase_attestation: 'none',
+  coinbase_country_attestation: 'none',
+  // The signature lives inside the identity token; no wallet, no action.
+  oidc_domain_attestation: 'none',
+  // Both branch in-circuit: with an action the wallet signs the typed data,
+  // without one it personal_signs the request's signal hash. Arc read
+  // 'required' until 2026-09-22 because its circuit had no second path -- a
+  // request without an action built a vector 64 bytes short and died inside
+  // the prover. The circuit gained the branch; the table follows it.
+  arc_eligibility: 'optional',
+  giwa_attestation: 'optional',
+  mdl_kr_ownership: 'none',
+  mdl_kr_age: 'none',
+  mdl_kr_region: 'none',
+} satisfies Record<CircuitId, 'none' | 'required' | 'optional'>;
+
+export type CircuitActionBinding =
+  (typeof CIRCUIT_ACTION_BINDING)[keyof typeof CIRCUIT_ACTION_BINDING];
+
+/**
+ * How this circuit treats an action, or an error naming the id that is not one.
+ *
+ * No default: a circuit nobody has classified must not inherit 'none', which
+ * would silently drop an action a dapp meant to bind.
+ */
+export function circuitActionBinding(circuit: string): CircuitActionBinding {
+  const binding = (CIRCUIT_ACTION_BINDING as Record<string, CircuitActionBinding | undefined>)[circuit];
+  if (!binding) {
+    throw new Error(
+      `Unknown circuit '${circuit}'. Expected: ${ALL_CIRCUIT_IDS.join(', ')}`,
+    );
+  }
+  return binding;
+}
+
 export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   coinbase_attestation: true,
   coinbase_country_attestation: true,
@@ -251,5 +310,9 @@ export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   mdl_kr_ownership: false,
   mdl_kr_age: false,
   mdl_kr_region: false,
-  giwa_attestation: false,
+  // A GIWA-attested wallet signing an EIP-712 action, the same shape as Arc.
+  // This read `false` while the circuit had always verified a wallet signature
+  // -- it sat under the Web2 comment above and was never revisited. A request
+  // for it would have reached the relay with no signer.
+  giwa_attestation: true,
 } satisfies Record<CircuitId, boolean>;
