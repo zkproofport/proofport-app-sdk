@@ -262,6 +262,8 @@ export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatu
  *               silently ignoring it would let a dapp believe a proof
  *               authorized something it never mentioned.
  */
+export type CircuitActionBinding = 'none' | 'required' | 'optional';
+
 export const CIRCUIT_ACTION_BINDING = {
   coinbase_attestation: 'none',
   coinbase_country_attestation: 'none',
@@ -277,10 +279,17 @@ export const CIRCUIT_ACTION_BINDING = {
   mdl_kr_ownership: 'none',
   mdl_kr_age: 'none',
   mdl_kr_region: 'none',
-} satisfies Record<CircuitId, 'none' | 'required' | 'optional'>;
+} satisfies Record<CircuitId, CircuitActionBinding>;
 
-export type CircuitActionBinding =
-  (typeof CIRCUIT_ACTION_BINDING)[keyof typeof CIRCUIT_ACTION_BINDING];
+/*
+ * The union is declared above rather than derived from the table's values.
+ *
+ * Deriving it narrowed the type to whatever the table happens to hold today --
+ * 'none' | 'optional' -- and TypeScript then called every `=== 'required'`
+ * check impossible. The publish typecheck caught it; `rollup` and `vitest` did
+ * not. 'required' is a state a circuit can legitimately be in (an EIP-712 path
+ * and nothing else), so the union says so and the table is checked against it.
+ */
 
 /**
  * How this circuit treats an action, or an error naming the id that is not one.
