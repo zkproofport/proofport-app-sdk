@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.3...v0.4.0) (2026-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* `arc_eligibility` is no longer a circuit id. CIRCUIT_IDS loses ARC_ELIGIBILITY, ArcEligibilityInputs is gone, and chain 5042002 has no RPC endpoint. A request naming the circuit is refused as unknown.
+
+### Features
+
+* remove arc_eligibility and Arc Testnet support ([501e693](https://github.com/zkproofport/proofport-app-sdk/commit/501e693c7bc99c2e828c16831e00287e2fc1b7c8))
+
 ## [0.3.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.2...v0.3.3) (2026-09-21)
 
 
