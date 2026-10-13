@@ -5,11 +5,9 @@ import { getDefaultProvider } from '../verifier';
 /**
  * A chain a proof can be verified on must be a chain the SDK can reach.
  *
- * On 2026-09-12 the Arc circuit was supported, its verifier was deployed on Arc
- * Testnet, a phone generated a valid proof — and on-chain verification answered
- * "No RPC endpoint configured for chain 5042002". Nothing was wrong with the
- * proof; the RPC table simply had no row, and the error named the chain in a
- * way that reads like the proof's fault.
+ * A verifier deployed on a chain the RPC table has no row for makes on-chain
+ * verification answer "No RPC endpoint configured for chain N" for a valid
+ * proof — an error that reads like the proof's fault.
  *
  * The chains listed here are the ones a ZKProofport verifier is deployed on.
  * Adding a deployment means adding its RPC, and this test is what says so.
@@ -18,7 +16,6 @@ const CHAINS_WITH_A_VERIFIER = {
   8453: 'Base',
   84532: 'Base Sepolia',
   91342: 'GIWA Sepolia',
-  5042002: 'Arc Testnet',
 } as const;
 
 describe('every chain we verify on is reachable', () => {
@@ -39,5 +36,16 @@ describe('every chain we verify on is reachable', () => {
 
   it('still refuses a chain nobody deployed to, naming it', () => {
     expect(() => getDefaultProvider(999999)).toThrow(/No RPC endpoint configured for chain 999999/);
+  });
+
+  it('names the chains it does know, so the caller sees what was expected', () => {
+    expect(() => getDefaultProvider(999999)).toThrow(/Known chains: .*8453.*84532|Known chains: .*84532.*8453/);
+  });
+
+  // Arc was removed from the SDK on 2026-10-13. Its testnet must now be refused
+  // like any other unknown chain -- never resolved to another chain's RPC.
+  it('refuses Arc Testnet (5042002), which the SDK no longer supports', () => {
+    expect(RPC_ENDPOINTS[5042002]).toBeUndefined();
+    expect(() => getDefaultProvider(5042002)).toThrow(/No RPC endpoint configured for chain 5042002/);
   });
 });

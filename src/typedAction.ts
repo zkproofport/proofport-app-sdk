@@ -1,5 +1,5 @@
 /**
- * Checking the EIP-712 action an `arc_eligibility` proof binds to.
+ * Checking the EIP-712 action a `giwa_attestation` proof binds to.
  *
  * Three places need this answer and they have to agree: a dapp building the
  * request, this SDK validating a deep link, and the mobile app before it asks
@@ -31,7 +31,7 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  */
 export function validateTypedAction(value: unknown): string | null {
   if (value === undefined || value === null) {
-    return 'action is required for arc_eligibility. The circuit proves that a wallet authorised ONE EIP-712 action; there is nothing to prove without it.';
+    return 'action is required. The circuit proves that a wallet authorised ONE EIP-712 action; there is nothing to prove without it.';
   }
   if (typeof value !== 'object' || Array.isArray(value)) {
     return 'action must be an object.';

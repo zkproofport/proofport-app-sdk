@@ -1,7 +1,7 @@
 /**
  * A dapp finds out its action is unusable HERE, not from inside the phone.
  *
- * `arc_eligibility` proves that a wallet authorised one EIP-712 action. An
+ * `giwa_attestation` can prove that a wallet authorised one EIP-712 action. An
  * action that is missing, malformed, or missing a field its own struct
  * declares cannot be proved — and the circuit will not say so, because it
  * hashes the action without reading it.
@@ -22,7 +22,7 @@ const GOOD_ACTION = {
   domain: {
     name: 'MyVault',
     version: '1',
-    chainId: 5042002,
+    chainId: 91342,
     verifyingContract: '0x0000000000000000000000000000000000000000',
   },
   types: { Deposit: [{ name: 'amount', type: 'uint256' }] },
@@ -44,11 +44,8 @@ describe('a dapp hears about a bad action from the SDK', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('refuses an action on a circuit that cannot prove one, before any network call', async () => {
-    // Arc stopped being the example here on 2026-09-22: its circuit gained a
-    // branch, so a request with no action is now a plain attestation rather
-    // than a refusal. What must still fail early is the opposite mistake --
-    // an action sent to a circuit with no slots for it, which would otherwise
-    // be dropped and leave the dapp believing something was authorized.
+    // An action sent to a circuit with no slots for it would otherwise be
+    // dropped and leave the dapp believing something was authorized.
     await expect(
       sdk().createRelayRequest('coinbase_attestation', {
         scope: 'myapp.com',
@@ -62,7 +59,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
   it('refuses an action missing a field its own struct declares, and names it', async () => {
     const broken = { ...GOOD_ACTION, message: {} };
     await expect(
-      sdk().createRelayRequest('arc_eligibility', {
+      sdk().createRelayRequest('giwa_attestation', {
         scope: 'myapp.com',
         action: broken,
       } as never),
@@ -76,7 +73,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
       domain: { ...GOOD_ACTION.domain, verifyingContract: 'MyVault' },
     };
     await expect(
-      sdk().createRelayRequest('arc_eligibility', {
+      sdk().createRelayRequest('giwa_attestation', {
         scope: 'myapp.com',
         action: broken,
       } as never),
@@ -84,9 +81,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
   });
 
   it('names the circuit in the message, so a multi-circuit dapp knows which call', async () => {
-    // Arc with no action is a valid request since its circuit gained the
-    // branch, so the example is now the refusal that remains: an action sent
-    // where nothing can prove it.
+    // The refusal: an action sent where nothing can prove it.
     const err = await sdk()
       .createRelayRequest('coinbase_attestation', {
         scope: 'myapp.com',
@@ -111,7 +106,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
         }),
       });
 
-    const req = await sdk().createRelayRequest('arc_eligibility', {
+    const req = await sdk().createRelayRequest('giwa_attestation', {
       scope: 'myapp.com',
       action: GOOD_ACTION,
     } as never);
@@ -123,10 +118,22 @@ describe('a dapp hears about a bad action from the SDK', () => {
     expect(JSON.parse((init as RequestInit).body as string).inputs.action).toEqual(GOOD_ACTION);
   });
 
-  it('demands a wallet signature for arc, as the relay does', async () => {
+  // Arc was removed from the SDK on 2026-10-13. A relay request for it must be
+  // refused locally as an unknown circuit, before any challenge is fetched.
+  it('refuses arc_eligibility as an unknown circuit, before any network call', async () => {
+    await expect(
+      sdk().createRelayRequest('arc_eligibility' as never, {
+        scope: 'myapp.com',
+        action: GOOD_ACTION,
+      } as never),
+    ).rejects.toThrow(/Unknown circuit 'arc_eligibility'\. Expected: .*giwa_attestation/);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('demands a wallet signature for giwa_attestation, as the relay does', async () => {
     const noSigner = ProofportSDK.create('local');
     await expect(
-      noSigner.createRelayRequest('arc_eligibility', {
+      noSigner.createRelayRequest('giwa_attestation', {
         scope: 'myapp.com',
         action: GOOD_ACTION,
       } as never),

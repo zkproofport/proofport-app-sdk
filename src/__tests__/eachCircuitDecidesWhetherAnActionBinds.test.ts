@@ -3,12 +3,11 @@
  * looked up once, not a chain of `circuit === '...'` tests.
  *
  * It was that chain. The deep-link validator and `createRelayRequest` each
- * spelled out `arc_eligibility`, which was fine while exactly one circuit
- * bound an action. `giwa_attestation` became the second on 2026-09-22 — and
- * unlike Arc it binds one OPTIONALLY, because its circuit branches: with an
- * action the wallet signs the typed data, without one it personal_signs the
- * signal hash. Two circuits with three behaviours between them is precisely
- * the shape that ends on whichever branch happens to be last.
+ * spelled out one circuit id. `giwa_attestation` binds an action OPTIONALLY,
+ * because its circuit branches: with an action the wallet signs the typed
+ * data, without one it personal_signs the signal hash. Three behaviours across
+ * circuits is precisely the shape that ends on whichever branch happens to be
+ * last.
  *
  * What is held here: every circuit is classified, an unclassified id is an
  * error rather than a quiet 'none', and each of the three behaviours actually
@@ -70,12 +69,10 @@ describe('the table itself', () => {
     const canBind = ALL_CIRCUIT_IDS.filter(
       id => CIRCUIT_ACTION_BINDING[id] !== 'none',
     );
-    expect(canBind.sort()).toEqual(['arc_eligibility', 'giwa_attestation']);
-    // Both optional since 2026-09-22, when Arc's circuit gained the branch it
-    // had been missing. Nothing is 'required' today; the value stays in the
-    // union because a circuit with only an EIP-712 path is a legitimate thing
-    // to build, and the callers already handle it.
-    expect(CIRCUIT_ACTION_BINDING.arc_eligibility).toBe('optional');
+    expect(canBind.sort()).toEqual(['giwa_attestation']);
+    // Nothing is 'required' today; the value stays in the union because a
+    // circuit with only an EIP-712 path is a legitimate thing to build, and
+    // the callers already handle it.
     expect(CIRCUIT_ACTION_BINDING.giwa_attestation).toBe('optional');
   });
 
@@ -88,19 +85,21 @@ describe('the table itself', () => {
 });
 
 describe('a deep link, per circuit', () => {
-  it('accepts arc_eligibility with no action, now that its circuit branches', () => {
-    expect(validateProofRequest(request('arc_eligibility', { scope: 'x' })).valid).toBe(true);
+  // Arc was removed from the SDK on 2026-10-13. A link naming it is an
+  // unknown circuit, refused with the id and the known list -- with or without
+  // an action, and never routed to another circuit's rules.
+  it('refuses arc_eligibility as an unknown circuit type', () => {
+    for (const inputs of [{ scope: 'x' }, { scope: 'x', action: ACTION }]) {
+      const r = validateProofRequest(request('arc_eligibility', inputs));
+      expect(r.valid).toBe(false);
+      expect(r.error).toMatch(/Invalid circuit type: arc_eligibility\. Expected one of: .*giwa_attestation/);
+    }
+    expect(() => circuitActionBinding('arc_eligibility')).toThrow(/Unknown circuit 'arc_eligibility'/);
   });
 
-  it('accepts arc_eligibility with an action', () => {
-    expect(
-      validateProofRequest(request('arc_eligibility', { scope: 'x', action: ACTION })).valid,
-    ).toBe(true);
-  });
-
-  it('still refuses a malformed action on arc_eligibility', () => {
+  it('still refuses a malformed primaryType on giwa_attestation', () => {
     const broken = { ...ACTION, primaryType: 'NotInTypes' };
-    const r = validateProofRequest(request('arc_eligibility', { scope: 'x', action: broken }));
+    const r = validateProofRequest(request('giwa_attestation', { scope: 'x', action: broken }));
     expect(r.valid).toBe(false);
   });
 

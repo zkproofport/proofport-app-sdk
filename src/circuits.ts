@@ -55,8 +55,6 @@ export const CIRCUIT_IDS = Object.freeze({
   COINBASE_COUNTRY_ATTESTATION: 'coinbase_country_attestation',
   /** OIDC email-domain attestation. Officially supported. */
   OIDC_DOMAIN_ATTESTATION: 'oidc_domain_attestation',
-  /** Arc eligibility: exact EIP-712 action authorization. Experimental on Arc Testnet. */
-  ARC_ELIGIBILITY: 'arc_eligibility',
   /** GIWA attestation. Planned — not officially supported yet. */
   GIWA_ATTESTATION: 'giwa_attestation',
   /** Korea Mobile ID ownership. Planned — not officially supported yet. */
@@ -95,7 +93,6 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     coinbase_attestation: 'supported',
     coinbase_country_attestation: 'supported',
     oidc_domain_attestation: 'supported',
-    arc_eligibility: 'experimental',
     // Experimental, not planned: the circuit is built, its verifier is
     // deployed on GIWA Sepolia and the demo requests it. What keeps it out of
     // 'supported' is that it is testnet-only, so the app offers it behind
@@ -130,7 +127,6 @@ export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.free
   coinbase_attestation: 'coinbase-attestation/target/vk/vk',
   coinbase_country_attestation: 'coinbase-country-attestation/target/vk/vk',
   oidc_domain_attestation: 'oidc-domain-attestation/target/vk/vk',
-  arc_eligibility: 'arc-eligibility/target/vk/vk',
   giwa_attestation: 'giwa-attestation/target/vk/vk',
   mdl_kr_ownership: 'mdl/kr-ownership/target/vk/vk',
   mdl_kr_age: 'mdl/kr-age/target/vk/vk',
@@ -166,12 +162,11 @@ export const SUPPORTED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
 /**
  * Circuits you can prove today, on a testnet, with everything subject to change.
  *
- * `arc_eligibility` is the reason this status exists. Calling it `planned`
- * would be wrong — the circuit compiles, the verifier is deployed and a proof
- * verifies against it — and calling it `supported` would be worse, because the
- * only deployment is Arc Testnet, Circle has not published a mainnet chain id,
- * and the public-input layout is still open. Neither existing word was true, so
- * the honest move was a third word rather than picking the closer lie.
+ * `giwa_attestation` is in this state. Calling it `planned` would be wrong —
+ * the circuit compiles, the verifier is deployed and a proof verifies against
+ * it — and calling it `supported` would be worse, because the only deployment
+ * is a testnet (GIWA Sepolia). Neither existing word was true, so the honest
+ * move was a third word rather than picking the closer lie.
  */
 export const EXPERIMENTAL_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
   ALL_CIRCUIT_IDS.filter(id => CIRCUIT_SUPPORT_STATUS[id] === 'experimental'),
@@ -248,7 +243,7 @@ export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatu
  *
  * ONE TABLE, because the answer was becoming a chain of `circuit === '...'`
  * tests. It was asked in the deep-link validator and again in
- * `createRelayRequest`, both spelling out `arc_eligibility`, and a second
+ * `createRelayRequest`, both spelling out one circuit id, and a second
  * action-capable circuit would have made each of them a two-branch chain that
  * ends on whatever the last test happens to be.
  *
@@ -269,12 +264,8 @@ export const CIRCUIT_ACTION_BINDING = {
   coinbase_country_attestation: 'none',
   // The signature lives inside the identity token; no wallet, no action.
   oidc_domain_attestation: 'none',
-  // Both branch in-circuit: with an action the wallet signs the typed data,
-  // without one it personal_signs the request's signal hash. Arc read
-  // 'required' until 2026-09-22 because its circuit had no second path -- a
-  // request without an action built a vector 64 bytes short and died inside
-  // the prover. The circuit gained the branch; the table follows it.
-  arc_eligibility: 'optional',
+  // Branches in-circuit: with an action the wallet signs the typed data,
+  // without one it personal_signs the request's signal hash.
   giwa_attestation: 'optional',
   mdl_kr_ownership: 'none',
   mdl_kr_age: 'none',
@@ -310,16 +301,13 @@ export function circuitActionBinding(circuit: string): CircuitActionBinding {
 export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   coinbase_attestation: true,
   coinbase_country_attestation: true,
-  // Same Coinbase-attested wallet as above; what changes is that it signs an
-  // EIP-712 action rather than signal_hash.
-  arc_eligibility: true,
   // The signature is inside the OIDC identity token, checked by the prover.
   oidc_domain_attestation: false,
   // Web2 (OmniOne CX) flows with no wallet binding at all.
   mdl_kr_ownership: false,
   mdl_kr_age: false,
   mdl_kr_region: false,
-  // A GIWA-attested wallet signing an EIP-712 action, the same shape as Arc.
+  // A GIWA-attested wallet signing an EIP-712 action (or its signal hash).
   // This read `false` while the circuit had always verified a wallet signature
   // -- it sat under the Web2 comment above and was never revisited. A request
   // for it would have reached the relay with no signer.

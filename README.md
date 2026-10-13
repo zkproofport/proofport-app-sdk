@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against testnet deployments and are marked experimental: Arc eligibility and GIWA attestation. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). One more proves today against a testnet deployment and is marked experimental: GIWA attestation. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -124,7 +124,6 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.COINBASE_ATTESTATION` | `coinbase_attestation` | **Supported** |
 | `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
-| `CIRCUIT_IDS.ARC_ELIGIBILITY` | `arc_eligibility` | _Experimental_ |
 | `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | _Experimental_ |
 | `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
 | `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
@@ -142,11 +141,11 @@ Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, planned o
 import { CIRCUIT_SUPPORT_STATUS, isSupportedCircuitId } from '@zkproofport-app/sdk';
 
 CIRCUIT_SUPPORT_STATUS.coinbase_attestation; // 'supported'
-CIRCUIT_SUPPORT_STATUS.arc_eligibility;      // 'experimental'
+CIRCUIT_SUPPORT_STATUS.giwa_attestation;     // 'experimental'
 CIRCUIT_SUPPORT_STATUS.mdl_kr_age;           // 'planned'
 
 isSupportedCircuitId('oidc_domain_attestation'); // true
-isSupportedCircuitId('arc_eligibility');         // false — experimental is not supported
+isSupportedCircuitId('giwa_attestation');        // false — experimental is not supported
 isSupportedCircuitId('mdl_kr_age');              // false
 isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
 ```
@@ -251,75 +250,6 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 
 ## Experimental Circuits
 
-### `arc_eligibility`
-
-Proves the same Coinbase attestation as `coinbase_attestation`, with one thing
-changed: the wallet signs a named EIP-712 action instead of an opaque signal
-hash. The proof's public inputs then carry the action's domain separator and
-struct hash, so a verifier checks **which** action was authorised — not merely
-that somebody eligible signed something.
-
-That matters once an agent moves money. `personal_sign` over 32 opaque bytes
-shows a person a hex string, so they approve without seeing what they approve;
-a typed action is rendered field by field in the wallet.
-
-```typescript
-import { CIRCUIT_IDS, validateTypedAction } from '@zkproofport-app/sdk';
-
-const action = {
-  domain: {
-    name: 'MyVault',
-    version: '1',
-    chainId: 5042002,                 // Arc Testnet
-    verifyingContract: '0xYourContract',
-  },
-  types: {
-    Deposit: [
-      { name: 'amount', type: 'uint256' },
-      { name: 'nonce', type: 'uint256' },
-    ],
-  },
-  primaryType: 'Deposit',
-  message: { amount: '1000000', nonce: '1' },
-};
-
-// Optional: catch a malformed action before sending it. The circuit hashes the
-// action without reading it, so a broken one produces a valid proof of the
-// wrong thing rather than failing.
-const problem = validateTypedAction(action);
-if (problem) throw new Error(problem);
-
-const relay = await sdk.createRelayRequest(CIRCUIT_IDS.ARC_ELIGIBILITY, {
-  scope: 'myapp.com',
-  action,
-});
-```
-
-`action` is optional, as of 2026-09-22. Send one and the wallet signs the
-typed data; send none and it personal_signs the request's signal hash, exactly
-as Coinbase KYC does. The circuit branches, and it refuses a request that
-tries to be both: with an action `signal_hash` must be empty, without one the
-EIP-712 pair must be.
-
-It used to be required, and not by choice: the circuit had no second path, so
-a request without an action produced a proof attempt that failed inside the
-prover. `CIRCUIT_ACTION_BINDING` now reports `'optional'` for it.
-
-One more thing worth knowing if you count people: its nullifier is
-`keccak(keccak(wallet ++ keccak("arc_eligibility")) ++ scope)` -- the wallet
-and a constant compiled into the circuit. It used to come from `signal_hash`,
-which nothing constrains and, in action mode, nobody signs.
-
-**Testnet only.** The verifier is deployed on Arc Testnet (chain `5042002`) and
-nowhere else. Circle has not published a mainnet chain id, so there is nothing
-to point a production build at. The mobile app keeps the whole Arc network
-behind Developer Mode for the same reason.
-
-The public inputs are `signal_hash`, `domain_separator`, `action_hash`,
-`signer_list_merkle_root`, `scope`, `nullifier` — a different order from every
-other circuit, which is why `extractScopeFromPublicInputs` and
-`extractNullifierFromPublicInputs` require the circuit id and refuse to guess.
-
 ### `giwa_attestation`
 
 The same attestation shape as Coinbase KYC, against GIWA's attester on GIWA
@@ -333,7 +263,7 @@ const { deepLink } = await sdk.createRelayRequest(
 );
 ```
 
-**An action is optional here, as it is for Arc.** Send one
+**An action is optional here.** Send one
 and the wallet signs EIP-712 typed data, so the person reads named fields and
 the proof carries what they approved. Send none and the wallet signs the
 request's signal hash, exactly as Coinbase KYC does. The circuit itself
@@ -357,8 +287,7 @@ await sdk.createRelayRequest(
 ```
 
 Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
-`signer_list_merkle_root`, `scope`, `nullifier` — the same order as Arc, and
-64 bytes longer than the Coinbase layout it used to share. Anything holding the
+`signer_list_merkle_root`, `scope`, `nullifier` — 64 bytes longer than the Coinbase layout it used to share. Anything holding the
 old offsets reads the Merkle root where the nullifier is.
 
 One more difference worth knowing if you count people: its nullifier is
@@ -377,13 +306,12 @@ circuit names are special:
 
 | What the circuit does with an action | Circuits |
 |---|---|
-| Signs it when present, signs the signal hash when not | `arc_eligibility`, `giwa_attestation` |
+| Signs it when present, signs the signal hash when not | `giwa_attestation` |
 | Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain, the three mDL circuits |
 
 ```typescript
 import { circuitActionBinding } from '@zkproofport-app/sdk';
 
-circuitActionBinding('arc_eligibility');   // 'optional'
 circuitActionBinding('giwa_attestation');  // 'optional'
 circuitActionBinding('coinbase_attestation'); // 'none'
 ```
@@ -1097,8 +1025,8 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitId` | Union of the eight canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'arc_eligibility' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
-| `TypedAction` | The EIP-712 action an `arc_eligibility` proof binds to: `{ domain, types, primaryType, message }` — the same object `eth_signTypedData_v4` takes |
+| `CircuitId` | Union of the seven canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `TypedAction` | The EIP-712 action a `giwa_attestation` proof binds to: `{ domain, types, primaryType, message }` — the same object `eth_signTypedData_v4` takes |
 | `CircuitSupportStatus` | `'supported' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
 | `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
@@ -1106,8 +1034,7 @@ import type {
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
 | `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
-| `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — required for `arc_eligibility`, optional for `giwa_attestation` |
-| `ArcEligibilityInputs` | Deprecated alias of `ActionBoundInputs`. It declared `action` as required, which was true of the circuit and not of the shape |
+| `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — optional for `giwa_attestation` |
 | `GiwaAttestationInputs` | Alias of `ActionBoundInputs`, for `giwa_attestation` |
 | `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |

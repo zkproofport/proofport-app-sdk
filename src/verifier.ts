@@ -92,7 +92,9 @@ export function getVerifierContract(
 export function getDefaultProvider(chainId: number) {
   const rpcUrl = RPC_ENDPOINTS[chainId];
   if (!rpcUrl) {
-    throw new Error(`No RPC endpoint configured for chain ${chainId}`);
+    throw new Error(
+      `No RPC endpoint configured for chain ${chainId}. Known chains: ${Object.keys(RPC_ENDPOINTS).join(', ')}`,
+    );
   }
   return createJsonRpcProvider(rpcUrl);
 }
@@ -273,7 +275,7 @@ export function getVerifierChainId(
  *
  * It replaced an `if / else if / else` chain whose final `else` handed every
  * unrecognised circuit — and every call that named no circuit at all —
- * Coinbase's offsets. For `arc_eligibility` that is not a near miss: its
+ * Coinbase's offsets. For `giwa_attestation` that is not a near miss: its
  * public inputs are signal_hash, domain_separator, action_hash, merkle root,
  * scope, nullifier, so the nullifier slot under Coinbase's offsets holds the
  * MERKLE ROOT, a value identical for every user. Duplicate detection built on
@@ -283,15 +285,13 @@ const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number
   // signal_hash, signer_list_merkle_root, scope, nullifier
   coinbase_attestation: { scope: [64, 95], nullifier: [96, 127] },
   // No longer Coinbase's layout. The GIWA circuit gained the EIP-712 pair, so
-  // it reads like Arc: signal_hash, domain_separator, action_hash, merkle
-  // root, then scope and nullifier 64 bytes further along than Coinbase.
+  // it reads: signal_hash, domain_separator, action_hash, merkle root, then
+  // scope and nullifier 64 bytes further along than Coinbase.
   giwa_attestation: { scope: [128, 159], nullifier: [160, 191] },
   // country_list, country_list_length and is_included sit before scope.
   coinbase_country_attestation: { scope: [86, 117], nullifier: [118, 149] },
   // pubkey_modulus_limbs and the bounded domain sit before scope.
   oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
-  // signal_hash, domain_separator, action_hash, merkle root, then the pair.
-  arc_eligibility: { scope: [128, 159], nullifier: [160, 191] },
   // The Korea mDL circuits open with the pair; signal_hash is commented out.
   mdl_kr_ownership: { scope: [0, 31], nullifier: [32, 63] },
   mdl_kr_age: { scope: [0, 31], nullifier: [32, 63] },

@@ -14,7 +14,6 @@ import type {
   MdlKrRegionInputs,
   DeepLinkComponents,
   CircuitType,
-  ArcEligibilityInputs,
 } from './types';
 import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
 import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
@@ -648,8 +647,7 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
   }
 
   // The list is the SDK's own, not a copy. The copy that used to sit here
-  // named six circuits and had missed two — `giwa_attestation` and
-  // `arc_eligibility` — so a link for either was refused as an invalid type
+  // had missed circuits, so a link for one was refused as an invalid type
   // while every other layer accepted it.
   if (!isCircuitId(request.circuit)) {
     return {
@@ -704,16 +702,10 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     if (mdlError) {
       return { valid: false, error: mdlError };
     }
-  } else if (request.circuit === 'arc_eligibility') {
-    const inputs = request.inputs as Partial<ArcEligibilityInputs>;
-    if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
-      return { valid: false, error: 'Invalid userAddress format' };
-    }
   }
 
   // The action, decided by the circuit's own entry rather than by naming a
-  // circuit here. This used to be part of the arc_eligibility branch above,
-  // which is why a second action-capable circuit had nowhere to be checked.
+  // circuit here, so every action-capable circuit is checked the same way.
   {
     const action = (request.inputs as { action?: unknown } | undefined)?.action;
     const binding = circuitActionBinding(request.circuit);

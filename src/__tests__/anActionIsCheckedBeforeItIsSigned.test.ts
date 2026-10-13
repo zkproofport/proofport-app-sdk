@@ -2,8 +2,8 @@
  * The circuit hashes the action without reading it, so a malformed action does
  * not fail — it produces a valid proof of the wrong thing.
  *
- * `arc_eligibility` commits to the EIP-712 domain separator and struct hash and
- * nothing else. Whoever defined the action recomputes those two values and
+ * `giwa_attestation` commits to the EIP-712 domain separator and struct hash and
+ * nothing else of the action. Whoever defined the action recomputes those two values and
  * compares; if the action was missing a field the wallet never showed, the
  * proof is still valid and says something nobody meant.
  *
@@ -18,7 +18,7 @@ const GOOD = {
   domain: {
     name: 'MyVault',
     version: '1',
-    chainId: 5042002,
+    chainId: 91342,
     verifyingContract: '0x0000000000000000000000000000000000000000',
   },
   types: {
@@ -47,8 +47,8 @@ describe('an action is checked before it is signed', () => {
   });
 
   it('refuses a missing action, naming what the circuit proves', () => {
-    expect(validateTypedAction(undefined)).toMatch(/required for arc_eligibility/);
-    expect(validateTypedAction(null)).toMatch(/required for arc_eligibility/);
+    expect(validateTypedAction(undefined)).toMatch(/action is required/);
+    expect(validateTypedAction(null)).toMatch(/action is required/);
   });
 
   it('refuses anything that is not an object', () => {
@@ -80,7 +80,7 @@ describe('an action is checked before it is signed', () => {
   });
 
   it('refuses a chainId that is not a whole number', () => {
-    for (const bad of ['5042002', 5042002.5, NaN]) {
+    for (const bad of ['91342', 91342.5, NaN]) {
       const a = { ...GOOD, domain: { ...GOOD.domain, chainId: bad } };
       expect(validateTypedAction(a)).toMatch(/chainId must be an integer/);
     }

@@ -7,7 +7,7 @@
  * route does. The values that came back were the right shape, the right
  * length, and the wrong bytes.
  *
- * For `arc_eligibility` it is not a near miss. Its public inputs are
+ * For `giwa_attestation` it is not a near miss. Its public inputs are
  * signal_hash, domain_separator, action_hash, signer_list_merkle_root, scope,
  * nullifier — so under Coinbase's offsets the nullifier slot holds the MERKLE
  * ROOT, a value identical for every user of the circuit. Anything counting
@@ -35,15 +35,15 @@ function block(start: number, byte: number): Record<number, number> {
 }
 
 describe('public inputs are read per circuit', () => {
-  it('reads Arc at its own offsets, not Coinbase’s', () => {
-    // Arc: scope at [128..159], nullifier at [160..191].
+  it('reads GIWA at its own offsets, not Coinbase’s', () => {
+    // GIWA: scope at [128..159], nullifier at [160..191].
     const fields = fieldsWith({
       ...block(96, 0xee), // signer_list_merkle_root — what the old else returned
       ...block(128, 0xaa),
       ...block(160, 0xbb),
     });
-    expect(extractScopeFromPublicInputs(fields, 'arc_eligibility')).toBe('0x' + 'aa'.repeat(32));
-    expect(extractNullifierFromPublicInputs(fields, 'arc_eligibility')).toBe('0x' + 'bb'.repeat(32));
+    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'aa'.repeat(32));
+    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'bb'.repeat(32));
     // The old behaviour, spelled out so its return value is visibly wrong.
     expect(extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + 'ee'.repeat(32));
   });
@@ -70,6 +70,18 @@ describe('public inputs are read per circuit', () => {
     expect(() => extractNullifierFromPublicInputs(fields, 'solana_thing')).toThrow(/Unknown circuit/);
   });
 
+  // Arc was removed from the SDK on 2026-10-13. Reading an Arc proof must be
+  // refused, naming the id and the known ones -- not answered with the GIWA
+  // offsets it used to share.
+  it('refuses arc_eligibility, which the SDK no longer knows', () => {
+    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
+    for (const read of [extractScopeFromPublicInputs, extractNullifierFromPublicInputs]) {
+      expect(() => read(fields, 'arc_eligibility')).toThrow(
+        /Unknown circuit 'arc_eligibility'\. Expected one of: .*giwa_attestation/,
+      );
+    }
+  });
+
   it('has offsets for every circuit the SDK knows', () => {
     const fields = fieldsWith({});
     for (const id of ALL_CIRCUIT_IDS) {
@@ -87,7 +99,7 @@ describe('public inputs are read per circuit', () => {
   it('reads GIWA two fields further along, because it gained the EIP-712 pair', () => {
     // GIWA and Coinbase shared a layout until GIWA gained an optional signed
     // action. Its `fn main` now reads signal_hash, domain_separator,
-    // action_hash, merkle root, scope, nullifier -- Arc's order -- so scope
+    // action_hash, merkle root, scope, nullifier -- so scope
     // and nullifier sit at 128 and 160 rather than Coinbase's 64 and 96.
     //
     // This assertion IS the check on that move. The test it replaces pinned
@@ -98,19 +110,11 @@ describe('public inputs are read per circuit', () => {
     expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + '88'.repeat(32));
   });
 
-  it('reads GIWA and Arc at the same offsets, which they now share', () => {
-    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
-    for (const id of ['giwa_attestation', 'arc_eligibility'] as const) {
-      expect(extractScopeFromPublicInputs(fields, id)).toBe('0x' + '77'.repeat(32));
-      expect(extractNullifierFromPublicInputs(fields, id)).toBe('0x' + '88'.repeat(32));
-    }
-  });
-
   it('does not read GIWA at Coinbase offsets any more', () => {
     // The failure that matters: reading a GIWA proof with the old offsets
     // returns the merkle ROOT where the nullifier should be -- a value
     // identical for every user, which duplicate detection would read as one
-    // person. Same class of bug as the Arc layout mix-up.
+    // person.
     const fields = fieldsWith({ ...block(64, 0x55), ...block(128, 0x77), ...block(160, 0x88) });
     expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + '55'.repeat(32));
   });

@@ -17,6 +17,7 @@ import {
   EXPERIMENTAL_CIRCUIT_IDS,
   PLANNED_CIRCUIT_IDS,
   SUPPORTED_CIRCUIT_IDS,
+  circuitActionBinding,
   getCircuitSupportStatus,
   isCircuitId,
   isSupportedCircuitId,
@@ -30,7 +31,6 @@ const NARGO_CIRCUIT_NAMES = [
   'coinbase_attestation',
   'coinbase_country_attestation',
   'oidc_domain_attestation',
-  'arc_eligibility',
   'giwa_attestation',
   'mdl_kr_ownership',
   'mdl_kr_age',
@@ -117,26 +117,34 @@ describe('circuit support status', () => {
     ]);
   });
 
-  // Arc used to sit in the list above, which told a reader to build on a
-  // circuit whose only verifier is on a testnet Circle has not given a mainnet
-  // chain id for. Neither existing word was true of it, so a third was added
-  // rather than picking the closer lie.
-  it('marks Arc and GIWA experimental — provable, testnet only', () => {
-    // Both prove today and neither is offered to everyone: their verifiers
-    // live on testnets, so the app keeps them behind Developer Mode and reads
-    // their circuit files from main instead of a release tag.
+  it('marks GIWA experimental — provable, testnet only', () => {
+    // It proves today and is not offered to everyone: its verifier lives on
+    // a testnet, so the app keeps it behind Developer Mode and reads its
+    // circuit files from main instead of a release tag.
     //
     // GIWA moved here from 'planned' on 2026-09-22, when its circuit gained
     // the optional EIP-712 action and its verifier was redeployed on GIWA
     // Sepolia. 'planned' had stopped being true: the demo already requests it.
-    expect([...EXPERIMENTAL_CIRCUIT_IDS].sort()).toEqual([
-      'arc_eligibility',
-      'giwa_attestation',
-    ]);
-    for (const id of ['arc_eligibility', 'giwa_attestation'] as const) {
-      expect(isSupportedCircuitId(id)).toBe(false);
-      expect(isCircuitId(id)).toBe(true);
-    }
+    expect([...EXPERIMENTAL_CIRCUIT_IDS]).toEqual(['giwa_attestation']);
+    expect(isSupportedCircuitId('giwa_attestation')).toBe(false);
+    expect(isCircuitId('giwa_attestation')).toBe(true);
+  });
+
+  // Arc was removed from the SDK on 2026-10-13. Its id must now be refused as
+  // unknown everywhere, with an error that names it and the known ids -- never
+  // resolved to another circuit's status, key path or action rule.
+  it('refuses arc_eligibility as an unknown circuit', () => {
+    expect(isCircuitId('arc_eligibility')).toBe(false);
+    expect(isSupportedCircuitId('arc_eligibility')).toBe(false);
+    expect((ALL_CIRCUIT_IDS as readonly string[]).includes('arc_eligibility')).toBe(false);
+    expect(Object.keys(CIRCUIT_IDS)).not.toContain('ARC_ELIGIBILITY');
+    expect(() => getCircuitSupportStatus('arc_eligibility' as CircuitId)).toThrow(
+      /Unknown circuit 'arc_eligibility'\. Expected one of: .*giwa_attestation/,
+    );
+    expect(() => circuitActionBinding('arc_eligibility')).toThrow(
+      /Unknown circuit 'arc_eligibility'\. Expected: .*giwa_attestation/,
+    );
+    expect(Object.keys(CIRCUIT_METADATA)).not.toContain('arc_eligibility');
   });
 
   it('marks the three mDL circuits as planned', () => {

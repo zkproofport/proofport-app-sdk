@@ -91,16 +91,6 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 148,
     publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider'],
   },
-  arc_eligibility: {
-    name: 'Arc Eligibility',
-    description: 'Prove eligibility and authorize one EIP-712 action, for an Arc gate',
-    // 6 x `pub [u8; 32]` in arc-eligibility/src/main.nr, flattened to bytes.
-    // Read off the compiled ABI rather than counted: signal_hash 0-31,
-    // domain_separator 32-63, action_hash 64-95, signer_list_merkle_root
-    // 96-127, scope 128-159, nullifier 160-191.
-    publicInputsCount: 192,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root'],
-  },
   // Planned circuit — the identifier is reserved and the circuit exists, but it
   // is not officially supported yet. See CIRCUIT_SUPPORT_STATUS in ./circuits.
   // Forked from coinbase_attestation, then given the EIP-712 pair and a
@@ -108,12 +98,12 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   // zero; without one it signs signal_hash and the pair is zero. Read off the
   // compiled ABI (6 x [u8; 32] = 192): signal_hash 0-31, domain_separator
   // 32-63, action_hash 64-95, signer_list_merkle_root 96-127, scope 128-159,
-  // nullifier 160-191 -- the same order as arc_eligibility.
+  // nullifier 160-191.
   //
-  // Unlike Arc, signal_hash is NOT part of this circuit's nullifier. That one
-  // derives its nullifier from a public input nobody signs and nothing
-  // constrains, so one wallet can mint as many nullifiers as it likes; here
-  // the secret is the address plus a constant compiled into the circuit.
+  // signal_hash is NOT part of this circuit's nullifier: a nullifier derived
+  // from a public input nobody signs and nothing constrains would let one
+  // wallet mint as many nullifiers as it likes; here the secret is the address
+  // plus a constant compiled into the circuit.
   giwa_attestation: {
     name: 'GIWA Attestation',
     description: 'Prove GIWA identity verification, optionally authorizing one EIP-712 action (planned — not officially supported yet)',
@@ -187,11 +177,6 @@ export const RPC_ENDPOINTS: Record<number, string> = {
   84532: 'https://sepolia.base.org', // Base Sepolia
   8453: 'https://mainnet.base.org', // Base Mainnet
   91342: 'https://sepolia-rpc.giwa.io', // GIWA Sepolia
-  // Arc Testnet. The arc_eligibility verifier is deployed here and nowhere
-  // else, and this line was missing on 2026-09-12 — the circuit shipped, a
-  // phone produced a valid proof, and on-chain verification answered "No RPC
-  // endpoint configured for chain 5042002", which reads like the proof's fault.
-  5042002: 'https://rpc.testnet.arc.io', // Arc Testnet
 };
 
 /**

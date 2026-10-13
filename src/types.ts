@@ -178,7 +178,7 @@ export interface MdlKrRegionInputs {
 export interface EmptyInputs {}
 
 /**
- * The EIP-712 action an `arc_eligibility` proof binds the wallet's signature to.
+ * The EIP-712 action a `giwa_attestation` proof binds the wallet's signature to.
  *
  * Exactly what `eth_signTypedData_v4` takes, because that is what the wallet is
  * shown and what it signs. The app does not build this — the dapp does — so the
@@ -188,7 +188,7 @@ export interface EmptyInputs {}
  * @example
  * ```typescript
  * const action: TypedAction = {
- *   domain: { name: 'MyVault', version: '1', chainId: 5042002,
+ *   domain: { name: 'MyVault', version: '1', chainId: 91342,
  *             verifyingContract: '0x…' },
  *   types: { Deposit: [ { name: 'amount', type: 'uint256' },
  *                       { name: 'nonce',  type: 'uint256' } ] },
@@ -213,17 +213,13 @@ export interface TypedAction {
 }
 
 /**
- * Input parameters for the Arc eligibility circuit.
+ * Input parameters for circuits that can bind an EIP-712 action
+ * (`giwa_attestation`).
  *
- * Proves the same Coinbase attestation as `coinbase_attestation`, with the
- * wallet signing a typed action instead of an opaque signal hash. The proof's
+ * The wallet signs a typed action instead of an opaque signal hash. The proof's
  * public inputs then carry the action's domain separator and struct hash, so a
  * verifier checks WHICH action was authorised — not merely that somebody
  * eligible signed something.
- *
- * `action` is REQUIRED. There is no version of this circuit without one: its
- * public inputs have the two slots and nothing else can fill them. Ask for
- * `coinbase_attestation` when there is no action to bind.
  *
  * @property scope - Scope string for nullifier derivation
  * @property action - The EIP-712 action the wallet signs
@@ -237,25 +233,15 @@ export interface ActionBoundInputs {
   /**
    * The EIP-712 action this proof authorizes.
    *
-   * Optional in the TYPE and not in every circuit: `arc_eligibility` proves
-   * nothing without one, `giwa_attestation` signs its signal hash instead when
-   * none is given. That difference lives in `CIRCUIT_ACTION_BINDING` and is
+   * Optional in the TYPE; whether a circuit requires it is the circuit's
+   * property (`giwa_attestation` signs its signal hash instead when none is
+   * given). That difference lives in `CIRCUIT_ACTION_BINDING` and is
    * enforced by `createRelayRequest` and the deep-link validator, so it is not
    * written a second time here -- two copies of one rule drift, and the copy
    * that drifts is the one nobody is looking at.
    */
   action?: TypedAction;
 }
-
-/**
- * @deprecated Use {@link ActionBoundInputs}. Kept because it is published API.
- *
- * It declared `action` as REQUIRED, which was true of the circuit and not of
- * the shape: `giwa_attestation` takes the same fields and may omit the action.
- * The requirement moved to `CIRCUIT_ACTION_BINDING`, which both doors into the
- * SDK consult.
- */
-export type ArcEligibilityInputs = ActionBoundInputs;
 
 /** The same shape, for the circuit whose action is optional. */
 export type GiwaAttestationInputs = ActionBoundInputs;

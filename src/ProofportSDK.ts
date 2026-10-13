@@ -1190,9 +1190,9 @@ export class ProofportSDK {
    * ```
    */
   // Which circuits need a wallet signature, from the one record in
-  // src/circuits.ts. The typed-out pair that used to sit here had missed
-  // arc_eligibility, so a dapp calling createRelayRequest() for it with no
-  // signer got no local error and a relay 401 two round trips later.
+  // src/circuits.ts. A typed-out list here once missed a circuit, so a dapp
+  // calling createRelayRequest() for it with no signer got no local error and
+  // a relay 401 two round trips later.
   private static needsWalletSignature(circuit: CircuitType): boolean {
     return CIRCUIT_NEEDS_WALLET_SIGNATURE[circuit as CircuitId] === true;
   }
@@ -1232,9 +1232,7 @@ export class ProofportSDK {
     // from inside the mobile app -- a screen the dapp developer never sees,
     // reached after the person has already scanned a QR code.
     //
-    // This named arc_eligibility directly until giwa_attestation became the
-    // second circuit that can carry an action; the id belongs in the table,
-    // not in the check.
+    // The circuit id belongs in the table, not in the check.
     {
       const action = (inputs as { action?: unknown }).action;
       const binding = circuitActionBinding(circuit);

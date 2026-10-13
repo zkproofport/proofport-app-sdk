@@ -94,7 +94,7 @@ export default [
       }),
     ],
   },
-  // "./typedAction" subpath — checking the EIP-712 action an arc_eligibility
+  // "./typedAction" subpath — checking the EIP-712 action a giwa_attestation
   // proof binds to, on its own. Same reason as "./circuits" above: the mobile
   // app validates an action before asking a wallet to sign, and importing it
   // from the package ROOT drags qrcode, ethers and @babel/runtime into a React

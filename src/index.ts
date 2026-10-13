@@ -83,7 +83,6 @@ export type {
   ProofRequestStatus,
   CoinbaseKycInputs,
   ActionBoundInputs,
-  ArcEligibilityInputs,
   GiwaAttestationInputs,
   TypedAction,
   CoinbaseCountryInputs,
@@ -104,7 +103,7 @@ export type {
   SDKEnvironment,
 } from './types';
 
-// Checking the EIP-712 action an arc_eligibility proof binds to. Exported so a
+// Checking the EIP-712 action a giwa_attestation proof binds to. Exported so a
 // dapp validates before sending and the mobile app validates before signing,
 // against one definition rather than three.
 export { validateTypedAction, parseTypedAction } from './typedAction';
