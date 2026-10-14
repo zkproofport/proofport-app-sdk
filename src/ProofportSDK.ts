@@ -61,6 +61,7 @@ import {
 } from './constants';
 import { CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, type CircuitId } from './circuits';
 import { validateTypedAction } from './typedAction';
+import { isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
 
 
@@ -1336,7 +1337,9 @@ export class ProofportSDK {
   }
 
   /**
-   * Polls the relay until proof is completed or failed, with configurable interval and timeout.
+   * Polls the relay until the request reaches a terminal status
+   * (`completed`, `error`, `failed`, `cancelled` or `expired`), with
+   * configurable interval and timeout. Branch on `result.status`.
    *
    * @param requestId - The relay-issued request ID
    * @param options - Polling options
@@ -1367,7 +1370,10 @@ export class ProofportSDK {
         options.onStatusChange?.(result);
       }
 
-      if (result.status === 'completed' || result.status === 'failed') {
+      // Every terminal status ends the wait, not only success: an app error,
+      // a cancellation and a relay-side timeout are answers too, and polling
+      // past them would only end in this method's own timeout.
+      if (isTerminalRelayStatus(result.status)) {
         return result;
       }
 
@@ -1388,7 +1394,7 @@ export class ProofportSDK {
    * @param requestId - The relay-issued request ID to subscribe to
    * @param callbacks - Event callbacks for status changes and results
    * @param callbacks.onStatus - Called on status updates (pending, generating)
-   * @param callbacks.onResult - Called when proof is completed or failed
+   * @param callbacks.onResult - Called once with the terminal result: completed, error, failed, cancelled or expired
    * @param callbacks.onError - Called on errors
    * @returns Unsubscribe function to clean up the connection
    * @throws Error if relayUrl not set or socket.io-client not installed

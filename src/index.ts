@@ -101,8 +101,13 @@ export type {
   WalletSigner,
   RelayProofRequest,
   RelayProofResult,
+  RelayProofStatus,
+  RelayTerminalStatus,
   SDKEnvironment,
 } from './types';
+
+// The statuses a relay request ends in, for branching on a RelayProofResult.
+export { RELAY_TERMINAL_STATUSES, isTerminalRelayStatus } from './relayStatus';
 
 // Checking the EIP-712 action a giwa_attestation proof binds to. Exported so a
 // dapp validates before sending and the mobile app validates before signing,

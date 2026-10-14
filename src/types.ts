@@ -529,18 +529,34 @@ export interface RelayProofRequest {
   requestId: string;
   /** Deep link URL to open ZKProofport app (built by relay) */
   deepLink: string;
-  /** Relay status: pending, completed, failed */
+  /** Relay status at creation: always 'pending' */
   status: string;
   /** Relative poll URL for checking proof status (e.g., /api/v1/proof/{requestId}) */
   pollUrl: string;
 }
 
 /**
- * Proof result retrieved from relay polling.
+ * The states a relay request ends in (see `RELAY_TERMINAL_STATUSES`). Once reached, the status never changes
+ * and `waitForProof()` / `waitForResult()` resolve with it.
+ *
+ * - `completed` — a proof came back.
+ * - `error` — the app could not produce a proof; `error` says why, `errorCode`
+ *   (e.g. `E2007`) names the cause when the app sent one.
+ * - `failed` — the older name for `error`, still sent by older app versions.
+ * - `cancelled` — the user declined in the ZKProofport app.
+ * - `expired` — the app did not answer in time, so the relay answered for it.
+ */
+export type RelayTerminalStatus = 'completed' | 'error' | 'failed' | 'cancelled' | 'expired';
+
+/** Every status a relay request can report: `pending`, `generating` while the app works, then a terminal one. */
+export type RelayProofStatus = 'pending' | 'generating' | RelayTerminalStatus;
+
+/**
+ * Proof result retrieved from the relay, by polling or over the socket.
  */
 export interface RelayProofResult {
   requestId: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: RelayProofStatus;
   deepLink?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -550,6 +566,8 @@ export interface RelayProofResult {
   verifierAddress?: string;
   chainId?: number;
   circuit?: string;
-  /** Present when status is 'failed' */
+  /** Human-readable reason, present when status is 'error', 'failed' or 'expired' */
   error?: string;
+  /** The app's error code (`E` + four digits, e.g. `E2007`), present on some 'error' results */
+  errorCode?: string;
 }

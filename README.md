@@ -692,7 +692,8 @@ When you are done, `sdk.disconnect()` closes any open socket.
 | `publicInputs` | `string[]` | `'completed'` | The circuit's public inputs **in circuit order**. This is the part that carries meaning — what each index holds is in [Public Input Layout Constants](#public-input-layout-constants). |
 | `verifierAddress` | `string` | `'completed'` | Address of the Solidity verifier contract that can check this exact proof. It comes from the mobile app — forward it, do not hardcode one. |
 | `chainId` | `number` | `'completed'` | The chain that `verifierAddress` lives on. Same rule: forward it. |
-| `error` | `string` | failures | Human-readable reason from the mobile app or the relay. |
+| `error` | `string` | `'error'`, `'failed'`, `'expired'` | Human-readable reason from the mobile app or the relay. |
+| `errorCode` | `string` | some `'error'` results | The app's error code, `E` + four digits (e.g. `'E2007'`). Absent when the app did not send one. |
 | `deepLink` | `string` | polling path only | The deep link the request was created with. |
 | `createdAt`, `updatedAt` | `string` | polling path only | ISO timestamps of creation and last update. |
 
@@ -703,37 +704,40 @@ The last three come from the relay's polling endpoint. `waitForProof()` normally
 | `status` | Terminal | What happened | What you do |
 |----------|----------|---------------|-------------|
 | `'pending'` | no | The request exists; no proof yet | Keep waiting — `waitForProof()` does that for you |
+| `'generating'` | no | The app is producing the proof | Keep waiting |
 | `'completed'` | yes | A proof came back | `proof`, `publicInputs`, `verifierAddress` and `chainId` are set. Verify it (Step 7) before trusting anything in it |
-| `'error'` | yes | The app could not produce a proof — no attestation on that address, sign-in refused, generation failed | Read `error`, show it, let the user start over |
-| `'failed'` | yes | Same meaning and same handling as `'error'` | Handle the pair; the type declares `'failed'`, the app sends `'error'` |
-| `'cancelled'` | see below | The user declined the request in the ZKProofport app | Reset your UI |
+| `'error'` | yes | The app could not produce a proof — no attestation on that address, sign-in refused, generation failed | Read `error`, show it, let the user start over. `errorCode` (e.g. `'E2007'`) names the cause when the app sent one |
+| `'failed'` | yes | Same meaning and same handling as `'error'`; older app versions send it | Handle it with `'error'` |
+| `'cancelled'` | yes | The user declined the request in the ZKProofport app | Reset your UI |
+| `'expired'` | yes | The app did not answer in time, so the relay answered for it (a little under five minutes after the request) | Offer to start a new request |
 
-`RelayProofResult` declares `status` as `'pending' | 'completed' | 'failed'`, which is narrower than what the relay can deliver, so TypeScript rejects a direct comparison against `'error'`. Widen it once and branch on the string:
+Every terminal status ends the wait: `waitForProof()`, `waitForResult()` and `subscribe()`'s `onResult` all settle on each of the five, so branch on `result.status` rather than assuming success:
 
 ```typescript
-const status: string = result.status;
+import { isTerminalRelayStatus } from '@zkproofport-app/sdk';
 
-if (status === 'completed') {
-  // verify it
-} else if (status === 'error' || status === 'failed') {
-  showError(result.error ?? 'Proof generation failed');
+const result = await sdk.waitForProof(relay.requestId);
+
+switch (result.status) {
+  case 'completed':
+    // verify it (Step 7)
+    break;
+  case 'error':
+  case 'failed':
+    showError(result.error ?? 'Proof generation failed', result.errorCode);
+    break;
+  case 'cancelled':
+    hideQrDialog();
+    break;
+  case 'expired':
+    offerRetry();
+    break;
 }
 ```
 
-`waitForProof()` settles on `'completed'`, `'error'` and `'failed'`. It does **not** settle on `'cancelled'` — a cancellation arrives as a status update, and if you ignore it the call sits there until `timeoutMs` expires. Watch for it if you want to drop the QR dialog the moment the user says no:
+`isTerminalRelayStatus(status)` and `RELAY_TERMINAL_STATUSES` are exported for code that drives `pollResult()` in a loop of its own.
 
-```typescript
-const result = await sdk.waitForProof(relay.requestId, {
-  onStatusChange: (update) => {
-    if (update.status === 'cancelled') {
-      // The user declined in the app. This promise will not settle on its own.
-      hideQrDialog();
-    }
-  },
-});
-```
-
-`waitForResult()`, the polling path, is narrower still: it returns only on `'completed'` and `'failed'`, and keeps polling through `'error'` and `'cancelled'` until `timeoutMs`. Prefer `waitForProof()`, or drive `pollResult()` in a loop of your own if you want to decide what counts as terminal.
+The relay answers `'expired'` before the SDK's default `timeoutMs` (300 000 ms) runs out, so with the defaults you get a result to branch on rather than a thrown timeout. If you pass a much shorter `timeoutMs`, the SDK's own timeout can still fire first and the promise rejects.
 
 #### What is not on the result
 
@@ -750,7 +754,8 @@ const result = await sdk.waitForProof(relay.requestId, {
 | `pollResult()` throws `Request not found or expired` | No — that id is gone | Yes, ask them to start again |
 | `status: 'error'` / `'failed'` | No — a retry re-runs the same failing thing | Yes: `error` says what went wrong, and it is usually the user's move (connect the right wallet, sign in, use the device holding the licence) |
 | `status: 'cancelled'` | No | Nothing to say — they just declined |
-| `waitForProof()` timeout | Only if the user asks for it | Yes |
+| `status: 'expired'` | Only if the user asks for it | Yes: the app never answered — the QR was not scanned, or the app was closed |
+| `waitForProof()` timeout (only with a `timeoutMs` shorter than the default) | Only if the user asks for it | Yes |
 | `verifyResponseOnChain()` returns `{ valid: false }` | No | Treat it as a rejected proof, not an outage — Step 7 |
 
 #### `ProofResponse` — the shape on-chain verification takes
@@ -1076,7 +1081,8 @@ import type {
 | `ChallengeResponse` | Challenge from the relay: `{ requestId, challenge, expiresAt }` |
 | `WalletSigner` | Signer interface: `{ signMessage(message), getAddress() }` |
 | `RelayProofRequest` | Result of `createRelayRequest()`: `{ requestId, deepLink, status, pollUrl }` |
-| `RelayProofResult` | Result of `waitForProof()` / `waitForResult()` / `pollResult()`: `{ requestId, status, deepLink?, createdAt?, updatedAt?, proof?, publicInputs?, verifierAddress?, chainId?, circuit?, error? }`. `status` is declared as `'pending' \| 'completed' \| 'failed'` but the relay also delivers `'error'` and `'cancelled'` — [Step 6](#step-6-read-the-result) |
+| `RelayProofResult` | Result of `waitForProof()` / `waitForResult()` / `pollResult()`: `{ requestId, status, deepLink?, createdAt?, updatedAt?, proof?, publicInputs?, verifierAddress?, chainId?, circuit?, error?, errorCode? }`. `status` is a `RelayProofStatus` — [Step 6](#step-6-read-the-result) |
+| `RelayProofStatus` / `RelayTerminalStatus` | `'pending' \| 'generating'` plus the terminal `'completed' \| 'error' \| 'failed' \| 'cancelled' \| 'expired'` |
 
 The `OidcDomainInputs` interface:
 
