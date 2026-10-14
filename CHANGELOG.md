@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.0...v0.4.1) (2026-10-14)
+
+
+### Features
+
+* **sdk:** add the dojang_playground circuit ([db955fd](https://github.com/zkproofport/proofport-app-sdk/commit/db955fd45d9882e1f636e90463dc672c94753c82))
+
 ## [0.4.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.3.3...v0.4.0) (2026-10-13)
 
 
