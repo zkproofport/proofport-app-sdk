@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.1...v0.4.2) (2026-10-14)
+
+
+### Features
+
+* **sdk:** end relay waits on error, cancelled and expired ([7770dd1](https://github.com/zkproofport/proofport-app-sdk/commit/7770dd1fcda30b7ea1de0c77af58636730ee9cd7))
+
 ## [0.4.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.0...v0.4.1) (2026-10-14)
 
 
