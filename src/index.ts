@@ -84,6 +84,7 @@ export type {
   CoinbaseKycInputs,
   ActionBoundInputs,
   GiwaAttestationInputs,
+  DojangPlaygroundInputs,
   TypedAction,
   CoinbaseCountryInputs,
   OidcDomainInputs,

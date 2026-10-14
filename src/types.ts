@@ -246,6 +246,9 @@ export interface ActionBoundInputs {
 /** The same shape, for the circuit whose action is optional. */
 export type GiwaAttestationInputs = ActionBoundInputs;
 
+/** Dojang Playground takes the same shape: its action is optional too. */
+export type DojangPlaygroundInputs = ActionBoundInputs;
+
 /**
  * Union type of all circuit-specific input types.
  * Each circuit type has a corresponding input interface.

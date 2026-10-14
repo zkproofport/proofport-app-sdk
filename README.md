@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). One more proves today against a testnet deployment and is marked experimental: GIWA attestation. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against a testnet deployment and are marked experimental: GIWA attestation and Dojang Playground. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -125,6 +125,7 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
 | `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | _Experimental_ |
+| `CIRCUIT_IDS.DOJANG_PLAYGROUND` | `dojang_playground` | _Experimental_ |
 | `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
 | `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
 | `CIRCUIT_IDS.MDL_KR_REGION` | `mdl_kr_region` | Planned |
@@ -162,7 +163,7 @@ isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
 | `isCircuitId(value)` | `value is CircuitId` | Narrows an unknown value; `false` for hyphenated names |
 | `isSupportedCircuitId(value)` | `value is CircuitId` | The same, and additionally requires `supported` |
 | `getCircuitSupportStatus(id)` | `CircuitSupportStatus` | Status of one ID; throws on an unknown one |
-| `CircuitId` | type | Union of the seven IDs. `CircuitType` is an alias of it |
+| `CircuitId` | type | Union of the eight IDs. `CircuitType` is an alias of it |
 | `CircuitSupportStatus` | type | `'supported' \| 'planned'` |
 
 Both objects and all three arrays are frozen. `ALL_CIRCUIT_IDS`, `SUPPORTED_CIRCUIT_IDS` and `PLANNED_CIRCUIT_IDS` are derived from `CIRCUIT_SUPPORT_STATUS` at load time, so they cannot disagree with it.
@@ -299,6 +300,33 @@ one nullifier and there is no input a prover can vary.
 nowhere else, so the mobile app keeps it behind Developer Mode. A mainnet
 deployment is planned; until it exists, do not ship on this.
 
+### `dojang_playground`
+
+Proves that the wallet signing the request is the wallet that issued itself a
+Dojang through the GIWA Playground: the same key signed a `payAndIssueEAS()`
+call to the Playground faucet. The app finds that transaction itself, so a
+request needs a scope and nothing else.
+
+```typescript
+const { deepLink } = await sdk.createRelayRequest(
+  CIRCUIT_IDS.DOJANG_PLAYGROUND,
+  { scope: 'myapp.com' },
+  { dappName: 'My App' },
+);
+```
+
+An action is optional, exactly as for `giwa_attestation`: send one and the
+wallet signs EIP-712 typed data, send none and it signs the signal hash.
+
+Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
+`scope`, `nullifier` (160 fields). There is no issuer list, so there is no
+Merkle root, and scope and nullifier sit 32 fields earlier than in
+`giwa_attestation`. Read them with `extractScopeFromPublicInputs(inputs,
+'dojang_playground')`, never with another circuit's id. The nullifier is
+`keccak(keccak(wallet ++ keccak("dojang_playground")) ++ scope)`.
+
+Testnet only, like `giwa_attestation`.
+
 ### Which circuits take an action
 
 `CIRCUIT_ACTION_BINDING` is the one table, so you do not have to learn which
@@ -306,7 +334,7 @@ circuit names are special:
 
 | What the circuit does with an action | Circuits |
 |---|---|
-| Signs it when present, signs the signal hash when not | `giwa_attestation` |
+| Signs it when present, signs the signal hash when not | `giwa_attestation`, `dojang_playground` |
 | Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain, the three mDL circuits |
 
 ```typescript
@@ -1025,7 +1053,7 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitId` | Union of the seven canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `CircuitId` | Union of the eight canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'dojang_playground' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
 | `TypedAction` | The EIP-712 action a `giwa_attestation` proof binds to: `{ domain, types, primaryType, message }` — the same object `eth_signTypedData_v4` takes |
 | `CircuitSupportStatus` | `'supported' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
 | `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
@@ -1034,8 +1062,9 @@ import type {
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
 | `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
-| `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — optional for `giwa_attestation` |
+| `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — optional for `giwa_attestation` and `dojang_playground` |
 | `GiwaAttestationInputs` | Alias of `ActionBoundInputs`, for `giwa_attestation` |
+| `DojangPlaygroundInputs` | Alias of `ActionBoundInputs`, for `dojang_playground` |
 | `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
 | `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |

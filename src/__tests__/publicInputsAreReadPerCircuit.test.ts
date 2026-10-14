@@ -13,12 +13,13 @@
  * ROOT, a value identical for every user of the circuit. Anything counting
  * distinct people would have counted one.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
 } from '../verifier';
 import { ALL_CIRCUIT_IDS } from '../circuits';
+import dojangProof from './fixtures/dojangPlaygroundPublicInputs.json';
 
 /** Public inputs as the prover emits them: one field element per byte. */
 function fieldsWith(marks: Record<number, number>, length = 256): string[] {
@@ -117,5 +118,24 @@ describe('public inputs are read per circuit', () => {
     // person.
     const fields = fieldsWith({ ...block(64, 0x55), ...block(128, 0x77), ...block(160, 0x88) });
     expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + '55'.repeat(32));
+  });
+
+  it('reads Dojang Playground off a real proof, not a hand-placed fixture', async () => {
+    // setup.ts mocks ethers; the hashes here must be the real ones.
+    const { concat, getBytes, keccak256, toUtf8Bytes } = await vi.importActual<typeof import('ethers')>('ethers');
+    // The public inputs of a proof that verifies on the GIWA Sepolia verifier.
+    // Scope and nullifier are recomputed here the way the circuit derives them,
+    // so a wrong offset reads bytes that cannot match by accident.
+    const fields = dojangProof.publicInputs;
+    expect(fields).toHaveLength(160);
+    const scope = keccak256(toUtf8Bytes('dojang-playground-scope'));
+    const tag = keccak256(toUtf8Bytes('dojang_playground'));
+    const secret = keccak256(concat([getBytes('0x5A3E649208Ae15ec52496c1Ae23b2Ff89Ac02f0c'), getBytes(tag)]));
+    const nullifier = keccak256(concat([getBytes(secret), getBytes(scope)]));
+    expect(extractScopeFromPublicInputs(fields, 'dojang_playground')).toBe(scope);
+    expect(extractNullifierFromPublicInputs(fields, 'dojang_playground')).toBe(nullifier);
+    // GIWA's offsets on the same proof run off its end: there is no merkle
+    // root in this circuit, so everything sits 32 fields earlier.
+    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe(scope);
   });
 });

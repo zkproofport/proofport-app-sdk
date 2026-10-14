@@ -32,6 +32,7 @@ const NARGO_CIRCUIT_NAMES = [
   'coinbase_country_attestation',
   'oidc_domain_attestation',
   'giwa_attestation',
+  'dojang_playground',
   'mdl_kr_ownership',
   'mdl_kr_age',
   'mdl_kr_region',
@@ -125,7 +126,8 @@ describe('circuit support status', () => {
     // GIWA moved here from 'planned' on 2026-09-22, when its circuit gained
     // the optional EIP-712 action and its verifier was redeployed on GIWA
     // Sepolia. 'planned' had stopped being true: the demo already requests it.
-    expect([...EXPERIMENTAL_CIRCUIT_IDS]).toEqual(['giwa_attestation']);
+    expect([...EXPERIMENTAL_CIRCUIT_IDS]).toEqual(['giwa_attestation', 'dojang_playground']);
+    expect(isSupportedCircuitId('dojang_playground')).toBe(false);
     expect(isSupportedCircuitId('giwa_attestation')).toBe(false);
     expect(isCircuitId('giwa_attestation')).toBe(true);
   });

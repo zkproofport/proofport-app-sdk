@@ -83,6 +83,7 @@ describe('ProofportSDK - Utility Methods', () => {
       'coinbase_country_attestation',
       'oidc_domain_attestation',
       'giwa_attestation',
+      'dojang_playground',
       'mdl_kr_ownership',
       'mdl_kr_age',
       'mdl_kr_region',

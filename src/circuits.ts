@@ -57,6 +57,8 @@ export const CIRCUIT_IDS = Object.freeze({
   OIDC_DOMAIN_ATTESTATION: 'oidc_domain_attestation',
   /** GIWA attestation. Planned — not officially supported yet. */
   GIWA_ATTESTATION: 'giwa_attestation',
+  /** Dojang Playground on GIWA Sepolia. Experimental — testnet only. */
+  DOJANG_PLAYGROUND: 'dojang_playground',
   /** Korea Mobile ID ownership. Planned — not officially supported yet. */
   MDL_KR_OWNERSHIP: 'mdl_kr_ownership',
   /** Korea Mobile ID age threshold. Planned — not officially supported yet. */
@@ -98,6 +100,9 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     // 'supported' is that it is testnet-only, so the app offers it behind
     // Developer Mode and reads its files from main rather than a release tag.
     giwa_attestation: 'experimental',
+    // Same footing as GIWA: built, verifier deployed on GIWA Sepolia, a real
+    // proof verifies there. Testnet only.
+    dojang_playground: 'experimental',
     mdl_kr_ownership: 'planned',
     mdl_kr_age: 'planned',
     mdl_kr_region: 'planned',
@@ -128,6 +133,7 @@ export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.free
   coinbase_country_attestation: 'coinbase-country-attestation/target/vk/vk',
   oidc_domain_attestation: 'oidc-domain-attestation/target/vk/vk',
   giwa_attestation: 'giwa-attestation/target/vk/vk',
+  dojang_playground: 'dojang-playground/target/vk/vk',
   mdl_kr_ownership: 'mdl/kr-ownership/target/vk/vk',
   mdl_kr_age: 'mdl/kr-age/target/vk/vk',
   mdl_kr_region: 'mdl/kr-region/target/vk/vk',
@@ -267,6 +273,8 @@ export const CIRCUIT_ACTION_BINDING = {
   // Branches in-circuit: with an action the wallet signs the typed data,
   // without one it personal_signs the request's signal hash.
   giwa_attestation: 'optional',
+  // Same branch as GIWA; see dojang-playground/src/main.nr.
+  dojang_playground: 'optional',
   mdl_kr_ownership: 'none',
   mdl_kr_age: 'none',
   mdl_kr_region: 'none',
@@ -312,4 +320,7 @@ export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   // -- it sat under the Web2 comment above and was never revisited. A request
   // for it would have reached the relay with no signer.
   giwa_attestation: true,
+  // The wallet signs the request, and the same key must have signed its
+  // Playground faucet transaction.
+  dojang_playground: true,
 } satisfies Record<CircuitId, boolean>;

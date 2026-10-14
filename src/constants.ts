@@ -110,6 +110,18 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 192,
     publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier'],
   },
+  // Experimental, GIWA Sepolia only. The wallet signs the request (an EIP-712
+  // action, or signal_hash when none is given -- the same branch as GIWA), and
+  // the same key must have signed a payAndIssueEAS() call to the Playground
+  // faucet. No issuer list, so no merkle root: 5 x [u8; 32] = 160, read off the
+  // compiled ABI -- signal_hash 0-31, domain_separator 32-63, action_hash
+  // 64-95, scope 96-127, nullifier 128-159.
+  dojang_playground: {
+    name: 'Dojang Playground',
+    description: 'Prove this wallet issued itself a Dojang through the GIWA Playground, optionally authorizing one EIP-712 action',
+    publicInputsCount: 160,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'scope', 'nullifier'],
+  },
   // Korea Mobile ID (mDL) circuits. Planned — not officially supported yet.
   // Counts are byte-flattened field totals from the compiled circuit ABIs:
   // [u8; 32] arrays contribute 32 inputs each.
