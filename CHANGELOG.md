@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.2...v0.4.3) (2026-10-15)
+
+
+### Features
+
+* **sdk:** send the scope on the relay envelope so it can be counted ([8ea84b9](https://github.com/zkproofport/proofport-app-sdk/commit/8ea84b90bcc8ce7b5a36e32f224bbe41f34aa83e))
+
 ## [0.4.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.1...v0.4.2) (2026-10-14)
 
 
