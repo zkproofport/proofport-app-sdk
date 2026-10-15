@@ -140,6 +140,53 @@ describe('SDK Relay Methods', () => {
       });
     });
 
+    describe('copies the scope onto the envelope for the relay to count', () => {
+      async function sentBody(inputs: Record<string, unknown>) {
+        const sdk = createSDKWithSigner();
+        (global.fetch as any).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockChallengeResponse),
+        });
+        (global.fetch as any).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockRelayResponse),
+        });
+        await sdk.createRelayRequest('coinbase_attestation', inputs as any);
+        return JSON.parse((global.fetch as any).mock.calls[1][1].body);
+      }
+
+      it.each([
+        ['a domain', 'myapp.com'],
+        ['one character', 'a'],
+        ['whitespace only, left for the relay to judge', '   '],
+        ['Korean and emoji', '도장🔏 앱'],
+        ['newlines, tabs and markup', 'a\n\tb<script>%_\\'],
+        ['longer than the relay counts', 'x'.repeat(5000)],
+      ])('%s: sent unchanged, and inputs keep it too', async (_name, scope) => {
+        const body = await sentBody({ scope });
+        expect(body.scope).toBe(scope);
+        expect(body.inputs.scope).toBe(scope);
+      });
+
+      it.each([
+        ['missing', {}],
+        ['empty', { scope: '' }],
+        ['null', { scope: null }],
+        ['a number', { scope: 42 }],
+        ['an object', { scope: { host: 'myapp.com' } }],
+      ])('%s: no envelope scope is sent', async (_name, inputs) => {
+        const body = await sentBody(inputs);
+        expect('scope' in body).toBe(false);
+        expect(body.inputs).toEqual(inputs);
+      });
+
+      it('does not change the caller\'s inputs object', async () => {
+        const inputs = { scope: 'myapp.com' };
+        await sentBody(inputs);
+        expect(inputs).toEqual({ scope: 'myapp.com' });
+      });
+    });
+
     it('throws on relay error', async () => {
       const sdk = createSDKWithSigner();
 

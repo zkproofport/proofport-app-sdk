@@ -1270,6 +1270,13 @@ export class ProofportSDK {
       challenge,
     };
 
+    // The relay never reads `inputs`, so the scope is also sent on the envelope,
+    // where the relay counts requests per scope. The app proves the scope inside
+    // `inputs` and uses the envelope copy only when `inputs` has none; both are
+    // the same string here.
+    const scope = (inputs as { scope?: unknown }).scope;
+    if (typeof scope === 'string' && scope.length > 0) body.scope = scope;
+
     // Sign challenge for circuits that require wallet signature
     if (needsSignature && this.signer) {
       body.signature = await this.signer.signMessage(challenge);

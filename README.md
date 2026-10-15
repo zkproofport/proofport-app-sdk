@@ -477,6 +477,8 @@ const relay = await sdk.createRelayRequest('coinbase_attestation', {
 
 Every field of the third argument is optional: `message`, `dappName` and `dappIcon` are shown to the user in the ZKProofport app, `nonce` is a value of your own choosing that the relay refuses to accept twice, and `returnScheme` is described next.
 
+The relay never reads your circuit inputs. So that ZKProofport can count requests per app, the SDK also sends `scope` alongside them, unchanged. The proof itself uses the scope in your inputs.
+
 #### Switching back: `returnScheme`
 
 When ZKProofport finishes a proof, the user is sitting in the ZKProofport app. `returnScheme` answers one question: **which app should come back to the foreground?**
