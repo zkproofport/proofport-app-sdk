@@ -61,4 +61,12 @@ jobs:
           esac
           dist=latest
           [[ "$TAG" == *beta* ]] && dist=beta
+          name=$(node -p "require('./$dir/package.json').name")
+          version=$(node -p "require('./$dir/package.json').version")
+          # core's first version is published by hand (see above); its release
+          # must not fail for trying to publish the same version again.
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already on npm; nothing to publish."
+            exit 0
+          fi
           (cd "$dir" && npm publish --access public --tag "$dist")
