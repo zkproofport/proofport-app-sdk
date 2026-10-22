@@ -17,6 +17,12 @@ const BB = '@aztec/bb.js';
 // cannot express ("output.dir must be used, not output.file").
 const BUFFER = 'buffer/';
 
+// @zkproofport-app/core is a dependency, never bundled: every consumer resolves
+// the one installed copy, which is the point of the package.
+const CORE = '@zkproofport-app/core';
+const CORE_CIRCUITS = '@zkproofport-app/core/circuits';
+const CORE_TYPED_ACTION = '@zkproofport-app/core/typedAction';
+
 export default [
   // CJS for Node.js — qrcode stays external
   {
@@ -26,7 +32,7 @@ export default [
       format: 'cjs',
       sourcemap: true,
     },
-    external: ['ethers', 'qrcode', 'socket.io-client', BB, BUFFER],
+    external: ['ethers', 'qrcode', 'socket.io-client', BB, BUFFER, CORE, CORE_CIRCUITS, CORE_TYPED_ACTION],
     plugins: [
       resolve(),
       commonjs(),
@@ -52,7 +58,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['ethers', 'socket.io-client', BB, BUFFER],
+    external: ['ethers', 'socket.io-client', BB, BUFFER, CORE, CORE_CIRCUITS, CORE_TYPED_ACTION],
     plugins: [
       resolve({ browser: true, preferBuiltins: false }),
       commonjs(),
@@ -68,6 +74,7 @@ export default [
   // Declarations come from the CJS build above, which emits dist/circuits.d.ts.
   {
     input: 'src/circuits.ts',
+    external: [CORE_CIRCUITS],
     output: [
       {
         file: 'dist/circuits.js',
@@ -101,6 +108,7 @@ export default [
   // Native bundle and into jest. Its only import is a TYPE, which is erased.
   {
     input: 'src/typedAction.ts',
+    external: [CORE_TYPED_ACTION],
     output: [
       {
         file: 'dist/typedAction.js',
