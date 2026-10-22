@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.0...v0.5.0-beta.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **core:** ship ESM as .mjs so every Node version loads it ([229d0cf](https://github.com/zkproofport/proofport-app-sdk/commit/229d0cffe6eb467982a82265d0bdfa2f9c3d5cee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.1.1 to 0.1.2
+
 ## [0.5.0-beta.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.3...v0.5.0-beta.0) (2026-10-22)
 
 
