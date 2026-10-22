@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.1.1...core-v0.1.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **core:** ship ESM as .mjs so every Node version loads it ([229d0cf](https://github.com/zkproofport/proofport-app-sdk/commit/229d0cffe6eb467982a82265d0bdfa2f9c3d5cee))
+
 ## [0.1.1](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.1.0...core-v0.1.1) (2026-10-22)
 
 
