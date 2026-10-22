@@ -81,7 +81,7 @@
       "bump-patch-for-minor-pre-major": true,
       "component": "core",
       "last-release-sha": "d036aed22d74874b494ddcc05676c5d68784a16a",
-      "release-as": "0.1.0"
+      "release-as": "0.1.1"
     }
   },
   "plugins": [
