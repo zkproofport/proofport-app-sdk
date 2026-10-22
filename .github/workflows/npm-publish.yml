@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The SDK type-checks against core's built declarations.
+      - name: Build core
+        run: npm run build --workspace packages/core
+
       - name: Type check
         run: npx tsc --noEmit
 
@@ -41,10 +45,20 @@ jobs:
         # node >=22.22 and fails EBADENGINE on the node 20 runner.
         run: npm install -g npm@11
 
+      # Two packages release from this repository: the SDK (tags vX.Y.Z) and
+      # @zkproofport-app/core in packages/core (tags core-vX.Y.Z). The tag says
+      # which one this release is. Each needs its own trusted-publisher entry
+      # on npmjs.com; core's first version had to be published by hand, because
+      # npm cannot attach a trusted publisher to a package that does not exist.
       - name: Publish to npm (OIDC trusted publisher)
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          if [[ "${{ github.event.release.tag_name }}" == *"beta"* ]]; then
-            npm publish --access public --tag beta
-          else
-            npm publish --access public
-          fi
+          case "$TAG" in
+            core-v*) dir=packages/core ;;
+            v*)      dir=. ;;
+            *) echo "Unknown release tag '$TAG': expected vX.Y.Z or core-vX.Y.Z" >&2; exit 1 ;;
+          esac
+          dist=latest
+          [[ "$TAG" == *beta* ]] && dist=beta
+          (cd "$dir" && npm publish --access public --tag "$dist")

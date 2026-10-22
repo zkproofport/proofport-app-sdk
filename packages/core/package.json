@@ -1,0 +1,57 @@
+{
+  "name": "@zkproofport-app/core",
+  "version": "0.1.0",
+  "description": "ZKProofport circuit identifiers, EIP-712 action check and on-chain proof verification",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.esm.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js"
+    },
+    "./circuits": {
+      "types": "./dist/circuits.d.ts",
+      "import": "./dist/circuits.esm.js",
+      "require": "./dist/circuits.js"
+    },
+    "./typedAction": {
+      "types": "./dist/typedAction.d.ts",
+      "import": "./dist/typedAction.esm.js",
+      "require": "./dist/typedAction.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zkproofport/proofport-app-sdk.git",
+    "directory": "packages/core"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "ethers": "^5.7.0 || ^6.0.0"
+  },
+  "devDependencies": {
+    "ethers": "^6.16.0"
+  },
+  "typesVersions": {
+    "*": {
+      "circuits": [
+        "dist/circuits.d.ts"
+      ],
+      "typedAction": [
+        "dist/typedAction.d.ts"
+      ]
+    }
+  }
+}

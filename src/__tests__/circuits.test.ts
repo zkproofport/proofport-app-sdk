@@ -210,7 +210,15 @@ describe('the rest of the SDK reads from the same list', () => {
 });
 
 describe('the circuits module stays dependency-free', () => {
-  const source = readFileSync(join(__dirname, '..', 'circuits.ts'), 'utf8');
+  // The list lives in @zkproofport-app/core now (packages/core); this SDK's
+  // src/circuits.ts only re-exports core's ethers-free subpath.
+  const source = readFileSync(join(__dirname, '..', '..', 'packages', 'core', 'src', 'circuits.ts'), 'utf8');
+
+  it('the SDK entry only re-exports core\'s dependency-free subpath', () => {
+    const shim = readFileSync(join(__dirname, '..', 'circuits.ts'), 'utf8');
+    const statements = shim.split('\n').filter((l) => /^\s*(import|export)\b/.test(l));
+    expect(statements).toEqual(["export * from '@zkproofport-app/core/circuits';"]);
+  });
 
   it('has no import statements', () => {
     const importLines = source

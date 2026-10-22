@@ -8,15 +8,79 @@
       "draft": false,
       "prerelease": false,
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "perf", "section": "Performance" },
-        { "type": "refactor", "section": "Refactoring" },
-        { "type": "docs", "section": "Documentation", "hidden": true },
-        { "type": "chore", "section": "Miscellaneous", "hidden": true }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "perf",
+          "section": "Performance"
+        },
+        {
+          "type": "refactor",
+          "section": "Refactoring"
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": true
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": true
+        }
       ],
       "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true
+      "bump-patch-for-minor-pre-major": true,
+      "exclude-paths": [
+        "packages/core"
+      ]
+    },
+    "packages/core": {
+      "release-type": "node",
+      "npm-publish": false,
+      "include-component-in-tag": true,
+      "draft": false,
+      "prerelease": false,
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "perf",
+          "section": "Performance"
+        },
+        {
+          "type": "refactor",
+          "section": "Refactoring"
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": true
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": true
+        }
+      ],
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "component": "core"
     }
-  }
+  },
+  "plugins": [
+    "node-workspace"
+  ]
 }
