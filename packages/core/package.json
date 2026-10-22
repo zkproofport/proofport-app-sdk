@@ -4,22 +4,22 @@
   "description": "ZKProofport circuit identifiers, EIP-712 action check and on-chain proof verification",
   "license": "MIT",
   "main": "./dist/index.js",
-  "module": "./dist/index.esm.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.esm.js",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
     "./circuits": {
       "types": "./dist/circuits.d.ts",
-      "import": "./dist/circuits.esm.js",
+      "import": "./dist/circuits.mjs",
       "require": "./dist/circuits.js"
     },
     "./typedAction": {
       "types": "./dist/typedAction.d.ts",
-      "import": "./dist/typedAction.esm.js",
+      "import": "./dist/typedAction.mjs",
       "require": "./dist/typedAction.js"
     },
     "./package.json": "./package.json"

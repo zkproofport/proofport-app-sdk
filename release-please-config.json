@@ -40,7 +40,8 @@
       "exclude-paths": [
         "packages/core"
       ],
-      "last-release-sha": "d036aed22d74874b494ddcc05676c5d68784a16a"
+      "last-release-sha": "d036aed22d74874b494ddcc05676c5d68784a16a",
+      "release-as": "0.5.0-beta.1"
     },
     "packages/core": {
       "release-type": "node",
