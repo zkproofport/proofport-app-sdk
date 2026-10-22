@@ -1,6 +1,6 @@
 {
   "name": "@zkproofport-app/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ZKProofport circuit identifiers, EIP-712 action check and on-chain proof verification",
   "license": "MIT",
   "main": "./dist/index.js",
