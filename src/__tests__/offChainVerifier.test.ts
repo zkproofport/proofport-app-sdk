@@ -7,12 +7,15 @@
  * throw, it returns `false`, and a mock returning `true` would sail past it
  * while the shipped code rejected every valid proof.
  *
- * So this reads what `bb prove` actually wrote into the circuits repository:
+ * So this reads what `bb prove -t evm` actually wrote for coinbase_attestation
+ * (circuits/scripts/build.sh writes it; the proof directory is not committed,
+ * so these cases run where the circuits have been built and skip elsewhere):
  *
- *   proof            16224 bytes, without the public inputs
- *   public_inputs     2112 bytes = 66 field elements of 32 bytes
- *   vk                1816 bytes — the size the pinned bb emits; bb 0.87.0 and
- *                     1.2.0 emit 1760, which is how a version drift shows up
+ *   proof             9920 bytes, without the public inputs
+ *   public_inputs     4096 bytes = 128 field elements of 32 bytes
+ *   vk                1888 bytes -- the size bb 4.2.0-aztecnr-rc.2 emits; the
+ *                     2025 nightly emitted 1816, which is how a stale build
+ *                     shows up
  *
  * That split is also exactly what the mobile app sends through the relay, so
  * these bytes exercise the same shape a caller passes in.
@@ -23,7 +26,7 @@ import { join } from 'path';
 import { verifyProofOffChain } from '../offChainVerifier';
 
 /** vitest runs with the SDK package root as cwd; the circuits repo is a sibling. */
-const CIRCUIT_DIR = join(process.cwd(), '..', 'circuits', 'mdl', 'kr-age', 'target');
+const CIRCUIT_DIR = join(process.cwd(), '..', 'circuits', 'coinbase-attestation', 'target');
 const PROOF_FILE = join(CIRCUIT_DIR, 'proof', 'proof');
 const PUBLIC_INPUTS_FILE = join(CIRCUIT_DIR, 'proof', 'public_inputs');
 const VK_FILE = join(CIRCUIT_DIR, 'vk', 'vk');
@@ -53,16 +56,16 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
   });
 
   it('the artifacts are the shape the pinned bb produces', () => {
-    // Not ceremony. If the verification key is 1760 bytes, someone rebuilt the
-    // circuits with a different bb and every case below would fail for a reason
+    // Not ceremony. If the verification key is not 1888 bytes, the circuits were
+    // built with a different bb and every case below would fail for a reason
     // that has nothing to do with this file.
-    expect(vk.length).toBe(1816);
-    expect(publicInputs.length).toBe(66);
+    expect(vk.length).toBe(1888);
+    expect(publicInputs.length).toBe(128);
     expect(proofHex.length).toBeGreaterThan(1000);
   });
 
   it('accepts a valid proof', async () => {
-    const result = await verifyProofOffChain('mdl_kr_age', proofHex, publicInputs, {
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, {
       verificationKey: vk,
     });
     expect(result.error).toBeUndefined();
@@ -72,10 +75,14 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
   it('rejects a proof with one byte changed', async () => {
     // The case that makes the one above mean something. A verifier that
     // returned true unconditionally would pass every other test in this file.
+    //
+    // Byte 4000 sits in the sumcheck scalars. A byte inside one of the curve
+    // points at the front (500, say) makes bb 4.x refuse the point outright
+    // ("val.on_curve()"), which is the next case.
     const bytes = new Uint8Array(readFileSync(PROOF_FILE));
-    bytes[500] = bytes[500] ^ 0xff;
+    bytes[4000] = bytes[4000] ^ 0x01;
 
-    const result = await verifyProofOffChain('mdl_kr_age', toHex(bytes), publicInputs, {
+    const result = await verifyProofOffChain('coinbase_attestation', toHex(bytes), publicInputs, {
       verificationKey: vk,
     });
     // `error` must be absent: a rejection has to come from the verifier saying
@@ -85,6 +92,20 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
     expect(result.valid).toBe(false);
   }, 120_000);
 
+  it('rejects a proof whose curve point was corrupted, and says why', async () => {
+    // bb 4.x does not answer false here: it rejects the point before verifying
+    // and throws "Assertion failed: (val.on_curve())". The caller must still
+    // get valid: false, with the reason, never an exception.
+    const bytes = new Uint8Array(readFileSync(PROOF_FILE));
+    bytes[500] = bytes[500] ^ 0x01;
+
+    const result = await verifyProofOffChain('coinbase_attestation', toHex(bytes), publicInputs, {
+      verificationKey: vk,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/on_curve/);
+  }, 120_000);
+
   it('rejects a proof whose public inputs were altered', async () => {
     // The public inputs are what the proof is ABOUT — an age threshold, a
     // scope, a nullifier. Accepting a proof against different ones would let a
@@ -92,7 +113,7 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
     const tampered = [...publicInputs];
     tampered[0] = '0x' + '11'.repeat(32);
 
-    const result = await verifyProofOffChain('mdl_kr_age', proofHex, tampered, {
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, tampered, {
       verificationKey: vk,
     });
     expect(result.error).toBeUndefined();
@@ -120,10 +141,10 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
     // Spelling that out because the tempting assertion (`error` undefined, like
     // its neighbours) fails for a reason that is not a defect, and "fixing" it
     // would mean swallowing the trap and reporting a confident false.
-    const otherVk = join(process.cwd(), '..', 'circuits', 'mdl', 'kr-region', 'target', 'vk', 'vk');
+    const otherVk = join(process.cwd(), '..', 'circuits', 'coinbase-country-attestation', 'target', 'vk', 'vk');
     if (!existsSync(otherVk)) return;
 
-    const result = await verifyProofOffChain('mdl_kr_age', proofHex, publicInputs, {
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, {
       verificationKey: new Uint8Array(readFileSync(otherVk)),
     });
     expect(result.valid).toBe(false);
@@ -162,17 +183,18 @@ describe('off-chain verification input handling', () => {
  * entry point — which is the question "does off-chain verification cover every
  * circuit" actually asks.
  *
- * Only the three Korea Mobile ID circuits have a proof in the repository;
- * Coinbase, OIDC and GIWA have an empty proof directory (their witnesses are
- * built from live attestation data, not committed). Those three go through the
- * identical code path and their verification keys are fetched by the live check
- * next door, but they are NOT exercised end to end here, and this comment says
- * so rather than letting a reader assume seven.
+ * Proofs are not committed; these are the circuits whose build writes one
+ * (build.sh with a Prover.toml). The Korea Mobile ID circuits prove through
+ * their own acceptance hook, so a proof left on disk there may come from an
+ * older toolchain -- they are left out rather than tested against the wrong
+ * key. OIDC has no committed witness. Those go through the identical code
+ * path but are NOT exercised end to end here.
  */
 const CIRCUITS_WITH_COMMITTED_PROOFS = [
-  {circuit: 'mdl_kr_age' as const, dir: ['mdl', 'kr-age']},
-  {circuit: 'mdl_kr_ownership' as const, dir: ['mdl', 'kr-ownership']},
-  {circuit: 'mdl_kr_region' as const, dir: ['mdl', 'kr-region']},
+  {circuit: 'coinbase_attestation' as const, dir: ['coinbase-attestation']},
+  {circuit: 'coinbase_country_attestation' as const, dir: ['coinbase-country-attestation']},
+  {circuit: 'giwa_attestation' as const, dir: ['giwa-attestation']},
+  {circuit: 'dojang_playground' as const, dir: ['dojang-playground']},
 ];
 
 describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)(

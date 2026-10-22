@@ -11,27 +11,28 @@
  * (through mopro's native Barretenberg); it was only the JavaScript side that
  * had no such thing.
  *
- * HOW IT WORKS. Proofs here are made with `--oracle_hash keccak` and ZK on, so
- * the matching check is `acirVerifyUltraKeccakZkHonk(proof, vk)`. Two things
- * have to line up:
+ * HOW IT WORKS. Proofs here are made for the EVM target (`bb prove -t evm`:
+ * keccak transcript, ZK on), so the matching check is bb.js's
+ * `UltraHonkVerifierBackend.verifyProof(..., { verifierTarget: 'evm' })`. Two
+ * things have to line up:
  *
- *   The version. `@aztec/bb.js@1.0.0-nightly.20250723` is the WASM build of the
- *   same bb the circuits are compiled with. Versions are not interchangeable:
- *   measured on the Korea Mobile ID age circuit, the pinned bb writes a 16256-
- *   byte proof where bb 1.2.0 writes 16224 for the identical circuit and
- *   witness — and the verification key comes out the SAME either way, so the
- *   key cannot warn you. A mismatch shows up only as verification failing.
+ *   The version. `@aztec/bb.js` must be the WASM build of the same bb the
+ *   circuits are compiled with -- `BB_VERSION` in circuits/toolchain.env,
+ *   4.2.0-aztecnr-rc.2 since the beta.19 toolchain. Versions are not
+ *   interchangeable: on the Korea Mobile ID age circuit the 2025 nightly wrote
+ *   a 16256-byte proof where bb 1.2.0 wrote 16224 for the identical circuit and
+ *   witness, with the SAME verification key, so the key cannot warn you. A
+ *   mismatch shows up only as verification failing.
  *
- *   The flavour. There are four verify entry points and picking the wrong one
- *   is not a polite false. `acirVerifyUltraZKHonk` (poseidon) answers false for
- *   a perfectly good proof, and `acirVerifyUltraKeccakHonk` — keccak without ZK
- *   — TRAPS the WebAssembly with a bare "unreachable", which looks exactly like
- *   a corrupt proof, a mismatched key, or a missing SRS.
+ *   The target. Verifying an EVM proof as any other target is not a polite
+ *   false. With the 2025 nightly, keccak-without-ZK trapped the WebAssembly
+ *   with a bare "unreachable" and the poseidon flavour answered false for a
+ *   good proof.
  *
  * THE PROOF ARRIVES IN TWO PIECES. The mobile app splits what Barretenberg
  * produced into `proof` and `publicInputs` before sending it, because the
- * Solidity verifier takes them separately. Verifying needs them joined back, in
- * that order, which is what `reconstructHonkProof` does.
+ * Solidity verifier takes them separately. bb.js 4.x's verifier takes the same
+ * two pieces, so nothing is joined back here.
  */
 import { CIRCUIT_VK_PATHS, type CircuitId } from './circuits';
 
@@ -117,8 +118,8 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 /**
- * @internal Public inputs as the flat byte run Barretenberg expects: each one a
- * 32-byte big-endian field element, concatenated in order.
+ * @internal Public inputs as 32-byte big-endian field elements in hex, the
+ * shape bb.js's verifier takes.
  *
  * The relay carries them as hex strings that are USUALLY already 32 bytes, but
  * a value that happens to have leading zeros can arrive short (`0x01`). Left-
@@ -126,18 +127,18 @@ function hexToBytes(hex: string): Uint8Array {
  * verification that works and one that fails on roughly one proof in a hundred,
  * for no reason the caller can see.
  */
-function packPublicInputs(publicInputs: string[]): Uint8Array {
-  const out = new Uint8Array(publicInputs.length * 32);
-  publicInputs.forEach((input, i) => {
+function normalisePublicInputs(publicInputs: string[]): string[] {
+  return publicInputs.map((input, i) => {
     const bytes = hexToBytes(input);
     if (bytes.length > 32) {
       throw new Error(
         `Public input ${i} is ${bytes.length} bytes; a field element is at most 32`
       );
     }
-    out.set(bytes, i * 32 + (32 - bytes.length));
+    const padded = new Uint8Array(32);
+    padded.set(bytes, 32 - bytes.length);
+    return '0x' + Array.from(padded, b => b.toString(16).padStart(2, '0')).join('');
   });
-  return out;
 }
 
 /**
@@ -244,52 +245,27 @@ export async function verifyProofOffChain(
     };
   }
 
-  let api:
-    | {
-        initSRSForCircuitSize(size: number): Promise<void>;
-        acirVerifyUltraKeccakZkHonk(p: Uint8Array, v: unknown): Promise<boolean>;
-        destroy(): Promise<void>;
-      }
-    | undefined;
+  let api: { destroy(): Promise<void> } | undefined;
   try {
     const proofBytes = hexToBytes(proof);
     if (proofBytes.length === 0) {
       return { valid: false, error: 'Proof is empty' };
     }
-    const publicInputBytes = packPublicInputs(publicInputs);
+    // Normalised to 32-byte big-endian fields before handing them over: the
+    // relay can deliver a short value (`0x01`), and the check below must see
+    // exactly what the circuit committed to.
+    const fields = normalisePublicInputs(publicInputs);
 
     const vk =
       options.verificationKey ?? (await fetchVerificationKey(circuit, timeoutMs));
 
-    // Public inputs first, then the proof — the order Barretenberg wrote them in
-    // before the mobile app split them apart for the Solidity verifier.
-    const full = bb.reconstructHonkProof(publicInputBytes, proofBytes);
-
-    api = (await bb.Barretenberg.new({ threads: 1 })) as unknown as typeof api;
-
-    // THE VERIFY MUST MATCH HOW THE PROOF WAS MADE, AND THERE ARE FOUR OF THEM.
-    //
-    // `scripts/build.sh` in the circuits repo proves with `--oracle_hash keccak`
-    // and ZK on — so the only entry point that answers correctly is the one that
-    // is BOTH. Measured against a real proof of the Korea Mobile ID age circuit,
-    // freshly generated against its own key:
-    //
-    //   acirVerifyUltraKeccakZkHonk    true     ← the right one
-    //   acirVerifyUltraKeccakHonk      TRAPS with a bare "unreachable"
-    //   acirVerifyUltraZKHonk          false    (poseidon: wrong oracle hash)
-    //
-    // The middle row is why this took a while: picking keccak-without-ZK does
-    // not return false, it kills the WebAssembly instance with a message that
-    // names nothing. It looks identical to a malformed proof, to a mismatched
-    // key, and to a missing SRS.
-    //
-    // Two more things that produce that same trap, both required:
-    //   initSRSForCircuitSize must be called before the first verify.
-    //   The key must be a RawBuffer — a plain Uint8Array is marshalled as a
-    //   length-prefixed vector, so its length is read as key material.
-    // Both are what bb.js's own BarretenbergVerifier does before verifying.
-    await api!.initSRSForCircuitSize(0);
-    const valid = await api!.acirVerifyUltraKeccakZkHonk(full, new bb.RawBuffer(vk));
+    const barretenberg = await bb.Barretenberg.new({ threads: 1 });
+    api = barretenberg;
+    const verifier = new bb.UltraHonkVerifierBackend(barretenberg);
+    const valid = await verifier.verifyProof(
+      { proof: proofBytes, publicInputs: fields, verificationKey: vk },
+      { verifierTarget: 'evm' }
+    );
     return { valid };
   } catch (error) {
     return { valid: false, error: error instanceof Error ? error.message : String(error) };
