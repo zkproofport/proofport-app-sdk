@@ -77,7 +77,8 @@
       ],
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
-      "component": "core"
+      "component": "core",
+      "last-release-sha": "d036aed22d74874b494ddcc05676c5d68784a16a"
     }
   },
   "plugins": [
