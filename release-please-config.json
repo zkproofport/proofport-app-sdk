@@ -39,7 +39,8 @@
       "bump-patch-for-minor-pre-major": true,
       "exclude-paths": [
         "packages/core"
-      ]
+      ],
+      "last-release-sha": "d036aed22d74874b494ddcc05676c5d68784a16a"
     },
     "packages/core": {
       "release-type": "node",
@@ -83,5 +84,7 @@
   },
   "plugins": [
     "node-workspace"
-  ]
+  ],
+  "commit-search-depth": 50,
+  "release-search-depth": 50
 }
