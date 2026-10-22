@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0-beta.0](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.3...v0.5.0-beta.0) (2026-10-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** verify off-chain with bb.js 4.2.0-aztecnr-rc.2
+
+### Features
+
+* add @zkproofport-app/core for what every consumer shares ([2b92c2e](https://github.com/zkproofport/proofport-app-sdk/commit/2b92c2e45a2d7797952d0d14d1b9cc8d7e7fe544))
+* **sdk:** verify off-chain with bb.js 4.2.0-aztecnr-rc.2 ([7e59b77](https://github.com/zkproofport/proofport-app-sdk/commit/7e59b77bb0f75bce6d14ab67cc4c76a0e1054602))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.1.0 to 0.1.1
+
 ## [0.4.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.4.2...v0.4.3) (2026-10-15)
 
 
