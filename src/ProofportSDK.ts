@@ -59,7 +59,7 @@ import {
   CIRCUIT_METADATA,
   RELAY_URLS,
 } from './constants';
-import { CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, type CircuitId } from './circuits';
+import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
 import { validateTypedAction } from './typedAction';
 import { isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -144,13 +144,11 @@ export class ProofportSDK {
 
   /**
    * @internal
-   * Creates a Coinbase KYC verification proof request.
+   * Creates a proof request for a circuit whose dapp-side input is a scope
+   * (Coinbase KYC, OIDC domain, GIWA, Dojang), keeping that circuit's id.
    *
-   * Generates a proof request for verifying Coinbase KYC status without revealing
-   * the actual attestation data. The proof confirms the user has passed Coinbase KYC
-   * while maintaining privacy through zero-knowledge proofs.
-   *
-   * @param inputs - Circuit inputs for Coinbase KYC
+   * @param circuit - The circuit requested; it is the request's circuit
+   * @param inputs - Circuit inputs; `scope` is required (and `domain` for OIDC)
    * @param inputs.scope - Application-specific scope (e.g., domain name)
    * @param options - Request configuration options
 
@@ -165,7 +163,7 @@ export class ProofportSDK {
    *
    * @example
    * ```typescript
-   * const request = sdk.createCoinbaseKycRequest({
+   * const request = sdk.createScopedRequest('coinbase_attestation', {
    *   scope: 'myapp.com'
    * }, {
    *   dappName: 'My DApp',
@@ -175,8 +173,9 @@ export class ProofportSDK {
    * const deepLink = sdk.getDeepLinkUrl(request);
    * ```
    */
-  private createCoinbaseKycRequest(
-    inputs: CoinbaseKycInputs,
+  private createScopedRequest(
+    circuit: CircuitType,
+    inputs: CircuitInputs,
     options: {
       message?: string;
       dappName?: string;
@@ -184,13 +183,33 @@ export class ProofportSDK {
       expiresInMs?: number;
     } = {}
   ): ProofRequest {
-    if (!inputs.scope) {
-      throw new Error('scope is required for coinbase_attestation circuit');
+    const scope = (inputs as { scope?: unknown }).scope;
+    if (typeof scope !== 'string' || scope.trim() === '') {
+      throw new Error(`scope is required for ${circuit} circuit`);
+    }
+    if (circuit === 'oidc_domain_attestation') {
+      const domain = (inputs as { domain?: unknown }).domain;
+      if (typeof domain !== 'string' || domain.trim() === '') {
+        throw new Error('domain is required for oidc_domain_attestation circuit');
+      }
+    }
+    const action = (inputs as { action?: unknown }).action;
+    const binding = circuitActionBinding(circuit);
+    if (binding === 'none' && action !== undefined) {
+      throw new Error(`${circuit} has no action inputs, so an action sent with it would not be proved.`);
+    }
+    if (binding === 'required' || (binding === 'optional' && action !== undefined)) {
+      const actionError = validateTypedAction(action);
+      if (actionError) throw new Error(`${actionError} (circuit: ${circuit})`);
     }
 
     const request: ProofRequest = {
       requestId: generateRequestId(),
-      circuit: 'coinbase_attestation',
+      // The circuit asked for, always. This used to be the literal
+      // 'coinbase_attestation', and every circuit that was not country or mDL
+      // was routed here -- a GIWA, Dojang or OIDC request silently became a
+      // Coinbase KYC request.
+      circuit,
       inputs,
       message: options.message,
       dappName: options.dappName,
@@ -309,18 +328,35 @@ export class ProofportSDK {
       expiresInMs?: number;
     } = {}
   ): ProofRequest {
-    if (circuit === 'coinbase_country_attestation') {
-      return this.createCoinbaseCountryRequest(inputs as CoinbaseCountryInputs, options);
-    } else if (
-      circuit === 'mdl_kr_ownership' ||
-      circuit === 'mdl_kr_age' ||
-      circuit === 'mdl_kr_region'
-    ) {
-      return this.createMdlKrRequest(circuit, inputs, options);
-    } else {
-      return this.createCoinbaseKycRequest(inputs as CoinbaseKycInputs, options);
+    if (!isCircuitId(circuit)) {
+      throw new Error(`Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.`);
+    }
+    const builder = ProofportSDK.REQUEST_BUILDERS[circuit];
+    switch (builder) {
+      case 'country':
+        return this.createCoinbaseCountryRequest(inputs as CoinbaseCountryInputs, options);
+      case 'mdl':
+        return this.createMdlKrRequest(circuit as 'mdl_kr_ownership' | 'mdl_kr_age' | 'mdl_kr_region', inputs, options);
+      case 'scoped':
+        return this.createScopedRequest(circuit, inputs, options);
     }
   }
+
+  /**
+   * How each circuit's request is built and checked. Keyed by circuit id and
+   * exhaustive over it, so a new circuit is a compile error here instead of
+   * falling through to another circuit's builder.
+   */
+  private static readonly REQUEST_BUILDERS = {
+    coinbase_attestation: 'scoped',
+    coinbase_country_attestation: 'country',
+    oidc_domain_attestation: 'scoped',
+    giwa_attestation: 'scoped',
+    dojang_playground: 'scoped',
+    mdl_kr_ownership: 'mdl',
+    mdl_kr_age: 'mdl',
+    mdl_kr_region: 'mdl',
+  } as const satisfies Record<CircuitId, 'scoped' | 'country' | 'mdl'>;
 
   /**
    * @internal
@@ -1195,7 +1231,10 @@ export class ProofportSDK {
   // calling createRelayRequest() for it with no signer got no local error and
   // a relay 401 two round trips later.
   private static needsWalletSignature(circuit: CircuitType): boolean {
-    return CIRCUIT_NEEDS_WALLET_SIGNATURE[circuit as CircuitId] === true;
+    if (!isCircuitId(circuit)) {
+      throw new Error(`Unknown circuit '${circuit}'. Expected: ${ALL_CIRCUIT_IDS.join(', ')}`);
+    }
+    return CIRCUIT_NEEDS_WALLET_SIGNATURE[circuit];
   }
 
   async createRelayRequest(
