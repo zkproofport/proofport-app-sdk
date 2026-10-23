@@ -296,9 +296,8 @@ One more difference worth knowing if you count people: its nullifier is
 a constant compiled into the circuit, so one wallet in one scope has exactly
 one nullifier and there is no input a prover can vary.
 
-**Testnet only.** The verifier lives on GIWA Sepolia (chain `91342`) and
-nowhere else, so the mobile app keeps it behind Developer Mode. A mainnet
-deployment is planned; until it exists, do not ship on this.
+The verifier is deployed on GIWA Sepolia (chain `91342`). The mobile app shows
+this circuit in its Laboratory, which the user turns on in More.
 
 ### `dojang_playground`
 
@@ -350,7 +349,7 @@ something the circuit never saw.
 
 ## Planned Circuits
 
-The identifiers below are reserved and exported, and the circuits exist — but they are **not officially supported yet**. Availability, input shape and public-input layout can change without a major version bump, so treat anything here as provisional. `CIRCUIT_SUPPORT_STATUS` reports each of them as `planned`.
+ZKProofport is registered with the Ministry of the Interior and Safety as a Korea Mobile ID integration service (모바일 신분증 연계서비스). The three circuits below are in beta: `CIRCUIT_SUPPORT_STATUS` reports each of them as `planned`, and their input shape and public-input layout can change without a major version bump.
 
 ### `mdl_kr_ownership`
 
