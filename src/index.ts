@@ -60,6 +60,12 @@ export type {
   OffChainVerifyOptions,
 } from './offChainVerifier';
 
+// The verifier contracts proofs are checked against, generated from the
+// circuits repository's deployment records. A response's own verifierAddress
+// is never used.
+export { PINNED_VERIFIERS, getPinnedVerifier } from './verifier';
+export type { PinnedVerifier } from './verifier';
+
 // Public input layout constants
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,

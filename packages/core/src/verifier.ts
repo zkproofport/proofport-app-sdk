@@ -8,6 +8,9 @@ import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
 import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './chain';
 import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
+import { getPinnedVerifier, sameAddress } from './pinnedVerifiers';
+import { checkProofIssuer } from './issuerChecks';
+import type { OidcKeyCheckOptions } from './oidcProviderKeys';
 
 // ethers v5/v6 compatibility shims
 const _ethers = ethers as any;
@@ -28,25 +31,6 @@ function createJsonRpcProvider(url: string) {
   if (typeof _ethers.JsonRpcProvider === 'function') return new _ethers.JsonRpcProvider(url);
   if (_ethers.providers?.JsonRpcProvider) return new _ethers.providers.JsonRpcProvider(url);
   throw new Error('No JsonRpcProvider found in ethers');
-}
-
-/**
- * @internal Resolve verifier from SDK config or proof response.
- * SDK config (customVerifier) takes priority over response-provided verifier.
- */
-function resolveVerifier(
-  customVerifier?: VerifierContract,
-  responseVerifier?: { verifierAddress?: string; chainId?: number }
-): VerifierContract | null {
-  if (customVerifier) return customVerifier;
-  if (responseVerifier?.verifierAddress) {
-    return {
-      address: responseVerifier.verifierAddress,
-      chainId: responseVerifier.chainId ?? 0,
-      abi: VERIFIER_ABI,
-    };
-  }
-  return null;
 }
 
 /**
@@ -100,67 +84,124 @@ export function getDefaultProvider(chainId: number) {
 }
 
 /**
+ * Which verifier to call: one the dApp configured, or the pinned deployment of
+ * this circuit on a chain the caller names. There is no third option.
+ */
+export type VerifierTarget = VerifierContract | { chainId: number };
+
+/**
+ * What a proof response claims about its verifier. Never used to choose the
+ * contract: only compared with the one chosen, and a mismatch is refused.
+ */
+export interface ClaimedVerifier {
+  verifierAddress?: string;
+  chainId?: number;
+}
+
+/** Options for {@link verifyProofOnChain}. */
+export interface OnChainVerifyOptions extends OidcKeyCheckOptions {}
+
+/** @internal The contract to call, or why there is none. */
+function resolveTarget(
+  circuit: string,
+  target: VerifierTarget | undefined,
+): { verifier: VerifierContract } | { error: string } {
+  if (!target) {
+    return {
+      error:
+        'No verifier chosen. Configure one, or name a chain to verify against the pinned ' +
+        'deployment for this circuit. A verifierAddress carried in a proof response is never used.',
+    };
+  }
+  if ('address' in target && target.address !== undefined) {
+    return { verifier: target };
+  }
+  try {
+    const pinned = getPinnedVerifier(circuit, target.chainId);
+    return { verifier: { address: pinned.address, chainId: target.chainId, abi: VERIFIER_ABI } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
  * Verify a zero-knowledge proof on-chain by calling the verifier smart contract.
  *
- * This function resolves the verifier contract from SDK config or proof response,
- * connects to the blockchain, and calls the verify() method with the proof and public inputs.
+ * In order, and any failure ends with `{ valid: false, error }`:
+ *  1. The circuit must be a known circuit id.
+ *  2. The verifier is `target`: a contract the caller configured, or
+ *     `{ chainId }` for the pinned deployment of this circuit on that chain
+ *     (see {@link PINNED_VERIFIERS}). Nothing else -- in particular not the
+ *     address a proof response carries.
+ *  3. If `claimed` (what a response said its verifier was) names a different
+ *     address or chain, the proof is refused rather than checked somewhere the
+ *     sender did not expect.
+ *  4. The circuit's issuer check runs ({@link checkProofIssuer}): for
+ *     `oidc_domain_attestation`, the RSA key must be one the provider
+ *     publishes.
+ *  5. The contract's `verify(proof, publicInputs)` decides.
  *
  * @param circuit - The canonical circuit identifier. REQUIRED.
  * @param parsedProof - Parsed proof object containing proofHex and publicInputsHex
- * @param providerOrSigner - Optional ethers.js Provider or Signer instance. If not provided, uses default RPC for the chain
- * @param customVerifier - Optional custom verifier contract config (takes priority over responseVerifier)
- * @param responseVerifier - Optional verifier info from proof generation response
- * @returns Promise resolving to verification result with valid flag and optional error message
+ * @param providerOrSigner - Optional ethers Provider or Signer; defaults to the
+ *   public RPC for the verifier's chain
+ * @param target - The verifier: a configured contract, or `{ chainId }`
+ * @param claimed - The verifier a proof response claims, compared and never used
+ * @param options - JWKS fetch timeout for the OIDC issuer check
  *
  * @example
  * ```typescript
- * const parsed = parseProofForOnChain(proof, publicInputs, numPublicInputs);
- * const result = await verifyProofOnChain(
- *   'coinbase_attestation',
- *   parsed,
- *   provider,
- *   { address: '0x...', chainId: 11155111, abi: VERIFIER_ABI }
- * );
- *
- * if (result.valid) {
- *   console.log('Proof is valid!');
- * } else {
- *   console.error('Verification failed:', result.error);
- * }
+ * const parsed = parseProofForOnChain(proof, publicInputs, publicInputs.length);
+ * const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 8453 });
  * ```
  */
 export async function verifyProofOnChain(
   circuit: CircuitType,
   parsedProof: ParsedProof,
   providerOrSigner?: any,
-  customVerifier?: VerifierContract,
-  responseVerifier?: { verifierAddress?: string; chainId?: number }
+  target?: VerifierTarget,
+  claimed?: ClaimedVerifier,
+  options: OnChainVerifyOptions = {},
 ): Promise<{ valid: boolean; error?: string }> {
-  const verifier = resolveVerifier(customVerifier, responseVerifier);
-  if (!verifier) {
+  if (!isCircuitId(circuit)) {
+    return { valid: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
+  }
+
+  const resolved = resolveTarget(circuit, target);
+  if ('error' in resolved) return { valid: false, error: resolved.error };
+  const verifier = resolved.verifier;
+
+  if (claimed?.verifierAddress !== undefined && !sameAddress(claimed.verifierAddress, verifier.address)) {
     return {
       valid: false,
-      error: 'No verifier address provided. Configure via SDK or ensure proof response includes verifierAddress.',
+      error:
+        `The response names verifier ${claimed.verifierAddress}, but ${circuit} verifies against ` +
+        `${verifier.address} on chain ${verifier.chainId}. Refusing rather than trusting the response.`,
+    };
+  }
+  if (claimed?.chainId !== undefined && Number(claimed.chainId) !== verifier.chainId) {
+    return {
+      valid: false,
+      error: `The response names chain ${claimed.chainId}, but ${circuit} verifies on chain ${verifier.chainId}.`,
     };
   }
 
-  const provider = providerOrSigner || (verifier.chainId > 0 ? getDefaultProvider(verifier.chainId) : null);
+  const issuer = await checkProofIssuer(circuit, parsedProof.publicInputsHex, options);
+  if (!issuer.ok) return { valid: false, error: issuer.error };
+
+  let provider = providerOrSigner;
   if (!provider) {
-    return {
-      valid: false,
-      error: 'No provider available. Provide a provider or ensure chainId is set for RPC lookup.',
-    };
+    try {
+      provider = getDefaultProvider(verifier.chainId);
+    } catch (error) {
+      return { valid: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
-
-  const contract = getVerifierContract(provider, verifier);
 
   try {
-    const isValid = await contract.verify(
-      parsedProof.proofHex,
-      parsedProof.publicInputsHex
-    );
-
-    return { valid: isValid };
+    const contract = getVerifierContract(provider, verifier);
+    const isValid = await contract.verify(parsedProof.proofHex, parsedProof.publicInputsHex);
+    return { valid: isValid === true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return { valid: false, error: errorMessage };

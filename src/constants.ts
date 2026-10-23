@@ -21,6 +21,50 @@ export const RELAY_URLS: Record<SDKEnvironment, string> = {
 };
 
 /**
+ * The chain each circuit is verified on, per environment. Complete: a circuit
+ * added to the SDK is a compile error here until somebody names its chain.
+ *
+ * Mirrors the mobile app's `CIRCUIT_NETWORKS` (proofport-app
+ * src/config/contracts.ts), because a proof is checked where the app said its
+ * verifier is: Base for the Coinbase and OIDC circuits, GIWA Sepolia for GIWA
+ * and Dojang (testnet-only), Base Sepolia for Korea Mobile ID (testnet-only).
+ * The ADDRESS on that chain always comes from core's pinned table, never from
+ * a proof response.
+ */
+export const VERIFICATION_CHAINS = {
+  production: {
+    coinbase_attestation: 8453,
+    coinbase_country_attestation: 8453,
+    oidc_domain_attestation: 8453,
+    giwa_attestation: 91342,
+    dojang_playground: 91342,
+    mdl_kr_ownership: 84532,
+    mdl_kr_age: 84532,
+    mdl_kr_region: 84532,
+  },
+  staging: {
+    coinbase_attestation: 84532,
+    coinbase_country_attestation: 84532,
+    oidc_domain_attestation: 84532,
+    giwa_attestation: 91342,
+    dojang_playground: 91342,
+    mdl_kr_ownership: 84532,
+    mdl_kr_age: 84532,
+    mdl_kr_region: 84532,
+  },
+  local: {
+    coinbase_attestation: 84532,
+    coinbase_country_attestation: 84532,
+    oidc_domain_attestation: 84532,
+    giwa_attestation: 91342,
+    dojang_playground: 91342,
+    mdl_kr_ownership: 84532,
+    mdl_kr_age: 84532,
+    mdl_kr_region: 84532,
+  },
+} as const satisfies Record<SDKEnvironment, Record<CircuitType, number>>;
+
+/**
  * Default deep link URL scheme for ZKProofport mobile app.
  * Used to construct deep link URLs that open the mobile app.
  *

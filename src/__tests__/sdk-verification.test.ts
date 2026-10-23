@@ -37,7 +37,8 @@ describe('SDK Verification', () => {
     const result = await sdkWithoutVerifier.verifyOnChain('coinbase_attestation', proof, publicInputs, mockProvider);
 
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('No verifier address provided');
+    // A custom-config SDK has no environment, so no pinned chain to fall back on.
+    expect(result.error).toContain('No verifier chosen');
   });
 
   it('verifyOnChain() returns { valid: false } when contract.verify throws', async () => {

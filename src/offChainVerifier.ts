@@ -34,7 +34,8 @@
  * Solidity verifier takes them separately. bb.js 4.x's verifier takes the same
  * two pieces, so nothing is joined back here.
  */
-import { CIRCUIT_VK_PATHS, type CircuitId } from './circuits';
+import { ALL_CIRCUIT_IDS, CIRCUIT_VK_PATHS, isCircuitId, type CircuitId } from './circuits';
+import { checkProofIssuer } from '@zkproofport-app/core';
 
 /**
  * Where verification keys are published.
@@ -192,6 +193,10 @@ async function fetchVerificationKey(
  * Needs no setup from the caller: the verifier ships with this SDK and is
  * loaded on first use.
  *
+ * For `oidc_domain_attestation` it first checks the proof's RSA key against the
+ * provider's published JWKS (core's `checkOidcProviderKey`); a key the provider
+ * does not publish, or a JWKS that cannot be fetched, is `{ valid: false }`.
+ *
  * @param circuit - Canonical circuit identifier
  * @param proof - Proof bytes as hex, WITHOUT public inputs (as the relay sends it)
  * @param publicInputs - Public inputs as hex strings, in circuit order
@@ -215,6 +220,20 @@ export async function verifyProofOffChain(
   options: OffChainVerifyOptions = {}
 ): Promise<OffChainVerifyResult> {
   const timeoutMs = options.timeoutMs ?? 30000;
+
+  if (!isCircuitId(circuit)) {
+    return { valid: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
+  }
+
+  // Before Barretenberg, and for the same reason as on-chain: a proof can be
+  // mathematically valid and still mean nothing, because some circuits take
+  // their trust anchor as a public input the prover chooses. For OIDC that is
+  // the RSA key -- see core's oidcProviderKeys. Checked here so a dApp that
+  // verifies off-chain gets the same answer as one that verifies on-chain.
+  const issuer = await checkProofIssuer(circuit, publicInputs);
+  if (!issuer.ok) {
+    return { valid: false, error: issuer.error };
+  }
 
   // A REQUIRED dependency, loaded lazily.
   //

@@ -42,8 +42,6 @@ import {
 import {
   verifyProofOnChain,
   parseProofForOnChain,
-  getVerifierAddress,
-  getVerifierChainId,
   getDefaultProvider,
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
@@ -58,8 +56,10 @@ import {
   DEFAULT_REQUEST_EXPIRY_MS,
   CIRCUIT_METADATA,
   RELAY_URLS,
+  VERIFICATION_CHAINS,
 } from './constants';
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
+import { getPinnedVerifier, type VerifierTarget } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -105,6 +105,12 @@ export class ProofportSDK {
   private signer: WalletSigner | null = null;
   private relayUrl: string;
   private socket: any = null;
+  /**
+   * Set by {@link ProofportSDK.create} from its environment preset. It decides
+   * which chain a proof is verified on when the dApp configured no verifier
+   * for the circuit; a custom-config SDK has none and must configure one.
+   */
+  private environment: SDKEnvironment | null = null;
 
   /**
    * Creates a new ProofportSDK instance.
@@ -783,8 +789,22 @@ export class ProofportSDK {
       publicInputs.length
     );
 
-    const customVerifier = this.config.verifiers[circuit];
-    return verifyProofOnChain(circuit, parsedProof, providerOrSigner, customVerifier);
+    return verifyProofOnChain(circuit, parsedProof, providerOrSigner, this.verifierTarget(circuit));
+  }
+
+  /**
+   * The verifier for a circuit: the one the dApp configured, otherwise the
+   * pinned deployment on the chain this SDK's environment verifies that
+   * circuit on. `undefined` when neither exists, which core reports as an
+   * error. Never anything a proof response said.
+   */
+  private verifierTarget(circuit: CircuitType): VerifierTarget | undefined {
+    const configured = this.config.verifiers[circuit];
+    if (configured) return configured;
+    if (this.environment === null) return undefined;
+    const chains: Record<string, number> = VERIFICATION_CHAINS[this.environment];
+    if (!Object.prototype.hasOwnProperty.call(chains, circuit)) return undefined;
+    return { chainId: chains[circuit] };
   }
 
   /**
@@ -835,12 +855,14 @@ export class ProofportSDK {
       response.publicInputs.length
     );
 
-    const customVerifier = this.config.verifiers[response.circuit];
-    const responseVerifier = {
+    // The response's verifierAddress and chainId are a claim to check, never
+    // the contract to call: whoever wrote the response would otherwise pick
+    // the judge. A claim that differs from the pinned or configured verifier
+    // is refused.
+    return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    };
-    return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, customVerifier, responseVerifier);
+    });
   }
 
   /**
@@ -902,8 +924,19 @@ export class ProofportSDK {
    * ```
    */
   getVerifierAddress(circuit: CircuitType): string {
-    const customVerifier = this.config.verifiers[circuit];
-    return getVerifierAddress(circuit, customVerifier);
+    return this.requireVerifier(circuit).address;
+  }
+
+  /** The configured or pinned verifier, or an error saying why there is none. */
+  private requireVerifier(circuit: CircuitType): { address: string; chainId: number } {
+    const target = this.verifierTarget(circuit);
+    if (!target) {
+      throw new Error(
+        `No verifier configured for circuit '${circuit}'. Configure one in the SDK's verifiers option, or create the SDK with ProofportSDK.create() to use the pinned deployment.`,
+      );
+    }
+    if ('address' in target) return { address: target.address, chainId: target.chainId };
+    return { address: getPinnedVerifier(circuit, target.chainId).address, chainId: target.chainId };
   }
 
   /**
@@ -924,8 +957,7 @@ export class ProofportSDK {
    * ```
    */
   getVerifierChainId(circuit: CircuitType): number {
-    const customVerifier = this.config.verifiers[circuit];
-    return getVerifierChainId(circuit, customVerifier);
+    return this.requireVerifier(circuit).chainId;
   }
 
   /**
@@ -1079,16 +1111,22 @@ export class ProofportSDK {
    */
   static create(envOrConfig?: SDKEnvironment | ProofportConfig): ProofportSDK {
     if (typeof envOrConfig === 'undefined') {
-      return new ProofportSDK({ relayUrl: RELAY_URLS.production });
+      return ProofportSDK.forEnvironment('production');
     }
     if (typeof envOrConfig === 'string') {
-      const relayUrl = RELAY_URLS[envOrConfig];
-      if (!relayUrl) {
-        throw new Error(`Unknown environment: ${envOrConfig}. Use 'production', 'staging', or 'local'.`);
-      }
-      return new ProofportSDK({ relayUrl });
+      return ProofportSDK.forEnvironment(envOrConfig);
     }
     return new ProofportSDK(envOrConfig);
+  }
+
+  /** @internal An SDK on an environment preset's relay, verifying on that environment's chains. */
+  private static forEnvironment(env: SDKEnvironment): ProofportSDK {
+    if (!Object.prototype.hasOwnProperty.call(RELAY_URLS, env)) {
+      throw new Error(`Unknown environment: ${env}. Use 'production', 'staging', or 'local'.`);
+    }
+    const sdk = new ProofportSDK({ relayUrl: RELAY_URLS[env] });
+    sdk.environment = env;
+    return sdk;
   }
 
   /**
