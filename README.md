@@ -81,7 +81,7 @@ const qrDataUrl = await sdk.generateQRCode(relay.deepLink);
 const result = await sdk.waitForProof(relay.requestId);
 
 if (result.status === 'completed') {
-  // 6. Verify on-chain — the relay result carries the verifier to call
+  // 6. Verify on-chain — against the SDK's own verifier for this circuit
   const response: ProofResponse = {
     requestId: result.requestId,
     circuit: result.circuit as CircuitType,
@@ -676,8 +676,8 @@ When you are done, `sdk.disconnect()` closes any open socket.
   circuit: 'coinbase_attestation',
   proof: '0x1f8b0a…',                       // proof bytes, opaque
   publicInputs: ['0x00…2f', '0x00…a1', …],  // ordered — 128 entries for this circuit
-  verifierAddress: '0x…',                   // contract that can check this proof
-  chainId: …,                               // network that contract lives on
+  verifierAddress: '0x…',                   // the verifier the app reports (checked, not trusted)
+  chainId: …,                               // the network the app reports (checked, not trusted)
   deepLink: 'zkproofport://proof-request?data=…',
   createdAt: '2026-02-07T09:14:02.101Z',
   updatedAt: '2026-02-07T09:14:48.902Z',
@@ -691,8 +691,8 @@ When you are done, `sdk.disconnect()` closes any open socket.
 | `circuit` | `string` | terminal results | Which circuit produced the proof, as reported by the mobile app. You need it to read `publicInputs`, because the layout is per circuit. Undefined while the request is still pending. |
 | `proof` | `string` | `'completed'` | The proof bytes as a `0x` hex string. Opaque: the only thing to do with it is hand it to a verifier. |
 | `publicInputs` | `string[]` | `'completed'` | The circuit's public inputs **in circuit order**. This is the part that carries meaning — what each index holds is in [Public Input Layout Constants](#public-input-layout-constants). |
-| `verifierAddress` | `string` | `'completed'` | Address of the Solidity verifier contract that can check this exact proof. It comes from the mobile app — forward it, do not hardcode one. |
-| `chainId` | `number` | `'completed'` | The chain that `verifierAddress` lives on. Same rule: forward it. |
+| `verifierAddress` | `string` | `'completed'` | The verifier contract the mobile app reports. Forward it: the SDK compares it with the verifier it ships with and refuses the proof if they differ. It never verifies against this address. |
+| `chainId` | `number` | `'completed'` | The network the mobile app reports. Same rule: compared, never trusted. |
 | `error` | `string` | `'error'`, `'failed'`, `'expired'` | Human-readable reason from the mobile app or the relay. |
 | `errorCode` | `string` | some `'error'` results | The app's error code, `E` + four digits (e.g. `'E2007'`). Absent when the app did not send one. |
 | `deepLink` | `string` | polling path only | The deep link the request was created with. |
@@ -770,8 +770,8 @@ The relay answers `'expired'` before the SDK's default `timeoutMs` (300 000 ms) 
 | `status` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` | Yes | `'completed'`. Anything else and verification returns `{ valid: false, error: 'Invalid or incomplete response' }` without touching the chain. Note the relay says `'failed'` where this type says `'error'` |
 | `proof` | `string` | When completed | `result.proof` |
 | `publicInputs` | `string[]` | When completed | `result.publicInputs` |
-| `verifierAddress` | `string` | When completed | `result.verifierAddress`. Without it there is no contract to call and verification fails with `No verifier address provided…` |
-| `chainId` | `number` | When completed | `result.chainId`. Used to pick a network when you pass no provider of your own |
+| `verifierAddress` | `string` | No | `result.verifierAddress`. Optional. When present it must match the SDK's own verifier for the circuit, or verification is refused |
+| `chainId` | `number` | No | `result.chainId`. Optional. When present it must match the network the SDK verifies the circuit on, or verification is refused |
 | `numPublicInputs` | `number` | No | Never delivered by the relay, and never read during verification — `publicInputs.length` is used instead. Omit it |
 | `timestamp` | `number` | No | Not delivered by the relay. Omit it |
 | `error` | `string` | On failure | `result.error`. Carried for your own logging; verification ignores it |
@@ -782,7 +782,13 @@ There is no `nullifier` field here either.
 
 Verify the proof cryptographically by calling the deployed Solidity verifier contract.
 
-The relay result tells you which contract to call (`verifierAddress`) and on which chain (`chainId`), so verification goes through `verifyResponseOnChain`, which reads both off the response:
+`verifyResponseOnChain` checks the proof against the verifier contract the SDK ships with for that circuit. Which contract judges a proof is never taken from the proof's own response: the SDK carries the deployed verifiers, generated from the circuits' deployment records, and a response whose `verifierAddress` or `chainId` differs from them is refused rather than checked elsewhere. If you configure your own verifier in the SDK's `verifiers` option, that one is used instead.
+
+For OIDC domain proofs the SDK also checks that the proof was made with a signing key Google or Microsoft actually publishes. That key is part of the proof's public inputs, so a proof made with a self-generated key would otherwise pass the contract. The SDK fetches the provider's published keys, caches them as the provider's own cache headers allow, and returns `{ valid: false, error }` when the key is not among them or the keys cannot be fetched. Every verify method does this; there is nothing to call separately.
+
+The one limit: a proof made with a key the provider has already withdrawn, which this process never saw while it was published, cannot be checked and is refused. Keys seen while published stay acceptable for 24 hours after they disappear.
+
+
 
 ```typescript
 import type { CircuitType, ProofResponse } from '@zkproofport-app/sdk';
@@ -814,11 +820,11 @@ The SDK connects to the right network on its own. Pass your own ethers `Provider
 const verification = await sdk.verifyResponseOnChain(response, myProvider);
 ```
 
-`verifyResponseOnChain` reports failures instead of throwing them. An incomplete response (`status` other than `'completed'`, or a missing `proof` / `publicInputs`) returns `{ valid: false, error: 'Invalid or incomplete response' }` without making a network call; a missing `verifierAddress` returns `{ valid: false, error: 'No verifier address provided…' }`; and a reverting contract call returns `{ valid: false, error }` carrying the revert message. It does throw in one case: a response carrying a `chainId` the SDK has no built-in endpoint for, when you passed no provider of your own. Pass your own provider if you ever hit that.
+`verifyResponseOnChain` reports failures instead of throwing them. An incomplete response (`status` other than `'completed'`, or a missing `proof` / `publicInputs`) returns `{ valid: false, error: 'Invalid or incomplete response' }` without making a network call; an unknown circuit, a response naming a different verifier, an OIDC signing key the provider does not publish and a reverting contract call each return `{ valid: false, error }` saying which.
 
 `valid: true` means the verifier contract accepted the proof: it is a real proof for that circuit, and its public inputs are the ones it was proved against. It does **not** yet mean the proof answers *your* question — that it was bound to your scope, or that the domain or country in it is the one you asked for. Those live in the public inputs, and reading them is Step 8. `valid: false` is a rejected proof, not an outage: do not retry it, refuse the user.
 
-> **Why not `verifyOnChain`?** `sdk.verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` takes the same proof in raw pieces. Those pieces carry no verifier address, and it never looks at a response for one — it consults only the `verifiers` map the SDK was constructed with, which `ProofportSDK.create()` leaves empty. Out of the box it therefore returns `{ valid: false, error: 'No verifier address provided. Configure via SDK or ensure proof response includes verifierAddress.' }`. Use `verifyResponseOnChain`.
+> **`verifyOnChain` and `verifyResponseOffChain`.** `sdk.verifyOnChain(circuit, proof, publicInputs, providerOrSigner?)` takes the same proof in raw pieces and checks it against the same built-in verifier, with the same OIDC key check. `sdk.verifyResponseOffChain(response)` checks the proof against the circuit's verification key with no chain involved, and runs the same OIDC key check. Prefer `verifyResponseOnChain` when the answer has to be the one a contract gives.
 
 ### Step 8: Extract Scope, Nullifier, and Domain
 
@@ -1024,7 +1030,7 @@ async function verifyUser() {
 
 ## Configuration
 
-`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed: the relay endpoint is built in, and the verifier contract and network to check a proof against arrive with the proof itself (`verifierAddress`, `chainId`).
+`ProofportSDK.create()` returns a fully configured SDK instance. No manual configuration is needed: the relay endpoint and the verifier contracts proofs are checked against are built in. The verifier a proof response names is compared with them, never used in their place.
 
 ## Types Reference
 

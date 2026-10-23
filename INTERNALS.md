@@ -70,8 +70,8 @@ https://myapp.com/callback?requestId=req-...&status=completed&proof=0x...&public
 | `nullifier` | string | Unique identifier for duplicate detection |
 | `timestamp` | number | Unix timestamp (ms) when proof was generated |
 | `circuit` | string | Circuit type used (for reference) |
-| `verifierAddress` | string | Verifier contract address (optional, provided by app) |
-| `chainId` | number | Chain ID where verifier is deployed (optional) |
+| `verifierAddress` | string | Verifier the app says it used (optional). A claim only: the SDK never verifies against it, and refuses the proof when it differs from the pinned or dApp-configured verifier |
+| `chainId` | number | Chain the app says that verifier is on (optional). Same rule: compared, never used |
 
 **Query Parameters (error case, status=error):**
 
@@ -94,47 +94,57 @@ https://myapp.com/callback?requestId=req-...&status=completed&proof=0x...&public
 
 The mobile app returns proof results with public inputs as a flattened array. Each circuit has a specific byte layout that must be respected for verification.
 
-### Coinbase Attestation (coinbase_attestation)
+Every public input is one field element, and a `[u8; 32]` in the circuit is
+32 of them, one byte each. Counts below are field elements, read off each
+circuit's `fn main` (they match `publicInputsCount` in `src/constants.ts`).
+Scope and nullifier offsets are core's `PUBLIC_INPUT_OFFSETS`
+(`packages/core/src/verifier.ts`).
 
-**Circuit public inputs count: 2**
+| Circuit | Count | Layout |
+|---|---|---|
+| `coinbase_attestation` | 128 | signal_hash 0-31, signer_list_merkle_root 32-63, scope 64-95, nullifier 96-127 |
+| `coinbase_country_attestation` | 150 | signal_hash 0-31, signer_list_merkle_root 32-63, country_list 64-83, country_list_length 84, is_included 85, scope 86-117, nullifier 118-149 |
+| `oidc_domain_attestation` | 148 | pubkey_modulus_limbs 0-17 (RSA-2048 modulus as 18 x 120-bit limbs, least significant first), domain storage 18-81, domain length 82, scope 83-114, nullifier 115-146, provider 147 (0 Google, 1 Microsoft) |
+| `giwa_attestation` | 192 | signal_hash 0-31, domain_separator 32-63, action_hash 64-95, signer_list_merkle_root 96-127, scope 128-159, nullifier 160-191 |
+| `dojang_playground` | 160 | signal_hash 0-31, domain_separator 32-63, action_hash 64-95, scope 96-127, nullifier 128-159 |
+| `mdl_kr_ownership` | 97 | scope 0-31, nullifier 32-63, disclose_flags 64, owner_commit 65-96 |
+| `mdl_kr_age` | 66 | scope 0-31, nullifier 32-63, age_threshold 64, current_year 65 |
+| `mdl_kr_region` | 96 | scope 0-31, nullifier 32-63, region_code 64-95 |
 
-The public inputs array contains 2 bytes32 values (64 bytes total):
+This section said Coinbase KYC had 2 public inputs and Country 14, with the
+Country nullifier at 192-223, until 2026-10-23; none of that was ever the
+circuit.
 
-| Field | Bytes | Size | Description |
-|-------|-------|------|-------------|
-| signal_hash | 0-31 | 32 bytes | Hash of the user's wallet address and scope |
-| merkle_root | 32-63 | 32 bytes | Root of the signer merkle tree from Coinbase |
+### Public inputs the verifier must check against the outside world
 
-**Nullifier and Scope Derivation:**
+Some circuits take their trust anchor as a public input the prover chooses, so
+a proof can verify and still prove nothing. Core's `CIRCUIT_ISSUER_CHECKS`
+(`packages/core/src/issuerChecks.ts`) names the check per circuit, and every
+verify function runs it -- `verifyProofOnChain`, `verifyProofOffChain`, and the
+SDK's `verifyOnChain`, `verifyResponseOnChain`, `verifyResponseOffChain`:
 
-The on-chain registry extracts the nullifier and scope from the public inputs:
-
-```
-nullifier = keccak256(keccak256(address + signalHash) + scope)
-```
-
-Where:
-- `address` is the user's wallet address
-- `signalHash` is derived from the public inputs
-- `scope` is the application-specific identifier
-
-### Coinbase Country Attestation (coinbase_country_attestation)
-
-**Circuit public inputs count: 14**
-
-The public inputs array contains 14 bytes32 values (448 bytes total):
-
-| Field | Bytes | Size | Description |
-|-------|-------|------|-------------|
-| signal_hash | 0-31 | 32 bytes | Hash of wallet address and scope |
-| merkle_root | 32-63 | 32 bytes | Signer merkle tree root |
-| country_list | 64-83 | 20 bytes | Packed country codes (ISO 3166-1 alpha-2) |
-| country_list_length | 84 | 1 byte | Number of countries in the list |
-| is_included | 85 | 1 byte | 1 if user IS in list, 0 if NOT in list |
-| scope | 86-117 | 32 bytes | Application-specific identifier |
-| reserved (padding) | 118-191 | 74 bytes | Unused; set to 0x00 |
-| nullifier | 192-223 | 32 bytes | Unique proof identifier |
-| reserved (padding) | 224-447 | 224 bytes | Unused; set to 0x00 |
+- `oidc_domain_attestation`: `pubkey_modulus_limbs` must equal the modulus of an
+  RSA key the provider publishes (`checkOidcProviderKey`,
+  `packages/core/src/oidcProviderKeys.ts`). Google:
+  `https://www.googleapis.com/oauth2/v3/certs`. Microsoft:
+  `https://login.microsoftonline.com/organizations/discovery/v2.0/keys` -- the
+  authority the app and the AI MCP sign in with -- and only keys whose `issuer`
+  is the multi-tenant template `https://login.microsoftonline.com/{tenantid}/v2.0`
+  (a tenant-scoped key can only be checked against the token's `iss`, which the
+  circuit does not expose; see
+  https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens,
+  "Validate the signing key issuer"). Keys must be `kty` RSA, `e` AQAB, `alg`
+  RS256 and `use` sig when present, 2048 bits. The key set is cached for its
+  `Cache-Control: max-age` (at most 24 h); a fetch that fails, times out or
+  redirects fails verification. A key seen in a fetched set stays acceptable
+  for 24 h after it was last listed, in memory. Limits: a key withdrawn before
+  the verifying process first saw it cannot be checked, and the circuit binds
+  no `iss`, `tid`, `aud`, `nonce` or `exp` (circuits-dev.md, "OIDC review,
+  2026-10-23").
+- `coinbase_attestation`, `coinbase_country_attestation`, `giwa_attestation`:
+  `signer_list_merkle_root` should equal the root of the published signer set.
+  **Not checked by the SDK yet** -- `null` in the table, recorded as a gap.
+  OpenStoa checks it (`openstoa/src/lib/proof-issuer.ts`).
 
 **Country Codes:**
 
@@ -434,39 +444,69 @@ Formats proof data for on-chain verification by ensuring correct hex encoding an
 **Details:**
 - Zero-pads public inputs to bytes32 (32 bytes / 64 hex characters)
 - Ensures all values have `0x` prefix
-- Verifies public inputs count matches specification
+- Does not check the count: `numPublicInputs` is recorded as given
 
 ```typescript
 import { parseProofForOnChain } from '@zkproofport-app/sdk';
 
-const parsed = parseProofForOnChain(response.proof, response.publicInputs, 2);
-// { proofHex: "0x...", publicInputsHex: ["0x...", "0x..."], numPublicInputs: 2 }
+const parsed = parseProofForOnChain(response.proof, response.publicInputs, response.publicInputs.length);
+// { proofHex: "0x...", publicInputsHex: ["0x...", ...], numPublicInputs: 128 }
 ```
 
-#### `verifyProofOnChain(circuit: CircuitType, parsedProof: ParsedProof, provider?: Provider, customVerifier?: VerifierContract, responseVerifier?: { verifierAddress?: string; chainId?: number }): Promise<{ valid: boolean; error?: string }>`
+#### `verifyProofOnChain(circuit, parsedProof, provider?, target?, claimed?, options?): Promise<{ valid: boolean; error?: string }>`
 
-Low-level on-chain verification by calling the verifier smart contract.
+Low-level on-chain verification. Lives in `@zkproofport-app/core`.
 
 **Parameters:**
-- `circuit` - Circuit type identifier
+- `circuit` - Circuit id; an unknown one is `{ valid: false, error: "Unknown circuit '...'. Known: ..." }`
 - `parsedProof` - Parsed proof from `parseProofForOnChain()`
-- `provider` - ethers Provider (v5 or v6 compatible); if omitted, uses default RPC
-- `customVerifier` - Custom verifier config (overrides all others)
-- `responseVerifier` - Verifier info from proof response
+- `provider` - ethers Provider (v5 or v6); if omitted, the public RPC for the verifier's chain
+- `target` - Which verifier: a `VerifierContract` the dApp configured, or `{ chainId }` for the pinned deployment of this circuit on that chain
+- `claimed` - `{ verifierAddress?, chainId? }` from a proof response. Compared with the chosen verifier and refused on any difference; never used to choose it
+- `options.timeoutMs` - JWKS fetch timeout for the OIDC key check (default 5000)
 
-**Returns:** Promise with verification result
+**Steps:** known circuit -> resolve `target` (no target is an error; there is no
+fallback to the response) -> refuse a differing `claimed` -> issuer check
+(`checkProofIssuer`) -> `verify(proof, publicInputs)` on the contract.
 
-**Verifier Resolution Order:**
-1. `customVerifier` (if provided)
-2. `responseVerifier` (from proof response)
-3. Default verifier address (if any)
+Until 2026-10-23 a call with no `customVerifier` verified against the
+`responseVerifier` address, so a response chose its own verifier.
 
 ```typescript
-import { verifyProofOnChain, parseProofForOnChain } from '@zkproofport-app/sdk';
+import { verifyProofOnChain, parseProofForOnChain } from '@zkproofport-app/core';
 
-const parsed = parseProofForOnChain(proof, publicInputs, 2);
-const result = await verifyProofOnChain('coinbase_attestation', parsed, provider);
+const parsed = parseProofForOnChain(proof, publicInputs, publicInputs.length);
+const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 8453 });
 ```
+
+#### `PINNED_VERIFIERS` / `getPinnedVerifier(circuit, chainId)`
+
+The verifier contract per circuit and chain, generated by
+`scripts/generate-pinned-verifiers.mjs` from the circuits repository's
+`broadcast/**/run-latest.json`, cross-checked with `deployments/<chainId>/*.json`
+(`packages/core/src/pinnedVerifiers.generated.ts`, source commit recorded in
+`PINNED_VERIFIERS_SOURCE_COMMIT`). Regenerate after every verifier deployment:
+
+```bash
+git -C ../circuits fetch origin
+node scripts/generate-pinned-verifiers.mjs          # write
+node scripts/generate-pinned-verifiers.mjs --check  # exit 1 on drift
+```
+
+`getPinnedVerifier` throws naming the circuit, or the chain and the chains that
+have one. The SDK picks the chain per environment from `VERIFICATION_CHAINS`
+(`src/constants.ts`, mirroring the app's `CIRCUIT_NETWORKS`): production uses
+Base 8453 for Coinbase/Country/OIDC, GIWA Sepolia 91342 for GIWA/Dojang, Base
+Sepolia 84532 for Korea Mobile ID; staging/local use 84532 and 91342. An SDK
+built with `new ProofportSDK(config)` has no environment and must configure
+verifiers.
+
+As generated from circuits `0a2d988` (2026-10-23): Base Sepolia, Ethereum
+Sepolia and GIWA Sepolia hold the beta.19 verifiers deployed 2026-10-22. The
+Base 8453 and Ethereum 1 entries were deployed 2026-03-05 to 2026-04-17 and are
+still the beta.8 verifiers (circuits-dev.md), so a proof from the beta.19
+toolchain will not verify there until they are redeployed. No mainnet verifier
+exists for GIWA, Dojang or Korea Mobile ID.
 
 #### `getVerifierContract(providerOrSigner: Provider | Signer, verifier: VerifierContract): ethers.Contract`
 
@@ -507,25 +547,15 @@ import { getDefaultProvider } from '@zkproofport-app/sdk';
 const provider = getDefaultProvider(84532); // Base Sepolia
 ```
 
-#### `getVerifierAddress(circuit: CircuitType, customVerifier?: VerifierContract): string | null`
+#### `getVerifierAddress(circuit: CircuitType, customVerifier?: VerifierContract): string`
 
-Gets the verifier contract address for a circuit.
+Core helper: the configured verifier's address. Throws when none is configured.
+The SDK method `sdk.getVerifierAddress(circuit)` returns the configured
+verifier, else the pinned one on the environment's chain, else throws.
 
-**Parameters:**
-- `circuit` - Circuit type identifier
-- `customVerifier` - Custom verifier config (if any)
+#### `getVerifierChainId(circuit: CircuitType, customVerifier?: VerifierContract): number`
 
-**Returns:** Checksummed address string, or null if not found
-
-#### `getVerifierChainId(circuit: CircuitType, customVerifier?: VerifierContract): number | null`
-
-Gets the chain ID where a circuit's verifier is deployed.
-
-**Parameters:**
-- `circuit` - Circuit type identifier
-- `customVerifier` - Custom verifier config (if any)
-
-**Returns:** Chain ID number, or null if not found
+Same, for the chain id.
 
 #### `extractNullifierFromPublicInputs(publicInputsHex: string[], circuit?: CircuitType): string | null`
 
@@ -851,6 +881,7 @@ Pre-configured public RPC endpoints by chain ID:
 const RPC_ENDPOINTS: Record<number, string> = {
   84532: 'https://sepolia.base.org',  // Base Sepolia (testnet)
   8453: 'https://mainnet.base.org',   // Base Mainnet (production)
+  91342: 'https://sepolia-rpc.giwa.io', // GIWA Sepolia (testnet)
 };
 ```
 
@@ -868,13 +899,13 @@ const CIRCUIT_METADATA: Record<CircuitType, {
   coinbase_attestation: {
     name: 'Coinbase KYC',
     description: 'Prove Coinbase identity verification',
-    publicInputsCount: 2,
+    publicInputsCount: 128,
     publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
   },
   coinbase_country_attestation: {
     name: 'Coinbase Country',
     description: 'Prove Coinbase country verification',
-    publicInputsCount: 14,
+    publicInputsCount: 150,
     publicInputNames: [
       'signal_hash',
       'signer_list_merkle_root',
