@@ -12,4 +12,5 @@ export * from './circuits';
 export * from './typedAction';
 export * from './verifier';
 export * from './chain';
+export * from './pinnedVerifiers';
 export type { CircuitType, ParsedProof, VerifierContract } from './types';
