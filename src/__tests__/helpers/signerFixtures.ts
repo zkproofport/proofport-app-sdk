@@ -1,0 +1,18 @@
+/**
+ * Public inputs for the signer-root circuits, shaped as each circuit emits
+ * them: the right count, one byte per field, the signer root at its offset.
+ * Everything else is zero; only the count and the root are read by the check.
+ */
+import { SIGNER_ROOT_LAYOUTS } from '../../verifier';
+
+export type RootCircuit = keyof typeof SIGNER_ROOT_LAYOUTS;
+
+const field = (v: number | bigint) => '0x' + BigInt(v).toString(16).padStart(64, '0');
+
+export function attestationInputs(circuit: RootCircuit, root: string = SIGNER_ROOT_LAYOUTS[circuit].set.root): string[] {
+  const layout = SIGNER_ROOT_LAYOUTS[circuit];
+  const inputs = Array.from({ length: layout.publicInputCount }, () => field(0));
+  const bytes = root.slice(2).match(/../g)!;
+  bytes.forEach((b, i) => (inputs[layout.rootStart + i] = field(parseInt(b, 16))));
+  return inputs;
+}

@@ -16,12 +16,13 @@ import {
   VERIFIER_ABI,
 } from '../verifier';
 import type { ProofResponse } from '../types';
+import { attestationInputs } from './helpers/signerFixtures';
 
 const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
 const ATTACKER = '0x000000000000000000000000000000000000dEaD';
 const PINNED_BASE_SEPOLIA_KYC = PINNED_VERIFIERS.coinbase_attestation[84532].address;
 const provider = {};
-const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: ['0x' + '00'.repeat(32)], numPublicInputs: 1 };
+const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: attestationInputs('coinbase_attestation'), numPublicInputs: 128 };
 
 const response = (over: Partial<ProofResponse> = {}): ProofResponse => ({
   requestId: 'r1',
@@ -166,7 +167,7 @@ describe('ProofportSDK.verifyResponseOnChain', () => {
   it('production verifies Coinbase KYC on Base and GIWA on GIWA Sepolia', async () => {
     const sdk = ProofportSDK.create();
     await sdk.verifyResponseOnChain(response(), provider);
-    await sdk.verifyResponseOnChain(response({ circuit: 'giwa_attestation' }), provider);
+    await sdk.verifyResponseOnChain(response({ circuit: 'giwa_attestation', publicInputs: attestationInputs('giwa_attestation') }), provider);
     expect(calledAddresses()).toEqual([
       PINNED_VERIFIERS.coinbase_attestation[8453].address,
       PINNED_VERIFIERS.giwa_attestation[91342].address,
@@ -193,5 +194,30 @@ describe('ProofportSDK.verifyResponseOnChain', () => {
       PINNED_VERIFIERS.oidc_domain_attestation[84532].address,
     );
     expect(ProofportSDK.create('staging').getVerifierChainId('dojang_playground')).toBe(91342);
+  });
+});
+
+describe('an explicit environment with a custom relay', () => {
+  it('verifies on that environment\'s pinned chain', async () => {
+    const sdk = new ProofportSDK({ relayUrl: 'http://192.168.0.10:4001', environment: 'local' });
+    expect((await sdk.verifyResponseOnChain(response(), provider)).valid).toBe(true);
+    expect(calledAddresses()).toEqual([PINNED_BASE_SEPOLIA_KYC]);
+  });
+
+  it.each([['prod'], ['PRODUCTION'], [''], ['__proto__'], ['toString']])('throws naming unknown environment %j', env => {
+    expect(() => new ProofportSDK({ environment: env as never })).toThrow(`Unknown environment '${env}'. Known: production, staging, local.`);
+  });
+
+  it('every demo page that builds its own SDK names an environment or verifiers', async () => {
+    const { readdirSync, readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const dir = join(process.cwd(), 'demo');
+    const constructions = readdirSync(dir)
+      .filter(f => f.endsWith('.html'))
+      .flatMap(f => (readFileSync(join(dir, f), 'utf8').match(/new ProofportSDK\(\{[^}]*\}\)/g) ?? []).map(c => [f, c]));
+    expect(constructions.length).toBeGreaterThan(0);
+    for (const [file, call] of constructions) {
+      expect(call, file).toMatch(/environment:|verifiers:/);
+    }
   });
 });

@@ -382,6 +382,14 @@ export interface ProofportConfig {
   relayUrl?: string;
   /** Custom verifier contract addresses per circuit type (overrides defaults) */
   verifiers?: Partial<Record<CircuitType, VerifierContract>>;
+  /**
+   * @internal Which environment's chains a circuit with no configured
+   * verifier is verified on (the pinned verifier on that chain).
+   * `ProofportSDK.create(env)` sets it; set it yourself only alongside a custom
+   * `relayUrl`, e.g. a local relay on a LAN address. Without it, and without a
+   * configured verifier, verification fails rather than guessing.
+   */
+  environment?: SDKEnvironment;
 }
 
 /**

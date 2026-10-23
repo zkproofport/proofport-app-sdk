@@ -100,7 +100,7 @@ import type { SDKEnvironment } from './types';
  * ```
  */
 export class ProofportSDK {
-  private config: Required<Omit<ProofportConfig, 'relayUrl'>>;
+  private config: Required<Omit<ProofportConfig, 'relayUrl' | 'environment'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
   private signer: WalletSigner | null = null;
   private relayUrl: string;
@@ -144,6 +144,14 @@ export class ProofportSDK {
       verifiers: config.verifiers || {},
     };
     this.relayUrl = config.relayUrl || '';
+    if (config.environment !== undefined) {
+      if (!Object.prototype.hasOwnProperty.call(VERIFICATION_CHAINS, config.environment)) {
+        throw new Error(
+          `Unknown environment '${config.environment}'. Known: ${Object.keys(VERIFICATION_CHAINS).join(', ')}.`,
+        );
+      }
+      this.environment = config.environment;
+    }
   }
 
   // ============ Request Creation ============
@@ -1124,9 +1132,7 @@ export class ProofportSDK {
     if (!Object.prototype.hasOwnProperty.call(RELAY_URLS, env)) {
       throw new Error(`Unknown environment: ${env}. Use 'production', 'staging', or 'local'.`);
     }
-    const sdk = new ProofportSDK({ relayUrl: RELAY_URLS[env] });
-    sdk.environment = env;
-    return sdk;
+    return new ProofportSDK({ relayUrl: RELAY_URLS[env], environment: env });
   }
 
   /**

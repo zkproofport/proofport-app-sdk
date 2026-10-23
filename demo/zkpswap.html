@@ -1743,7 +1743,9 @@
     // In local mode, derive relay URL from current hostname to work over LAN
     const localRelayUrl = `${window.location.protocol}//${window.location.hostname}:4001`;
     const sdk = sdkEnv === 'local'
-      ? new ProofportSDK({ relayUrl: localRelayUrl })
+      // environment: 'local' -- verify on the local preset's chains; without it
+      // the SDK has no chain to verify on and refuses rather than guessing.
+      ? new ProofportSDK({ relayUrl: localRelayUrl, environment: 'local' })
       : ProofportSDK.create(sdkEnv);
 
     // Auto-login with demo credentials (server-side injected)

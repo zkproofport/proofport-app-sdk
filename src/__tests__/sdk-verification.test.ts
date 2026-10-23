@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProofportSDK } from '../ProofportSDK';
 import type { ProofResponse } from '../types';
+import { attestationInputs } from './helpers/signerFixtures';
 
 describe('SDK Verification', () => {
   let sdk: ProofportSDK;
@@ -21,7 +22,7 @@ describe('SDK Verification', () => {
 
   it('verifyOnChain() calls contract and returns { valid: true }', async () => {
     const proof = '0x' + 'a'.repeat(128);
-    const publicInputs = ['0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'];
+    const publicInputs = attestationInputs('coinbase_attestation');
 
     const result = await sdk.verifyOnChain('coinbase_attestation', proof, publicInputs, mockProvider);
 
@@ -32,7 +33,7 @@ describe('SDK Verification', () => {
   it('verifyOnChain() returns { valid: false, error } when no verifier configured', async () => {
     const sdkWithoutVerifier = new ProofportSDK({});
     const proof = '0x' + 'a'.repeat(128);
-    const publicInputs = ['0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'];
+    const publicInputs = attestationInputs('coinbase_attestation');
 
     const result = await sdkWithoutVerifier.verifyOnChain('coinbase_attestation', proof, publicInputs, mockProvider);
 
@@ -48,7 +49,7 @@ describe('SDK Verification', () => {
     });
 
     const proof = '0x' + 'a'.repeat(128);
-    const publicInputs = ['0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'];
+    const publicInputs = attestationInputs('coinbase_attestation');
 
     const result = await sdk.verifyOnChain('coinbase_attestation', proof, publicInputs, mockProvider);
 
@@ -62,7 +63,7 @@ describe('SDK Verification', () => {
       requestId: 'req-123',
       circuit: 'coinbase_attestation',
       proof: '0x' + 'b'.repeat(128),
-      publicInputs: ['0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'],
+      publicInputs: attestationInputs('coinbase_attestation'),
     };
 
     const result = await sdk.verifyResponseOnChain(response, mockProvider);

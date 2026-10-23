@@ -9,25 +9,31 @@
  */
 import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
+import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
 
 export type IssuerCheck = (publicInputs: readonly string[], options: OidcKeyCheckOptions) => Promise<IssuerCheckResult>;
 
 /**
- * `null` means this package runs no issuer check for that circuit today. For
- * the Coinbase circuits and GIWA that is a known gap, not a statement that none
- * is needed: their signer-list Merkle root is a public input the verifier must
- * compare with the published signer set (OpenStoa does, in
- * `src/lib/proof-issuer.ts`). It is recorded here so nobody reads `null` as
- * "safe".
+ * `null` means the circuit has no issuer anchor among its public inputs, so
+ * there is nothing for a verifier to compare -- said per circuit below, so
+ * nobody reads `null` as a check someone forgot.
  */
 export const CIRCUIT_ISSUER_CHECKS = {
-  coinbase_attestation: null,
-  coinbase_country_attestation: null,
+  // signer_list_merkle_root is chosen by the prover; see ./signerRoots.
+  coinbase_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_attestation),
+  coinbase_country_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_country_attestation),
   // pubkey_modulus_limbs is chosen by the prover; see ./oidcProviderKeys.
   oidc_domain_attestation: checkOidcProviderKey,
-  giwa_attestation: null,
-  // Self-issued by design: no issuer list exists to compare with.
+  giwa_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.giwa_attestation),
+  // No issuer anchor: the Playground faucet address and GIWA Sepolia's chain
+  // id are constants compiled into the circuit (dojang-playground/src/main.nr,
+  // PLAYGROUND_FAUCET, GIWA_SEPOLIA_CHAIN_ID), so the verification key already
+  // pins them, and the issuance is self-signed by design -- no issuer exists.
   dojang_playground: null,
+  // No issuer anchor at all: the Korea Mobile ID circuits verify no issuer
+  // signature (cx_integrity_root is commented out pending HS256 registration,
+  // mdl/kr-*/src/main.nr), so a verifier has nothing to compare. These proofs
+  // do not show an issuer said anything; they are 'planned' for that reason.
   mdl_kr_ownership: null,
   mdl_kr_age: null,
   mdl_kr_region: null,

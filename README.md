@@ -786,6 +786,8 @@ Verify the proof cryptographically by calling the deployed Solidity verifier con
 
 For OIDC domain proofs the SDK also checks that the proof was made with a signing key Google or Microsoft actually publishes. That key is part of the proof's public inputs, so a proof made with a self-generated key would otherwise pass the contract. The SDK fetches the provider's published keys, caches them as the provider's own cache headers allow, and returns `{ valid: false, error }` when the key is not among them or the keys cannot be fetched. Every verify method does this; there is nothing to call separately.
 
+For Coinbase KYC, Coinbase country and GIWA proofs the SDK checks that the attestation's signer belongs to the published signer set: the proof carries the root of the signer list it was made against, and a proof made against any other list is refused with `{ valid: false, error }`. This too runs in every verify method.
+
 The one limit: a proof made with a key the provider has already withdrawn, which this process never saw while it was published, cannot be checked and is refused. Keys seen while published stay acceptable for 24 hours after they disappear.
 
 

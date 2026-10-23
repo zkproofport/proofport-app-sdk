@@ -11,6 +11,7 @@ import { ProofportSDK } from '../ProofportSDK';
 import { verifyProofOnChain, clearOidcKeyCache } from '../verifier';
 import { verifyProofOffChain } from '../offChainVerifier';
 import type { ProofResponse } from '../types';
+import { attestationInputs } from './helpers/signerFixtures';
 import { makeRsaKey, oidcPublicInputs, serveJwks, GOOGLE_JWKS_URL } from './helpers/oidcFixtures';
 
 const bbLoaded = vi.fn();
@@ -90,7 +91,7 @@ describe.each(paths)('%s', (_name, verify, backend) => {
 
 it('non-OIDC circuits fetch no key set', async () => {
   const fetchMock = serveJwks({});
-  const result = await ProofportSDK.create('staging').verifyOnChain('coinbase_attestation', PROOF, ['0x01'], {});
+  const result = await ProofportSDK.create('staging').verifyOnChain('coinbase_attestation', PROOF, attestationInputs('coinbase_attestation'), {});
   expect(result.valid).toBe(true);
   expect(fetchMock).not.toHaveBeenCalled();
 });

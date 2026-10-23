@@ -142,9 +142,28 @@ SDK's `verifyOnChain`, `verifyResponseOnChain`, `verifyResponseOffChain`:
   no `iss`, `tid`, `aud`, `nonce` or `exp` (circuits-dev.md, "OIDC review,
   2026-10-23").
 - `coinbase_attestation`, `coinbase_country_attestation`, `giwa_attestation`:
-  `signer_list_merkle_root` should equal the root of the published signer set.
-  **Not checked by the SDK yet** -- `null` in the table, recorded as a gap.
-  OpenStoa checks it (`openstoa/src/lib/proof-issuer.ts`).
+  `signer_list_merkle_root` (fields 32-63, 32-63, 96-127) must equal the root
+  of the published signer set (`signerRootCheck`,
+  `packages/core/src/signerRoots.ts`), and the input count must be exactly
+  128 / 150 / 192. The roots are in `signerRoots.generated.ts`, written by
+  `scripts/generate-signer-roots.mjs` from the provers' own lists at
+  `origin/main` -- proofport-app `AUTHORIZED_SIGNERS` and
+  `GIWA_AUTHORIZED_SIGNERS`, proofport-ai's copies, and OpenStoa's
+  `COINBASE_SIGNERS` -- which must agree in order. Tree: leaf
+  keccak256(address bytes), node keccak256(left || right), an odd layer
+  duplicates its last node (proofport-ai `src/input/merkleTree.ts`, checked
+  in-circuit by `coinbase-libs/src/merkle.nr`). On 2026-10-23 the generated
+  Coinbase root `0xb60da981...e2bf` and GIWA root `0xad0e6d81...0b92` equalled
+  the roots inside the real Coinbase, Country and GIWA proofs built in
+  circuits/*/target/proof. Regenerate (`--check` fails on drift) when a
+  signer list changes.
+- `dojang_playground`: no issuer anchor among its public inputs. The faucet
+  address and chain id are circuit constants, pinned by the verification key,
+  and the issuance is self-signed by design.
+- `mdl_kr_*`: no issuer anchor at all. The circuits verify no issuer signature
+  (`cx_integrity_root` is commented out pending HS256 registration), so the
+  birth date, region and owner data are whatever the prover supplied. There is
+  nothing a verifier can compare; these circuits stay `planned`.
 
 **Country Codes:**
 
@@ -498,8 +517,10 @@ have one. The SDK picks the chain per environment from `VERIFICATION_CHAINS`
 (`src/constants.ts`, mirroring the app's `CIRCUIT_NETWORKS`): production uses
 Base 8453 for Coinbase/Country/OIDC, GIWA Sepolia 91342 for GIWA/Dojang, Base
 Sepolia 84532 for Korea Mobile ID; staging/local use 84532 and 91342. An SDK
-built with `new ProofportSDK(config)` has no environment and must configure
-verifiers.
+built with `new ProofportSDK(config)` must name one -- `environment: 'local'`
+next to a custom `relayUrl`, as the demo pages do for a LAN relay -- or
+configure verifiers; with neither, verification fails ("No verifier chosen").
+An unknown environment throws naming it.
 
 As generated from circuits `0a2d988` (2026-10-23): Base Sepolia, Ethereum
 Sepolia and GIWA Sepolia hold the beta.19 verifiers deployed 2026-10-22. The
