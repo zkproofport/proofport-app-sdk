@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0-beta.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.2...v0.5.0-beta.3) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** verify OIDC v2 proofs and their audience, nonce and time
+
+### Features
+
+* **core:** verify OIDC v2 proofs and their audience, nonce and time ([3ea28ea](https://github.com/zkproofport/proofport-app-sdk/commit/3ea28eab342788013feaf4028aeaa684031ba2df))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.2.0 to 0.3.0
+
 ## [0.5.0-beta.2](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.1...v0.5.0-beta.2) (2026-10-27)
 
 
