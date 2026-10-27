@@ -12,7 +12,9 @@ import { verifyProofOnChain, clearOidcKeyCache } from '../verifier';
 import { verifyProofOffChain } from '../offChainVerifier';
 import type { ProofResponse } from '../types';
 import { attestationInputs } from './helpers/signerFixtures';
-import { makeRsaKey, oidcPublicInputs, serveJwks, GOOGLE_JWKS_URL } from './helpers/oidcFixtures';
+import { makeRsaKey, oidcPublicInputs, serveJwks, GOOGLE_JWKS_URL, REQUEST_ID, SCOPE } from './helpers/oidcFixtures';
+
+const REQUEST = { scope: SCOPE, requestId: REQUEST_ID };
 
 const bbLoaded = vi.fn();
 vi.mock('@aztec/bb.js', () => {
@@ -32,20 +34,20 @@ const PROOF = '0x' + 'ab'.repeat(64);
 const VK = new Uint8Array(1888);
 
 const response = (n: string): ProofResponse => ({
-  requestId: 'r1',
+  requestId: REQUEST_ID,
   circuit: 'oidc_domain_attestation',
   status: 'completed',
   proof: PROOF,
-  publicInputs: oidcPublicInputs(n, 0),
+  publicInputs: oidcPublicInputs(n, 0, { request: REQUEST }),
 });
 
 const paths: Array<[string, (n: string) => Promise<{ valid: boolean; error?: string }>, 'chain' | 'bb']> = [
   ['core verifyProofOnChain', n =>
-    verifyProofOnChain('oidc_domain_attestation', { proofHex: PROOF, publicInputsHex: oidcPublicInputs(n, 0), numPublicInputs: 148 }, {}, { chainId: 84532 }), 'chain'],
+    verifyProofOnChain('oidc_domain_attestation', { proofHex: PROOF, publicInputsHex: oidcPublicInputs(n, 0), numPublicInputs: 214 }, {}, { chainId: 84532 }), 'chain'],
   ['sdk.verifyOnChain', n => ProofportSDK.create('staging').verifyOnChain('oidc_domain_attestation', PROOF, oidcPublicInputs(n, 0), {}), 'chain'],
-  ['sdk.verifyResponseOnChain', n => ProofportSDK.create('staging').verifyResponseOnChain(response(n), {}), 'chain'],
+  ['sdk.verifyResponseOnChain', n => ProofportSDK.create('staging').verifyResponseOnChain(response(n), {}, { request: REQUEST }), 'chain'],
   ['verifyProofOffChain', n => verifyProofOffChain('oidc_domain_attestation', PROOF, oidcPublicInputs(n, 0), { verificationKey: VK }), 'bb'],
-  ['sdk.verifyResponseOffChain', n => ProofportSDK.create('staging').verifyResponseOffChain(response(n), { verificationKey: VK }), 'bb'],
+  ['sdk.verifyResponseOffChain', n => ProofportSDK.create('staging').verifyResponseOffChain(response(n), { verificationKey: VK, request: REQUEST }), 'bb'],
 ];
 
 beforeEach(() => {
@@ -80,7 +82,7 @@ describe.each(paths)('%s', (_name, verify, backend) => {
     const result = await (async () => {
       const inputs = oidcPublicInputs(published.n, 7);
       if (backend === 'chain') {
-        return verifyProofOnChain('oidc_domain_attestation', { proofHex: PROOF, publicInputsHex: inputs, numPublicInputs: 148 }, {}, { chainId: 84532 });
+        return verifyProofOnChain('oidc_domain_attestation', { proofHex: PROOF, publicInputsHex: inputs, numPublicInputs: 214 }, {}, { chainId: 84532 });
       }
       return verifyProofOffChain('oidc_domain_attestation', PROOF, inputs, { verificationKey: VK });
     })();

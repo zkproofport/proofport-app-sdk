@@ -14,6 +14,7 @@ export * from './verifier';
 export * from './chain';
 export * from './pinnedVerifiers';
 export * from './oidcProviderKeys';
+export * from './oidcPolicy';
 export * from './issuerChecks';
 export * from './signerRoots';
 export type { CircuitType, ParsedProof, VerifierContract } from './types';

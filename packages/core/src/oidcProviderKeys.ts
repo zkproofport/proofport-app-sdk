@@ -21,8 +21,11 @@
  * this process has seen listed within {@link RECENT_KEY_RETENTION_MS}. A proof
  * made with a key the provider has since withdrawn, and that this process never
  * saw while it was listed, fails -- there is no public archive of past keys to
- * consult. It also does not see the token's `iss`, `tid`, `aud` or `exp`: the
- * circuit does not expose them.
+ * consult. It does not judge the token's audience, nonce or time: since v2
+ * the circuit exposes `aud_hash`, `nonce_mode`, `nonce_binding` and `now`
+ * (it checks `iat <= now < exp` and the issuer's form itself), and
+ * ./oidcPolicy checks those on every verify path before this runs. The
+ * token's `iss` and `tid` are still not exposed.
  *
  * Runs in browsers, React Native and Node: `fetch` and `AbortController` only,
  * no `Buffer`. Both JWKS endpoints answer CORS requests (checked 2026-10-23),
@@ -31,8 +34,11 @@
  */
 import { OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './chain';
 
-/** Number of public inputs the OIDC circuit has. Anything else is not its proof. */
-export const OIDC_PUBLIC_INPUT_COUNT = 148;
+/**
+ * Number of public inputs the OIDC circuit (v2) has. Anything else is not its
+ * proof; a v1 proof (148) is refused by name in ./oidcPolicy.
+ */
+export const OIDC_PUBLIC_INPUT_COUNT = 214;
 
 /** The circuit's RSA modulus is 18 limbs of 120 bits, least significant first. */
 const LIMB_BITS = 120n;

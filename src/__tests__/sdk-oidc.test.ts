@@ -149,8 +149,8 @@ describe('OIDC Domain Attestation', () => {
       expect(CIRCUIT_METADATA).toHaveProperty('oidc_domain_attestation');
     });
 
-    it('has correct publicInputsCount of 148', () => {
-      expect(CIRCUIT_METADATA['oidc_domain_attestation'].publicInputsCount).toBe(148);
+    it('has correct publicInputsCount of 214 (v2)', () => {
+      expect(CIRCUIT_METADATA['oidc_domain_attestation'].publicInputsCount).toBe(214);
     });
 
     it('has correct publicInputNames', () => {
@@ -160,6 +160,10 @@ describe('OIDC Domain Attestation', () => {
         'scope',
         'nullifier',
         'provider',
+        'aud_hash',
+        'nonce_mode',
+        'nonce_binding',
+        'now',
       ]);
     });
   });
@@ -191,8 +195,15 @@ describe('OIDC Domain Attestation', () => {
       expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_END).toBe(146);
     });
 
-    it('PROVIDER is field 147 (total 148 public inputs)', () => {
+    it('PROVIDER is field 147, unchanged from v1', () => {
       expect(OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT.PROVIDER).toBe(147);
+    });
+
+    it('v2 appends aud_hash 148-179, nonce_mode 180, nonce_binding 181-212, now 213 (214 total)', () => {
+      const l = OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT;
+      expect([l.AUD_HASH_START, l.AUD_HASH_END, l.NONCE_MODE, l.NONCE_BINDING_START, l.NONCE_BINDING_END, l.NOW])
+        .toEqual([148, 179, 180, 181, 212, 213]);
+      expect(l.NOW + 1).toBe(CIRCUIT_METADATA['oidc_domain_attestation'].publicInputsCount);
     });
   });
 

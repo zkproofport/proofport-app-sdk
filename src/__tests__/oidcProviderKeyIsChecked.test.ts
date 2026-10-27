@@ -117,10 +117,10 @@ describe('which key is accepted', () => {
 });
 
 describe('malformed public inputs', () => {
-  it.each([0, 1, 147, 149, 300])('refuses %i public inputs (the circuit has 148)', async count => {
+  it.each([0, 1, 147, 148, 149, 213, 215, 428])('refuses %i public inputs (the v2 circuit has 214)', async count => {
     const fetchMock = serveJwks({ [GOOGLE_JWKS_URL]: [google.jwk] });
     const inputs = oidcPublicInputs(google.n, 0);
-    const resized = count <= 148 ? inputs.slice(0, count) : [...inputs, ...Array(count - 148).fill('0x00')];
+    const resized = count <= 214 ? inputs.slice(0, count) : [...inputs, ...Array(count - 214).fill('0x00')];
     expect((await checkOidcProviderKey(resized)).ok).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });

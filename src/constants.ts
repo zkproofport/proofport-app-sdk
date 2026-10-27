@@ -132,8 +132,10 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   oidc_domain_attestation: {
     name: 'OIDC Domain',
     description: 'Prove email domain affiliation via OIDC JWT',
-    publicInputsCount: 148,
-    publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider'],
+    // v2: 148 v1 fields, then aud_hash (32), nonce_mode (1), nonce_binding
+    // (32), now (1). oidc-domain-attestation/src/main.nr.
+    publicInputsCount: 214,
+    publicInputNames: ['pubkey_modulus_limbs', 'domain', 'scope', 'nullifier', 'provider', 'aud_hash', 'nonce_mode', 'nonce_binding', 'now'],
   },
   // Planned circuit — the identifier is reserved and the circuit exists, but it
   // is not officially supported yet. See CIRCUIT_SUPPORT_STATUS in ./circuits.

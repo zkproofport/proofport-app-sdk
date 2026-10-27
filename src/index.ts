@@ -66,6 +66,22 @@ export type {
 export { PINNED_VERIFIERS, getPinnedVerifier } from './verifier';
 export type { PinnedVerifier } from './verifier';
 
+// What an OIDC proof's token must say (audience, nonce, time) before any verify
+// function calls it valid; run by every verify path. Exported so a dApp can
+// derive the nonce a request expects or show why a proof was refused.
+export {
+  checkOidcPolicy,
+  deriveOidcNonceBinding,
+  oidcAudienceHash,
+  OIDC_ALLOWED_AUDIENCES,
+  OIDC_NONCE_DOMAIN,
+  OIDC_NOW_MAX_AGE_SECONDS,
+  OIDC_NOW_MAX_FUTURE_SECONDS,
+  OIDC_V1_PUBLIC_INPUT_COUNT,
+  OIDC_V2_PUBLIC_INPUT_COUNT,
+} from './verifier';
+export type { OidcRequestContext, OidcAudience, OidcNonceMode } from './verifier';
+
 // Public input layout constants
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,

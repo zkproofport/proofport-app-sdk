@@ -146,15 +146,24 @@ export const MDL_KR_PUBLIC_INPUT_LAYOUT = {
 } as const;
 
 /**
- * OIDC Domain Attestation circuit public input layout (field offsets).
- * Defines the field positions in the flattened public inputs array (148 fields total).
+ * OIDC Domain Attestation circuit public input layout (field offsets), v2.
+ * Defines the field positions in the flattened public inputs array (214 fields total).
  *
- * Circuit public inputs (from main.nr):
+ * Circuit public inputs (from main.nr). Offsets 0-147 are v1's, unchanged;
+ * v2 appends the token's audience, nonce and time after `provider`:
  * - pubkey_modulus_limbs: pub [u128; 18] → 18 fields (0–17)
- * - domain: pub BoundedVec<u8, 64> → 1 len + 64 storage = 65 fields (18–82)
+ * - domain: pub BoundedVec<u8, 64> → 64 storage + 1 len = 65 fields (18–82)
  * - scope: pub [u8; 32] → 32 fields (83–114)
  * - nullifier: pub [u8; 32] → 32 fields (115–146)
- * - provider: pub u8 → 1 field (147)
+ * - provider: pub u8 → 1 field (147), 0 Google, 1 Microsoft
+ * - aud_hash: pub [u8; 32] → 32 fields (148–179), keccak256 of the token's `aud`
+ * - nonce_mode: pub u8 → 1 field (180), 1 request-bound nonce, 0 none
+ * - nonce_binding: pub [u8; 32] → 32 fields (181–212); the token's nonce is its
+ *   lowercase hex in mode 1, all zero in mode 0
+ * - now: pub u64 → 1 field (213), unix seconds with iat <= now < exp
+ *
+ * A v1 proof has 148 fields and is refused by every verify path
+ * (see ./oidcPolicy).
  *
  * @example
  * ```typescript
@@ -175,6 +184,12 @@ export const OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   NULLIFIER_START: 115,
   NULLIFIER_END: 146,
   PROVIDER: 147,
+  AUD_HASH_START: 148,
+  AUD_HASH_END: 179,
+  NONCE_MODE: 180,
+  NONCE_BINDING_START: 181,
+  NONCE_BINDING_END: 212,
+  NOW: 213,
   /** @deprecated Use DOMAIN_STORAGE_START */
   DOMAIN_START: 18,
   /** @deprecated Use DOMAIN_LEN */

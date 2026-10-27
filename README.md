@@ -784,7 +784,9 @@ Verify the proof cryptographically by calling the deployed Solidity verifier con
 
 `verifyResponseOnChain` checks the proof against the verifier contract the SDK ships with for that circuit. Which contract judges a proof is never taken from the proof's own response: the SDK carries the deployed verifiers, generated from the circuits' deployment records, and a response whose `verifierAddress` or `chainId` differs from them is refused rather than checked elsewhere. If you configure your own verifier in the SDK's `verifiers` option, that one is used instead.
 
-For OIDC domain proofs the SDK also checks that the proof was made with a signing key Google or Microsoft actually publishes. That key is part of the proof's public inputs, so a proof made with a self-generated key would otherwise pass the contract. The SDK fetches the provider's published keys, caches them as the provider's own cache headers allow, and returns `{ valid: false, error }` when the key is not among them or the keys cannot be fetched. Every verify method does this; there is nothing to call separately.
+For OIDC domain proofs the SDK first checks what the proof says about the sign-in token: it must have been issued to a ZKProofport sign-in client (not to some other website), the proof must have been made within the last 15 minutes (and not more than 5 minutes ahead of your clock), and a proof made by the ZKProofport app must carry the nonce of **your** request — so a proof made for another request cannot be replayed as the answer to yours. For a request you created with `createRelayRequest` on the same SDK instance this happens automatically. If you verify in a different process (or after a restart), pass the request back: `sdk.verifyResponseOnChain(response, provider, { request: { scope, requestId } })`, with the scope you requested and the `requestId` the relay returned; without it an OIDC response is refused. `verifyOnChain` and `verifyResponseOffChain` take the same `request` option.
+
+The SDK also checks that the proof was made with a signing key Google or Microsoft actually publishes. That key is part of the proof's public inputs, so a proof made with a self-generated key would otherwise pass the contract. The SDK fetches the provider's published keys, caches them as the provider's own cache headers allow, and returns `{ valid: false, error }` when the key is not among them or the keys cannot be fetched. Every verify method does this; there is nothing to call separately.
 
 For Coinbase KYC, Coinbase country and GIWA proofs the SDK checks that the attestation's signer belongs to the published signer set: the proof carries the root of the signer list it was made against, and a proof made against any other list is refused with `{ valid: false, error }`. This too runs in every verify method.
 
@@ -932,7 +934,7 @@ import {
 const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
 const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
 
-// OIDC domain attestation uses a different public input layout (148 fields)
+// OIDC domain attestation uses a different public input layout (214 fields)
 const oidcScope = extractScopeFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 const oidcNullifier = extractNullifierFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 
@@ -1156,7 +1158,7 @@ const signalHash = toBytes32(publicInputs.slice(L.SIGNAL_HASH_START, L.SIGNAL_HA
 
 The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. Read indices 64–85 back and confirm they are the list and the direction you asked for; a valid proof against a different list is still a valid proof.
 
-### `oidc_domain_attestation` — 148 entries
+### `oidc_domain_attestation` — 214 entries
 
 | Index | Constants | Circuit field | What it is |
 |-------|-----------|---------------|------------|
@@ -1166,6 +1168,12 @@ The country list and the `is_included` flag are public inputs, which means the p
 | 83–114 | `SCOPE_START` / `_END` | `scope` | `bytes32` scope hash |
 | 115–146 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32` over the user's email and the scope |
 | 147 | `PROVIDER` | `provider` | `0` = Google, `1` = Microsoft. The circuit accepts no other value |
+| 148–179 | `AUD_HASH_START` / `_END` | `aud_hash` | keccak256 of the ID token's `aud` (the sign-in client it was issued to) |
+| 180 | `NONCE_MODE` | `nonce_mode` | `1` = the token's nonce is bound to your request, `0` = no nonce (agent device sign-in) |
+| 181–212 | `NONCE_BINDING_START` / `_END` | `nonce_binding` | In mode `1`, keccak256("zkproofport-oidc-v1" ‖ keccak256(scope) ‖ requestId); all zero in mode `0` |
+| 213 | `NOW` | `now` | Unix seconds the proof was made at; the circuit proves the token was valid then |
+
+Proofs from the earlier 148-entry version of this circuit bind no audience, expiry or nonce and are refused by every verify method.
 
 `DOMAIN_START` and `DOMAIN_END` are kept as deprecated aliases of `DOMAIN_STORAGE_START` and `DOMAIN_LEN`. Use the current names — the old pair reads as a range and is not one.
 

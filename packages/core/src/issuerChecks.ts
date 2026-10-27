@@ -9,9 +9,29 @@
  */
 import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
+import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
 
-export type IssuerCheck = (publicInputs: readonly string[], options: OidcKeyCheckOptions) => Promise<IssuerCheckResult>;
+/**
+ * What a verify function passes down: the JWKS fetch timeout, and the request
+ * the proof answers (only `oidc_domain_attestation` reads it; see ./oidcPolicy).
+ */
+export interface ProofCheckOptions extends OidcKeyCheckOptions, OidcPolicyOptions {}
+
+export type IssuerCheck = (publicInputs: readonly string[], options: ProofCheckOptions) => Promise<IssuerCheckResult>;
+
+/**
+ * The OIDC check: the token's audience, nonce and time first (offline, and a
+ * refusal there costs no request to the provider), then the RSA key.
+ */
+export async function checkOidcProof(
+  publicInputs: readonly string[],
+  options: ProofCheckOptions = {},
+): Promise<IssuerCheckResult> {
+  const policy = checkOidcPolicy(publicInputs, { request: options.request });
+  if (!policy.ok) return policy;
+  return checkOidcProviderKey(publicInputs, { timeoutMs: options.timeoutMs });
+}
 
 /**
  * `null` means the circuit has no issuer anchor among its public inputs, so
@@ -22,8 +42,9 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // signer_list_merkle_root is chosen by the prover; see ./signerRoots.
   coinbase_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_attestation),
   coinbase_country_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_country_attestation),
-  // pubkey_modulus_limbs is chosen by the prover; see ./oidcProviderKeys.
-  oidc_domain_attestation: checkOidcProviderKey,
+  // pubkey_modulus_limbs is chosen by the prover (./oidcProviderKeys), and the
+  // audience, nonce and time it exposes need judging (./oidcPolicy).
+  oidc_domain_attestation: checkOidcProof,
   giwa_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.giwa_attestation),
   // No issuer anchor: the Playground faucet address and GIWA Sepolia's chain
   // id are constants compiled into the circuit (dojang-playground/src/main.nr,
@@ -48,7 +69,7 @@ export const CIRCUIT_ISSUER_CHECKS = {
 export async function checkProofIssuer(
   circuit: string,
   publicInputs: readonly string[],
-  options: OidcKeyCheckOptions = {},
+  options: ProofCheckOptions = {},
 ): Promise<IssuerCheckResult> {
   if (!isCircuitId(circuit)) {
     return { ok: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };

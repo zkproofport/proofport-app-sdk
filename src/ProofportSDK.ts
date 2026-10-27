@@ -59,7 +59,7 @@ import {
   VERIFICATION_CHAINS,
 } from './constants';
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
-import { getPinnedVerifier, type VerifierTarget } from './verifier';
+import { getPinnedVerifier, type VerifierTarget, type OidcRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -102,6 +102,15 @@ import type { SDKEnvironment } from './types';
 export class ProofportSDK {
   private config: Required<Omit<ProofportConfig, 'relayUrl' | 'environment'>>;
   private pendingRequests: Map<string, ProofRequest> = new Map();
+  /**
+   * requestId -> scope of the relay requests this instance created, so that
+   * verifyResponse* can check an OIDC proof's request-bound nonce without the
+   * dApp passing the request back in. Oldest entries go first past
+   * {@link ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS}.
+   */
+  private relayRequests: Map<string, OidcRequestContext> = new Map();
+  /** Bound on {@link relayRequests}; a dApp that verifies later can pass the request explicitly. */
+  static readonly MAX_REMEMBERED_RELAY_REQUESTS = 1000;
   private signer: WalletSigner | null = null;
   private relayUrl: string;
   private socket: any = null;
@@ -789,7 +798,8 @@ export class ProofportSDK {
     circuit: CircuitType,
     proof: string,
     publicInputs: string[],
-    providerOrSigner?: any
+    providerOrSigner?: any,
+    options: { request?: OidcRequestContext } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -797,7 +807,52 @@ export class ProofportSDK {
       publicInputs.length
     );
 
-    return verifyProofOnChain(circuit, parsedProof, providerOrSigner, this.verifierTarget(circuit));
+    return verifyProofOnChain(circuit, parsedProof, providerOrSigner, this.verifierTarget(circuit), undefined, {
+      request: options.request,
+    });
+  }
+
+  /**
+   * The request an `oidc_domain_attestation` response answers: the one the
+   * caller passed, else the relay request this instance created under the
+   * response's requestId. `{ error }` when there is none, or when the two
+   * disagree -- an OIDC proof made with a request-bound nonce is only
+   * meaningful against the request it was bound to, so a response this SDK
+   * cannot place is refused rather than checked without it.
+   */
+  private oidcRequestFor(
+    response: ProofResponse,
+    explicit: OidcRequestContext | undefined,
+  ): { request: OidcRequestContext } | { error: string } {
+    if (explicit !== undefined) {
+      if (explicit === null || typeof explicit !== 'object' || explicit.requestId !== response.requestId) {
+        return {
+          error: `The request passed in (${JSON.stringify(explicit?.requestId)}) is not the one this response answers (${JSON.stringify(response.requestId)}).`,
+        };
+      }
+      return { request: explicit };
+    }
+    const remembered = this.relayRequests.get(response.requestId);
+    if (!remembered) {
+      return {
+        error:
+          `No request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the OIDC proof's ` +
+          'nonce cannot be checked against it. Pass { request: { scope, requestId } } -- the scope and relay ' +
+          'requestId of the request you created.',
+      };
+    }
+    return { request: remembered };
+  }
+
+  /** @internal Remember a relay request's scope for verifyResponse*. */
+  private rememberRelayRequest(requestId: unknown, scope: unknown): void {
+    if (typeof requestId !== 'string' || typeof scope !== 'string') return;
+    this.relayRequests.delete(requestId);
+    this.relayRequests.set(requestId, { scope, requestId });
+    while (this.relayRequests.size > ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS) {
+      const oldest = this.relayRequests.keys().next().value as string;
+      this.relayRequests.delete(oldest);
+    }
   }
 
   /**
@@ -823,6 +878,9 @@ export class ProofportSDK {
    *
    * @param response - ProofResponse object from parseResponse()
    * @param providerOrSigner - ethers v6 Provider or Signer (defaults to base mainnet public RPC)
+   * @param options.request - For `oidc_domain_attestation`: the `{ scope, requestId }`
+   *   the response answers. Not needed for a relay request this SDK instance
+   *   created; an OIDC response this instance cannot place is refused without it.
    *
    * @returns Promise resolving to verification result with valid boolean and optional error message
    *
@@ -851,10 +909,18 @@ export class ProofportSDK {
    */
   async verifyResponseOnChain(
     response: ProofResponse,
-    providerOrSigner?: any
+    providerOrSigner?: any,
+    options: { request?: OidcRequestContext } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
+    }
+
+    let request: OidcRequestContext | undefined;
+    if (response.circuit === 'oidc_domain_attestation') {
+      const found = this.oidcRequestFor(response, options.request);
+      if ('error' in found) return { valid: false, error: found.error };
+      request = found.request;
     }
 
     const parsedProof = parseProofForOnChain(
@@ -870,7 +936,7 @@ export class ProofportSDK {
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    });
+    }, { request });
   }
 
   /**
@@ -904,11 +970,17 @@ export class ProofportSDK {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
     }
+    let request: OidcRequestContext | undefined;
+    if (response.circuit === 'oidc_domain_attestation') {
+      const found = this.oidcRequestFor(response, options?.request);
+      if ('error' in found) return { valid: false, error: found.error };
+      request = found.request;
+    }
     return verifyProofOffChain(
       response.circuit,
       response.proof,
       response.publicInputs,
-      options
+      { ...options, request }
     );
   }
 
@@ -1389,7 +1461,9 @@ export class ProofportSDK {
       throw new Error(error.error || `Relay request failed: HTTP ${response.status}`);
     }
 
-    return await response.json() as RelayProofRequest;
+    const created = await response.json() as RelayProofRequest;
+    this.rememberRelayRequest(created.requestId, scope);
+    return created;
   }
 
   /**

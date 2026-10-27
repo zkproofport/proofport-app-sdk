@@ -35,7 +35,7 @@
  * two pieces, so nothing is joined back here.
  */
 import { ALL_CIRCUIT_IDS, CIRCUIT_VK_PATHS, isCircuitId, type CircuitId } from './circuits';
-import { checkProofIssuer } from '@zkproofport-app/core';
+import { checkProofIssuer, type OidcRequestContext } from '@zkproofport-app/core';
 
 /**
  * Where verification keys are published.
@@ -67,6 +67,12 @@ export interface OffChainVerifyOptions {
   verificationKey?: Uint8Array;
   /** Milliseconds before the fetch is abandoned. Default 30000. */
   timeoutMs?: number;
+  /**
+   * For `oidc_domain_attestation`: the request the proof answers. A proof made
+   * with a request-bound nonce (the app path) must be bound to exactly this
+   * scope and requestId. See core's `checkOidcPolicy`.
+   */
+  request?: OidcRequestContext;
 }
 
 /**
@@ -193,9 +199,11 @@ async function fetchVerificationKey(
  * Needs no setup from the caller: the verifier ships with this SDK and is
  * loaded on first use.
  *
- * For `oidc_domain_attestation` it first checks the proof's RSA key against the
- * provider's published JWKS (core's `checkOidcProviderKey`); a key the provider
- * does not publish, or a JWKS that cannot be fetched, is `{ valid: false }`.
+ * For `oidc_domain_attestation` it first checks the token's audience, nonce and
+ * time (core's `checkOidcPolicy`, against `options.request` when given) and the
+ * proof's RSA key against the provider's published JWKS (core's
+ * `checkOidcProviderKey`); any refusal, or a JWKS that cannot be fetched, is
+ * `{ valid: false }`.
  *
  * @param circuit - Canonical circuit identifier
  * @param proof - Proof bytes as hex, WITHOUT public inputs (as the relay sends it)
@@ -230,7 +238,7 @@ export async function verifyProofOffChain(
   // their trust anchor as a public input the prover chooses. For OIDC that is
   // the RSA key -- see core's oidcProviderKeys. Checked here so a dApp that
   // verifies off-chain gets the same answer as one that verifies on-chain.
-  const issuer = await checkProofIssuer(circuit, publicInputs);
+  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request });
   if (!issuer.ok) {
     return { valid: false, error: issuer.error };
   }

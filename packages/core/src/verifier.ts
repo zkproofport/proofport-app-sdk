@@ -10,7 +10,7 @@ import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOU
 import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { getPinnedVerifier, sameAddress } from './pinnedVerifiers';
 import { checkProofIssuer } from './issuerChecks';
-import type { OidcKeyCheckOptions } from './oidcProviderKeys';
+import type { ProofCheckOptions } from './issuerChecks';
 
 // ethers v5/v6 compatibility shims
 const _ethers = ethers as any;
@@ -98,8 +98,12 @@ export interface ClaimedVerifier {
   chainId?: number;
 }
 
-/** Options for {@link verifyProofOnChain}. */
-export interface OnChainVerifyOptions extends OidcKeyCheckOptions {}
+/**
+ * Options for {@link verifyProofOnChain}: the JWKS fetch timeout and, for an
+ * `oidc_domain_attestation` proof, the request it answers (`{ scope,
+ * requestId }`), which a nonce-bound proof must be bound to.
+ */
+export interface OnChainVerifyOptions extends ProofCheckOptions {}
 
 /** @internal The contract to call, or why there is none. */
 function resolveTarget(
@@ -137,7 +141,9 @@ function resolveTarget(
  *     address or chain, the proof is refused rather than checked somewhere the
  *     sender did not expect.
  *  4. The circuit's issuer check runs ({@link checkProofIssuer}): for
- *     `oidc_domain_attestation`, the RSA key must be one the provider
+ *     `oidc_domain_attestation`, the token's audience, nonce mode, nonce
+ *     binding (against `options.request` when given) and `now` must pass
+ *     {@link checkOidcPolicy}, and the RSA key must be one the provider
  *     publishes.
  *  5. The contract's `verify(proof, publicInputs)` decides.
  *
@@ -147,7 +153,7 @@ function resolveTarget(
  *   public RPC for the verifier's chain
  * @param target - The verifier: a configured contract, or `{ chainId }`
  * @param claimed - The verifier a proof response claims, compared and never used
- * @param options - JWKS fetch timeout for the OIDC issuer check
+ * @param options - JWKS fetch timeout, and the request an OIDC proof answers
  *
  * @example
  * ```typescript
