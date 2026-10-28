@@ -279,6 +279,29 @@ describe('rotation', () => {
     expect((await checkOidcProviderKey(oidcPublicInputs(google.n, 0))).ok).toBe(false);
   });
 
+  it('keeps a dropped key for exactly 1 hour', () => {
+    expect(RECENT_KEY_RETENTION_MS).toBe(60 * 60 * 1000);
+  });
+
+  it('accepts a key last listed 59 minutes ago that the refetched set no longer lists', async () => {
+    const fetchMock = serveJwks({ [GOOGLE_JWKS_URL]: [google.jwk] }, 'max-age=60');
+    expect((await checkOidcProviderKey(oidcPublicInputs(google.n, 0))).ok).toBe(true);
+    fetchMock.mockResolvedValue(jwksResponse([google2.jwk], 'max-age=60') as never);
+    vi.setSystemTime(Date.now() + 59 * 60_000);
+    expect((await checkOidcProviderKey(oidcPublicInputs(google.n, 0))).ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a key last listed 61 minutes ago that the refetched set no longer lists', async () => {
+    const fetchMock = serveJwks({ [GOOGLE_JWKS_URL]: [google.jwk] }, 'max-age=60');
+    expect((await checkOidcProviderKey(oidcPublicInputs(google.n, 0))).ok).toBe(true);
+    fetchMock.mockResolvedValue(jwksResponse([google2.jwk], 'max-age=60') as never);
+    vi.setSystemTime(Date.now() + 61 * 60_000);
+    const result = await checkOidcProviderKey(oidcPublicInputs(google.n, 0));
+    expect(result.ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('refuses a key withdrawn before this process ever saw it (the documented limit)', async () => {
     serveJwks({ [GOOGLE_JWKS_URL]: [google2.jwk] });
     expect((await checkOidcProviderKey(oidcPublicInputs(google.n, 0))).ok).toBe(false);

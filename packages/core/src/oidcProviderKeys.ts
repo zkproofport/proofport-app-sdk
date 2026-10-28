@@ -101,11 +101,13 @@ export const MAX_JWKS_CACHE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * How long a key stays acceptable after the last JWKS that listed it. Covers a
- * proof made moments before the provider withdrew its key. 24 hours is
- * Microsoft's max-age and above Google's (about 5.5 hours, 2026-10-23); it is
- * in-memory only, so a fresh process starts with nothing remembered.
+ * proof made moments before the provider withdrew its key, and no more: a
+ * withdrawn key may be a compromised one, so the window is kept short (1 hour,
+ * decided 2026-10-28). Measured from the fetch that last listed the key, not
+ * from the refetch that found it gone. In-memory only, so a fresh process
+ * starts with nothing remembered.
  */
-export const RECENT_KEY_RETENTION_MS = 24 * 60 * 60 * 1000;
+export const RECENT_KEY_RETENTION_MS = 60 * 60 * 1000;
 
 /**
  * A key missing from a still-fresh cache triggers one refetch, but not more

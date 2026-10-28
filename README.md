@@ -790,7 +790,7 @@ The SDK also checks that the proof was made with a signing key Google or Microso
 
 For Coinbase KYC, Coinbase country and GIWA proofs the SDK checks that the attestation's signer belongs to the published signer set: the proof carries the root of the signer list it was made against, and a proof made against any other list is refused with `{ valid: false, error }`. This too runs in every verify method.
 
-The one limit: a proof made with a key the provider has already withdrawn, which this process never saw while it was published, cannot be checked and is refused. Keys seen while published stay acceptable for 24 hours after they disappear.
+The one limit: a proof made with a key the provider has already withdrawn, which this process never saw while it was published, cannot be checked and is refused. Keys seen while published stay acceptable for 1 hour after they were last listed.
 
 
 

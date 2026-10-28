@@ -137,7 +137,7 @@ SDK's `verifyOnChain`, `verifyResponseOnChain`, `verifyResponseOffChain`:
   RS256 and `use` sig when present, 2048 bits. The key set is cached for its
   `Cache-Control: max-age` (at most 24 h); a fetch that fails, times out or
   redirects fails verification. A key seen in a fetched set stays acceptable
-  for 24 h after it was last listed, in memory. Limits: a key withdrawn before
+  for 1 h after it was last listed, in memory. Limits: a key withdrawn before
   the verifying process first saw it cannot be checked, and the circuit binds
   no `iss`, `tid`, `aud`, `nonce` or `exp` (circuits-dev.md, "OIDC review,
   2026-10-23").
