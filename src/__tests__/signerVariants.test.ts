@@ -175,12 +175,17 @@ describe('lookups end at an error naming the key', () => {
     );
   });
 
-  it('an android package with nothing deployed says so, per chain', () => {
-    expect(() => getPinnedVariantVerifier('oidc_domain_attestation', 'android', 84532)).toThrow(
-      "No oidc_domain_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain.",
-    );
+  // Coinbase KYC's android package is held back by NOT_PINNED_HERE, so it stays
+  // empty when the OIDC android verifiers are deployed and the table regenerated.
+  it('an android package with nothing deployed says so', () => {
     expect(() => getPinnedVariantVerifier('coinbase_attestation', 'android', 84532)).toThrow(
-      "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532.",
+      "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain.",
+    );
+  });
+
+  it('an android package without a deployment on the chain asked for says so', () => {
+    expect(() => getPinnedVariantVerifier('oidc_domain_attestation', 'android', 424242)).toThrow(
+      /^No oidc_domain_attestation verifier for the 'android' signer is deployed on chain 424242\. /,
     );
   });
 });
@@ -300,8 +305,8 @@ describe('every verify path applies it before anything else runs', () => {
   });
 
   it('core on-chain: an android proof with nothing pinned names the missing deployment', async () => {
-    const r = await verifyProofOnChain('oidc_domain_attestation', { ...parsed(ANDROID), publicInputsHex: [] }, {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
-    expect(r).toEqual({ valid: false, error: "No oidc_domain_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain." });
+    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
+    expect(r).toEqual({ valid: false, error: "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain." });
     expect(Contract).not.toHaveBeenCalled();
   });
 
