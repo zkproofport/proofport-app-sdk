@@ -7,8 +7,8 @@
 import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
 import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './chain';
-import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
-import { getPinnedVerifier, sameAddress } from './pinnedVerifiers';
+import { ALL_CIRCUIT_IDS, isCircuitId, resolveSignerVariant, type CircuitId, type SignerVariant } from './circuits';
+import { getPinnedVariantVerifier, sameAddress } from './pinnedVerifiers';
 import { checkProofIssuer } from './issuerChecks';
 import type { ProofCheckOptions } from './issuerChecks';
 
@@ -99,15 +99,27 @@ export interface ClaimedVerifier {
 }
 
 /**
- * Options for {@link verifyProofOnChain}: the JWKS fetch timeout and, for an
+ * Options for {@link verifyProofOnChain}: the JWKS fetch timeout; for an
  * `oidc_domain_attestation` proof, the request it answers (`{ scope,
- * requestId }`), which a nonce-bound proof must be bound to.
+ * requestId }`), which a nonce-bound proof must be bound to; and the
+ * `signerVariant` the proof's result says made it.
  */
-export interface OnChainVerifyOptions extends ProofCheckOptions {}
+export interface OnChainVerifyOptions extends ProofCheckOptions {
+  /**
+   * Which package of the circuit made the proof, as its result says (see
+   * {@link SignerVariant}). Pass the result's field through unchanged; omitted
+   * means `standard`, refused when the proof has another package's length
+   * ({@link resolveSignerVariant}). It selects among pinned verifiers only.
+   * A string, because it arrives from the proof's sender; a value the circuit
+   * has no package for is refused by name.
+   */
+  signerVariant?: string;
+}
 
 /** @internal The contract to call, or why there is none. */
 function resolveTarget(
   circuit: string,
+  variant: SignerVariant,
   target: VerifierTarget | undefined,
 ): { verifier: VerifierContract } | { error: string } {
   if (!target) {
@@ -118,10 +130,20 @@ function resolveTarget(
     };
   }
   if ('address' in target && target.address !== undefined) {
+    // A configured verifier is one contract per circuit, built from the
+    // standard package's key. Another package's proof never verifies there,
+    // so say that instead of letting the contract answer false.
+    if (variant !== 'standard') {
+      return {
+        error:
+          `This ${circuit} proof was made by the '${variant}' signer's package, whose verification key differs ` +
+          `from the configured verifier's. Verify it against the pinned '${variant}' verifier by naming a chain.`,
+      };
+    }
     return { verifier: target };
   }
   try {
-    const pinned = getPinnedVerifier(circuit, target.chainId);
+    const pinned = getPinnedVariantVerifier(circuit, variant, target.chainId);
     return { verifier: { address: pinned.address, chainId: target.chainId, abi: VERIFIER_ABI } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
@@ -133,19 +155,23 @@ function resolveTarget(
  *
  * In order, and any failure ends with `{ valid: false, error }`:
  *  1. The circuit must be a known circuit id.
- *  2. The verifier is `target`: a contract the caller configured, or
- *     `{ chainId }` for the pinned deployment of this circuit on that chain
- *     (see {@link PINNED_VERIFIERS}). Nothing else -- in particular not the
+ *  2. The package that made the proof is `options.signerVariant`, or
+ *     `standard` when omitted, cross-checked against the proof's length
+ *     ({@link resolveSignerVariant}).
+ *  3. The verifier is `target`: a contract the caller configured (standard
+ *     package only), or `{ chainId }` for the pinned deployment of that
+ *     package on that chain (see {@link PINNED_VERIFIERS} and
+ *     {@link PINNED_VARIANT_VERIFIERS}). Nothing else -- in particular not the
  *     address a proof response carries.
- *  3. If `claimed` (what a response said its verifier was) names a different
+ *  4. If `claimed` (what a response said its verifier was) names a different
  *     address or chain, the proof is refused rather than checked somewhere the
  *     sender did not expect.
- *  4. The circuit's issuer check runs ({@link checkProofIssuer}): for
+ *  5. The circuit's issuer check runs ({@link checkProofIssuer}): for
  *     `oidc_domain_attestation`, the token's audience, nonce mode, nonce
  *     binding (against `options.request` when given) and `now` must pass
  *     {@link checkOidcPolicy}, and the RSA key must be one the provider
  *     publishes.
- *  5. The contract's `verify(proof, publicInputs)` decides.
+ *  6. The contract's `verify(proof, publicInputs)` decides.
  *
  * @param circuit - The canonical circuit identifier. REQUIRED.
  * @param parsedProof - Parsed proof object containing proofHex and publicInputsHex
@@ -153,7 +179,8 @@ function resolveTarget(
  *   public RPC for the verifier's chain
  * @param target - The verifier: a configured contract, or `{ chainId }`
  * @param claimed - The verifier a proof response claims, compared and never used
- * @param options - JWKS fetch timeout, and the request an OIDC proof answers
+ * @param options - JWKS fetch timeout, the request an OIDC proof answers, and
+ *   the signer variant the proof's result names
  *
  * @example
  * ```typescript
@@ -173,7 +200,10 @@ export async function verifyProofOnChain(
     return { valid: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
   }
 
-  const resolved = resolveTarget(circuit, target);
+  const signer = resolveSignerVariant(circuit, options.signerVariant, parsedProof.proofHex);
+  if ('error' in signer) return { valid: false, error: signer.error };
+
+  const resolved = resolveTarget(circuit, signer.variant, target);
   if ('error' in resolved) return { valid: false, error: resolved.error };
   const verifier = resolved.verifier;
 

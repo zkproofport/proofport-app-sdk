@@ -307,6 +307,14 @@ export interface ProofResponse {
   verifierAddress?: string;
   /** Chain ID where verifier contract is deployed (provided by mobile app) */
   chainId?: number;
+  /**
+   * Which of the circuit's packages made the proof (a `SignerVariant`,
+   * provided by mobile app). Pass the relay result's `signerVariant` through
+   * unchanged; a value the circuit has no package for is refused by name.
+   * Omitted means `standard`; a proof whose length is another package's is
+   * then refused.
+   */
+  signerVariant?: string;
 }
 
 
@@ -499,6 +507,8 @@ export interface RelayProofResult {
   verifierAddress?: string;
   chainId?: number;
   circuit?: string;
+  /** Which of the circuit's packages made the proof; copy it into `ProofResponse.signerVariant`. */
+  signerVariant?: string;
   /** Human-readable reason, present when status is 'error', 'failed' or 'expired' */
   error?: string;
   /** The app's error code (`E` + four digits, e.g. `E2007`), present on some 'error' results */

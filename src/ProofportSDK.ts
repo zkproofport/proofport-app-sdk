@@ -799,7 +799,7 @@ export class ProofportSDK {
     proof: string,
     publicInputs: string[],
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext } = {}
+    options: { request?: OidcRequestContext; signerVariant?: string } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -809,6 +809,7 @@ export class ProofportSDK {
 
     return verifyProofOnChain(circuit, parsedProof, providerOrSigner, this.verifierTarget(circuit), undefined, {
       request: options.request,
+      signerVariant: options.signerVariant,
     });
   }
 
@@ -936,7 +937,7 @@ export class ProofportSDK {
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    }, { request });
+    }, { request, signerVariant: response.signerVariant });
   }
 
   /**
@@ -980,7 +981,7 @@ export class ProofportSDK {
       response.circuit,
       response.proof,
       response.publicInputs,
-      { ...options, request }
+      { ...options, request, signerVariant: response.signerVariant }
     );
   }
 

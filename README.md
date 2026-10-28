@@ -90,6 +90,7 @@ if (result.status === 'completed') {
     publicInputs: result.publicInputs,
     verifierAddress: result.verifierAddress,
     chainId: result.chainId,
+    signerVariant: result.signerVariant,
   };
 
   const verification = await sdk.verifyResponseOnChain(response);
@@ -772,6 +773,7 @@ The relay answers `'expired'` before the SDK's default `timeoutMs` (300 000 ms) 
 | `publicInputs` | `string[]` | When completed | `result.publicInputs` |
 | `verifierAddress` | `string` | No | `result.verifierAddress`. Optional. When present it must match the SDK's own verifier for the circuit, or verification is refused |
 | `chainId` | `number` | No | `result.chainId`. Optional. When present it must match the network the SDK verifies the circuit on, or verification is refused |
+| `signerVariant` | `string` | No | `result.signerVariant`. Copy it unchanged whenever the relay sends it: some circuits are proved by more than one package, each with its own verifier, and this field says which one made the proof. When it is absent the circuit's standard verifier is used, and a proof that has another package's size is refused |
 | `numPublicInputs` | `number` | No | Never delivered by the relay, and never read during verification — `publicInputs.length` is used instead. Omit it |
 | `timestamp` | `number` | No | Not delivered by the relay. Omit it |
 | `error` | `string` | On failure | `result.error`. Carried for your own logging; verification ignores it |
@@ -806,6 +808,7 @@ if (result.status === 'completed') {
     publicInputs: result.publicInputs,
     verifierAddress: result.verifierAddress,
     chainId: result.chainId,
+    signerVariant: result.signerVariant,
   };
 
   const verification = await sdk.verifyResponseOnChain(response);

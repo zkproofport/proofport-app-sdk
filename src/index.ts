@@ -50,6 +50,13 @@ export {
   isSupportedCircuitId,
   getCircuitSupportStatus,
   CIRCUIT_VK_PATHS,
+  CIRCUIT_PACKAGES,
+  SIGNER_VARIANTS,
+  isSignerVariant,
+  signerVariantsOf,
+  getCircuitPackage,
+  resolveSignerVariant,
+  evmProofByteLength,
 } from './circuits';
 
 // Off-chain verification — checking a proof against its verification key, with
@@ -63,7 +70,7 @@ export type {
 // The verifier contracts proofs are checked against, generated from the
 // circuits repository's deployment records. A response's own verifierAddress
 // is never used.
-export { PINNED_VERIFIERS, getPinnedVerifier } from './verifier';
+export { PINNED_VERIFIERS, PINNED_VARIANT_VERIFIERS, getPinnedVerifier, getPinnedVariantVerifier } from './verifier';
 export type { PinnedVerifier } from './verifier';
 
 // What an OIDC proof's token must say (audience, nonce, time) before any verify
@@ -90,7 +97,7 @@ export {
   MDL_KR_PUBLIC_INPUT_LAYOUT,
 } from './constants';
 
-export type { CircuitId, CircuitSupportStatus } from './circuits';
+export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage } from './circuits';
 // Whether a circuit binds an EIP-712 action, and whether it must. One table,
 // so a dapp does not have to learn which circuit names are special.
 export {

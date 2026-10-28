@@ -109,6 +109,95 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
   } as const);
 
 /**
+ * Which circuit PACKAGE produced a proof, for a circuit id served by more than
+ * one.
+ *
+ * A circuit id names a statement (its public inputs, their order and meaning,
+ * its nullifier). A package is one Noir program that proves it, with its own
+ * verification key and verifier contract. Most circuit ids have one package,
+ * `standard`. `oidc_domain_attestation` and `coinbase_attestation` also have an
+ * `android` package: the same public inputs, but the statement is signed by a
+ * key Android key attestation vouches for instead of an iPhone App Attest key
+ * or the proving server's key. That signer alone is about 1.17M gates, so it is
+ * a separate 2^21 circuit rather than a branch that would push every iPhone and
+ * server proof from 2^20 to 2^21.
+ *
+ * The variant only selects among keys and verifiers this package pins; it never
+ * names one. A wrong claim selects a verifier the proof does not verify against.
+ */
+export type SignerVariant = 'standard' | 'android';
+
+/** Every signer variant, `standard` first. */
+export const SIGNER_VARIANTS: readonly SignerVariant[] = Object.freeze(['standard', 'android'] as const);
+
+/** One circuit package inside the `zkproofport/circuits` repository. */
+export interface CircuitPackage {
+  /** Package directory, relative to the circuits repository root. */
+  readonly packageDir: string;
+  /** Verification key file, relative to the circuits repository root. */
+  readonly vkPath: string;
+  /** `Deploy<Name>.s.sol` that deploys its verifier: `<Name>`. */
+  readonly deployScriptName: string;
+  /**
+   * log2 of the circuit size, only where a circuit id has more than one
+   * package: the EVM proof's byte length follows from it (see
+   * {@link evmProofByteLength}), and that length is how a proof whose result
+   * does not say which package made it is told apart. Read from the first word
+   * of each package's `target/vk/vk` and the `LOG_N` of its Solidity verifier.
+   */
+  readonly logCircuitSize?: number;
+}
+
+/**
+ * The packages behind each circuit id, by signer variant. Exhaustive over
+ * {@link CircuitId}: every circuit id has a `standard` package.
+ *
+ * `coinbase_attestation`'s `standard` package is still v1
+ * (`coinbase-attestation`, 128 public inputs); its `android` package is the
+ * Coinbase KYC v2 layout. This core judges coinbase_attestation by the v1
+ * layout, so an android Coinbase proof is refused by its public input count
+ * and has no pinned verifier until the release that adopts the v2 layout.
+ */
+const CIRCUIT_PACKAGE_ROWS = {
+  coinbase_attestation: {
+    standard: { packageDir: 'coinbase-attestation', vkPath: 'coinbase-attestation/target/vk/vk', deployScriptName: 'CoinbaseAttestation', logCircuitSize: 19 },
+    android: { packageDir: 'coinbase-attestation-v2-android', vkPath: 'coinbase-attestation-v2-android/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2Android', logCircuitSize: 21 },
+  },
+  coinbase_country_attestation: {
+    standard: { packageDir: 'coinbase-country-attestation', vkPath: 'coinbase-country-attestation/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestation' },
+  },
+  oidc_domain_attestation: {
+    standard: { packageDir: 'oidc-domain-attestation', vkPath: 'oidc-domain-attestation/target/vk/vk', deployScriptName: 'OidcDomainAttestation', logCircuitSize: 20 },
+    android: { packageDir: 'oidc-domain-attestation-android', vkPath: 'oidc-domain-attestation-android/target/vk/vk', deployScriptName: 'OidcDomainAttestationAndroid', logCircuitSize: 21 },
+  },
+  giwa_attestation: {
+    standard: { packageDir: 'giwa-attestation', vkPath: 'giwa-attestation/target/vk/vk', deployScriptName: 'GiwaAttestation' },
+  },
+  dojang_playground: {
+    standard: { packageDir: 'dojang-playground', vkPath: 'dojang-playground/target/vk/vk', deployScriptName: 'DojangPlayground' },
+  },
+  mdl_kr_ownership: {
+    standard: { packageDir: 'mdl/kr-ownership', vkPath: 'mdl/kr-ownership/target/vk/vk', deployScriptName: 'MdlKrOwnership' },
+  },
+  mdl_kr_age: {
+    standard: { packageDir: 'mdl/kr-age', vkPath: 'mdl/kr-age/target/vk/vk', deployScriptName: 'MdlKrAge' },
+  },
+  mdl_kr_region: {
+    standard: { packageDir: 'mdl/kr-region', vkPath: 'mdl/kr-region/target/vk/vk', deployScriptName: 'MdlKrRegion' },
+  },
+} satisfies Record<CircuitId, { readonly standard: CircuitPackage } & Partial<Record<SignerVariant, CircuitPackage>>>;
+
+// Frozen after the check, not inside it: `satisfies` on Object.freeze's result
+// is a generic call's type, which skips excess-property checking, so a key that
+// names no circuit id or no variant (`andriod`) would compile.
+for (const row of Object.values(CIRCUIT_PACKAGE_ROWS)) {
+  for (const pkg of Object.values(row)) Object.freeze(pkg);
+  Object.freeze(row);
+}
+/** The packages behind each circuit id, by signer variant; see the table above. */
+export const CIRCUIT_PACKAGES = Object.freeze(CIRCUIT_PACKAGE_ROWS);
+
+/**
  * Where each circuit's verification key FILE lives inside the
  * `zkproofport/circuits` repository, relative to its root.
  *
@@ -124,20 +213,19 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
  * directory produced a URL that answers 404, and the first browser to try
  * off-chain verification said "Could not fetch the verification key (HTTP 404)".
  *
- * Exhaustive over {@link CircuitId} on purpose. A new circuit whose key path is
- * not listed here fails to compile rather than failing at verification time,
- * where the only symptom would be a proof that cannot be checked.
+ * The `standard` package's key ({@link CIRCUIT_PACKAGES}); a proof from another
+ * package needs {@link getCircuitPackage}.
+ *
+ * Exhaustive over {@link CircuitId} because {@link CIRCUIT_PACKAGES} is: a new
+ * circuit whose package is not listed there fails to compile rather than
+ * failing at verification time, where the only symptom would be a proof that
+ * cannot be checked.
  */
-export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.freeze({
-  coinbase_attestation: 'coinbase-attestation/target/vk/vk',
-  coinbase_country_attestation: 'coinbase-country-attestation/target/vk/vk',
-  oidc_domain_attestation: 'oidc-domain-attestation/target/vk/vk',
-  giwa_attestation: 'giwa-attestation/target/vk/vk',
-  dojang_playground: 'dojang-playground/target/vk/vk',
-  mdl_kr_ownership: 'mdl/kr-ownership/target/vk/vk',
-  mdl_kr_age: 'mdl/kr-age/target/vk/vk',
-  mdl_kr_region: 'mdl/kr-region/target/vk/vk',
-} as const);
+export const CIRCUIT_VK_PATHS: Readonly<Record<CircuitId, string>> = Object.freeze(
+  Object.fromEntries(
+    (Object.keys(CIRCUIT_PACKAGES) as CircuitId[]).map(id => [id, CIRCUIT_PACKAGES[id].standard.vkPath]),
+  ) as Record<CircuitId, string>,
+);
 
 /**
  * Every canonical circuit identifier, in declaration order.
@@ -196,6 +284,125 @@ export const PLANNED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
  */
 export function isCircuitId(value: unknown): value is CircuitId {
   return typeof value === 'string' && (ALL_CIRCUIT_IDS as readonly string[]).includes(value);
+}
+
+/** Narrows an unknown value to a {@link SignerVariant}. */
+export function isSignerVariant(value: unknown): value is SignerVariant {
+  return typeof value === 'string' && (SIGNER_VARIANTS as readonly string[]).includes(value);
+}
+
+/**
+ * The signer variants a circuit id has packages for, `standard` first.
+ *
+ * @throws Error naming the circuit when it is not a circuit id.
+ */
+export function signerVariantsOf(circuit: string): readonly SignerVariant[] {
+  if (!isCircuitId(circuit)) {
+    throw new Error(`Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.`);
+  }
+  const row: Partial<Record<SignerVariant, CircuitPackage>> = CIRCUIT_PACKAGES[circuit];
+  return SIGNER_VARIANTS.filter(v => Object.prototype.hasOwnProperty.call(row, v));
+}
+
+/**
+ * The package that proves `circuit` with `variant`'s signer.
+ *
+ * @throws Error naming the circuit when it is not a circuit id, and naming the
+ *   circuit and its variants when it has no package for `variant`.
+ */
+export function getCircuitPackage(circuit: string, variant: string): CircuitPackage {
+  const known = signerVariantsOf(circuit);
+  if (!(known as readonly string[]).includes(variant)) {
+    throw new Error(
+      `Circuit '${circuit}' has no '${variant}' signer variant. Known for ${circuit}: ${known.join(', ')}.`,
+    );
+  }
+  return (CIRCUIT_PACKAGES[circuit as CircuitId] as Partial<Record<SignerVariant, CircuitPackage>>)[variant as SignerVariant]!;
+}
+
+/**
+ * Byte length of an EVM UltraHonk proof (keccak transcript, ZK) of a circuit of
+ * size 2^logCircuitSize, as the relay carries it: without public inputs, with
+ * the 8 pairing-point fields.
+ *
+ * `calculateProofSize` of the HonkVerifier bb 4.2.0-aztecnr-rc.2 writes
+ * (`circuits/toolchain.env`): 82 fields that do not depend on the size, and 12
+ * per log2 step (9 sumcheck univariate coefficients, 1 Gemini evaluation, 1
+ * Gemini fold commitment of 2 fields). Measured: 9920 bytes at 2^19
+ * (coinbase-attestation/target/proof/proof) and 10304 at 2^20
+ * (coinbase-attestation-v2/target/proof/proof).
+ */
+export function evmProofByteLength(logCircuitSize: number): number {
+  if (!Number.isInteger(logCircuitSize) || logCircuitSize < 1 || logCircuitSize > 28) {
+    throw new Error(`logCircuitSize must be an integer from 1 to 28; got ${logCircuitSize}.`);
+  }
+  return 32 * (82 + 12 * logCircuitSize);
+}
+
+/**
+ * Which package's verifier judges a proof: the variant its result claims, or
+ * `standard` when the result claims none, cross-checked against the proof's
+ * byte length where the circuit has more than one package.
+ *
+ * A result without the field is what every app before the Android signer sent,
+ * so it means `standard`. It is refused when the proof has another variant's
+ * length: a newer app's proof whose field was dropped on the way (a relay or a
+ * dApp that copies only the fields it knows) would otherwise reach the
+ * standard verifier and fail with nothing saying why. A claimed variant whose
+ * proof has another variant's length is refused for the same reason.
+ *
+ * Nothing the sender controls makes it throw: a variant arrives from the
+ * proof's sender, so a bad one is an `{ error }`. It throws only if this
+ * table is inconsistent (a multi-package circuit without `logCircuitSize`),
+ * which a test rules out.
+ */
+export function resolveSignerVariant(
+  circuit: string,
+  claimed: unknown,
+  proofHex: string,
+): { variant: SignerVariant } | { error: string } {
+  if (!isCircuitId(circuit)) {
+    return { error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
+  }
+  const known = signerVariantsOf(circuit);
+  let variant: SignerVariant;
+  if (claimed === undefined || claimed === null) {
+    variant = 'standard';
+  } else if (typeof claimed === 'string' && (known as readonly string[]).includes(claimed)) {
+    variant = claimed as SignerVariant;
+  } else {
+    return {
+      error: `Circuit '${circuit}' has no ${JSON.stringify(claimed)} signer variant. Known for ${circuit}: ${known.join(', ')}.`,
+    };
+  }
+  if (known.length === 1) return { variant };
+
+  const hex = typeof proofHex === 'string' && /^0x/i.test(proofHex) ? proofHex.slice(2) : proofHex;
+  if (typeof hex !== 'string' || hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+    return { error: `The ${circuit} proof is not hex bytes, so its length cannot say which package made it.` };
+  }
+  const bytes = hex.length / 2;
+  const lengthOf = (v: SignerVariant): number => {
+    const pkg = getCircuitPackage(circuit, v);
+    if (pkg.logCircuitSize === undefined) {
+      throw new Error(`Circuit '${circuit}' has several packages but its '${v}' package names no logCircuitSize.`);
+    }
+    return evmProofByteLength(pkg.logCircuitSize);
+  };
+  const own = lengthOf(variant);
+  for (const other of known) {
+    if (other === variant) continue;
+    const otherLength = lengthOf(other);
+    if (bytes === otherLength && otherLength !== own) {
+      const said = claimed === undefined || claimed === null ? 'does not say which signer made it' : `says signerVariant '${variant}'`;
+      return {
+        error:
+          `This ${circuit} proof is ${bytes} bytes, the length of a '${other}' proof, but its result ${said}. ` +
+          `Refusing rather than checking it against the '${variant}' verifier. Pass the result's signerVariant through unchanged.`,
+      };
+    }
+  }
+  return { variant };
 }
 
 /**

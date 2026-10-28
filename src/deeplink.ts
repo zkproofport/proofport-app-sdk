@@ -283,6 +283,12 @@ export function parseProofResponseUrl(url: string): ProofResponse | null {
       if (timestamp) {
         response.timestamp = parseInt(timestamp, 10);
       }
+      // Kept as sent, even when unknown: verification refuses it by name,
+      // which says more than a callback that fails to parse.
+      const signerVariant = urlObj.searchParams.get('signerVariant');
+      if (signerVariant !== null) {
+        response.signerVariant = signerVariant;
+      }
     } else if (status === 'error') {
       response.error = urlObj.searchParams.get('error') || undefined;
     }

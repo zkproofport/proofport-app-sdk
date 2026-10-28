@@ -34,7 +34,7 @@
  * Solidity verifier takes them separately. bb.js 4.x's verifier takes the same
  * two pieces, so nothing is joined back here.
  */
-import { ALL_CIRCUIT_IDS, CIRCUIT_VK_PATHS, isCircuitId, type CircuitId } from './circuits';
+import { ALL_CIRCUIT_IDS, getCircuitPackage, isCircuitId, resolveSignerVariant, type CircuitId, type SignerVariant } from './circuits';
 import { checkProofIssuer, type OidcRequestContext } from '@zkproofport-app/core';
 
 /**
@@ -73,6 +73,13 @@ export interface OffChainVerifyOptions {
    * scope and requestId. See core's `checkOidcPolicy`.
    */
   request?: OidcRequestContext;
+  /**
+   * Which of the circuit's packages made the proof, as its result says. Omitted
+   * means `standard`; a proof with another package's length is then refused.
+   * Selects whose verification key is fetched (ignored when `verificationKey`
+   * is given).
+   */
+  signerVariant?: string;
 }
 
 /**
@@ -155,18 +162,14 @@ function normalisePublicInputs(publicInputs: string[]): string[] {
  */
 async function fetchVerificationKey(
   circuit: CircuitId,
+  variant: SignerVariant,
   timeoutMs: number
 ): Promise<Uint8Array> {
-  const cached = vkCache.get(circuit);
+  const cacheKey = `${circuit}/${variant}`;
+  const cached = vkCache.get(cacheKey);
   if (cached && Date.now() - cached.at < VK_CACHE_TTL_MS) return cached.vk;
 
-  const vkPath = CIRCUIT_VK_PATHS[circuit];
-  if (!vkPath) {
-    throw new Error(
-      `No verification key path for circuit '${circuit}'. ` +
-        `Add it to CIRCUIT_VK_PATHS, or pass verificationKey directly.`
-    );
-  }
+  const vkPath = getCircuitPackage(circuit, variant).vkPath;
 
   const url = `${CIRCUITS_VK_BASE}/${vkPath}`;
   const controller = new AbortController();
@@ -186,7 +189,7 @@ async function fetchVerificationKey(
           `The path is probably wrong and something else was served.`
       );
     }
-    vkCache.set(circuit, { vk, at: Date.now() });
+    vkCache.set(cacheKey, { vk, at: Date.now() });
     return vk;
   } finally {
     clearTimeout(timer);
@@ -231,6 +234,11 @@ export async function verifyProofOffChain(
 
   if (!isCircuitId(circuit)) {
     return { valid: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
+  }
+
+  const signer = resolveSignerVariant(circuit, options.signerVariant, proof);
+  if ('error' in signer) {
+    return { valid: false, error: signer.error };
   }
 
   // Before Barretenberg, and for the same reason as on-chain: a proof can be
@@ -284,7 +292,7 @@ export async function verifyProofOffChain(
     const fields = normalisePublicInputs(publicInputs);
 
     const vk =
-      options.verificationKey ?? (await fetchVerificationKey(circuit, timeoutMs));
+      options.verificationKey ?? (await fetchVerificationKey(circuit, signer.variant, timeoutMs));
 
     const barretenberg = await bb.Barretenberg.new({ threads: 1 });
     api = barretenberg;
