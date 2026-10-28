@@ -120,15 +120,19 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
  * key Android key attestation vouches for instead of an iPhone App Attest key
  * or the proving server's key. That signer alone is about 1.17M gates, so it is
  * a separate 2^21 circuit rather than a branch that would push every iPhone and
- * server proof from 2^20 to 2^21.
+ * server proof from 2^20 to 2^21. `android_factory` is the same for devices
+ * provisioned at the factory (launched with Android 12 or earlier): their key
+ * attestation chains to Google's RSA root, and a Play Integrity verdict is
+ * verified in the circuit. It is 2^21 as well, so a proof's length cannot tell
+ * `android` from `android_factory`: only the result's field can.
  *
  * The variant only selects among keys and verifiers this package pins; it never
  * names one. A wrong claim selects a verifier the proof does not verify against.
  */
-export type SignerVariant = 'standard' | 'android';
+export type SignerVariant = 'standard' | 'android' | 'android_factory';
 
 /** Every signer variant, `standard` first. */
-export const SIGNER_VARIANTS: readonly SignerVariant[] = Object.freeze(['standard', 'android'] as const);
+export const SIGNER_VARIANTS: readonly SignerVariant[] = Object.freeze(['standard', 'android', 'android_factory'] as const);
 
 /** One circuit package inside the `zkproofport/circuits` repository. */
 export interface CircuitPackage {
@@ -154,14 +158,15 @@ export interface CircuitPackage {
  *
  * `coinbase_attestation`'s `standard` package is still v1
  * (`coinbase-attestation`, 128 public inputs); its `android` package is the
- * Coinbase KYC v2 layout. This core judges coinbase_attestation by the v1
+ * Coinbase KYC v2 layout, and so is its `android_factory` package. This core judges coinbase_attestation by the v1
  * layout, so an android Coinbase proof is refused by its public input count
- * and has no pinned verifier until the release that adopts the v2 layout.
+ * and neither has a pinned verifier until the release that adopts the v2 layout.
  */
 const CIRCUIT_PACKAGE_ROWS = {
   coinbase_attestation: {
     standard: { packageDir: 'coinbase-attestation', vkPath: 'coinbase-attestation/target/vk/vk', deployScriptName: 'CoinbaseAttestation', logCircuitSize: 19 },
     android: { packageDir: 'coinbase-attestation-v2-android', vkPath: 'coinbase-attestation-v2-android/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2Android', logCircuitSize: 21 },
+    android_factory: { packageDir: 'coinbase-attestation-v2-android-factory', vkPath: 'coinbase-attestation-v2-android-factory/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2AndroidFactory', logCircuitSize: 21 },
   },
   coinbase_country_attestation: {
     standard: { packageDir: 'coinbase-country-attestation', vkPath: 'coinbase-country-attestation/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestation' },
@@ -169,6 +174,7 @@ const CIRCUIT_PACKAGE_ROWS = {
   oidc_domain_attestation: {
     standard: { packageDir: 'oidc-domain-attestation', vkPath: 'oidc-domain-attestation/target/vk/vk', deployScriptName: 'OidcDomainAttestation', logCircuitSize: 20 },
     android: { packageDir: 'oidc-domain-attestation-android', vkPath: 'oidc-domain-attestation-android/target/vk/vk', deployScriptName: 'OidcDomainAttestationAndroid', logCircuitSize: 21 },
+    android_factory: { packageDir: 'oidc-domain-attestation-android-factory', vkPath: 'oidc-domain-attestation-android-factory/target/vk/vk', deployScriptName: 'OidcDomainAttestationAndroidFactory', logCircuitSize: 21 },
   },
   giwa_attestation: {
     standard: { packageDir: 'giwa-attestation', vkPath: 'giwa-attestation/target/vk/vk', deployScriptName: 'GiwaAttestation' },
@@ -349,7 +355,10 @@ export function evmProofByteLength(logCircuitSize: number): number {
  * length: a newer app's proof whose field was dropped on the way (a relay or a
  * dApp that copies only the fields it knows) would otherwise reach the
  * standard verifier and fail with nothing saying why. A claimed variant whose
- * proof has another variant's length is refused for the same reason.
+ * proof has another variant's length is refused for the same reason. Packages
+ * of equal size (`android`, `android_factory`) cannot be told apart by length;
+ * between them only the claim decides, and the verifier then rejects a wrong
+ * one.
  *
  * Nothing the sender controls makes it throw: a variant arrives from the
  * proof's sender, so a bad one is an `{ error }`. It throws only if this
@@ -390,17 +399,15 @@ export function resolveSignerVariant(
     return evmProofByteLength(pkg.logCircuitSize);
   };
   const own = lengthOf(variant);
-  for (const other of known) {
-    if (other === variant) continue;
-    const otherLength = lengthOf(other);
-    if (bytes === otherLength && otherLength !== own) {
-      const said = claimed === undefined || claimed === null ? 'does not say which signer made it' : `says signerVariant '${variant}'`;
-      return {
-        error:
-          `This ${circuit} proof is ${bytes} bytes, the length of a '${other}' proof, but its result ${said}. ` +
-          `Refusing rather than checking it against the '${variant}' verifier. Pass the result's signerVariant through unchanged.`,
-      };
-    }
+  if (bytes === own) return { variant };
+  const matching = known.filter(other => other !== variant && lengthOf(other) === bytes);
+  if (matching.length > 0) {
+    const said = claimed === undefined || claimed === null ? 'does not say which signer made it' : `says signerVariant '${variant}'`;
+    return {
+      error:
+        `This ${circuit} proof is ${bytes} bytes, the length of a ${matching.map(v => `'${v}'`).join(' or ')} proof, but its result ${said}. ` +
+        `Refusing rather than checking it against the '${variant}' verifier. Pass the result's signerVariant through unchanged.`,
+    };
   }
   return { variant };
 }

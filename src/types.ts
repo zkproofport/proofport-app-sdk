@@ -308,8 +308,8 @@ export interface ProofResponse {
   /** Chain ID where verifier contract is deployed (provided by mobile app) */
   chainId?: number;
   /**
-   * Which of the circuit's packages made the proof (a `SignerVariant`,
-   * provided by mobile app). Pass the relay result's `signerVariant` through
+   * Which of the circuit's packages made the proof (a `SignerVariant`:
+   * `standard`, `android` or `android_factory`; provided by mobile app). Pass the relay result's `signerVariant` through
    * unchanged; a value the circuit has no package for is refused by name.
    * Omitted means `standard`; a proof whose length is another package's is
    * then refused.

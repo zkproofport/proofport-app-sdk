@@ -14,6 +14,7 @@ export const VERIFIER_BY_SCRIPT = Object.freeze({
   CoinbaseCountryAttestation: { circuit: 'coinbase_country_attestation', variant: 'standard' },
   OidcDomainAttestation: { circuit: 'oidc_domain_attestation', variant: 'standard' },
   OidcDomainAttestationAndroid: { circuit: 'oidc_domain_attestation', variant: 'android' },
+  OidcDomainAttestationAndroidFactory: { circuit: 'oidc_domain_attestation', variant: 'android_factory' },
   GiwaAttestation: { circuit: 'giwa_attestation', variant: 'standard' },
   DojangPlayground: { circuit: 'dojang_playground', variant: 'standard' },
   MdlKrOwnership: { circuit: 'mdl_kr_ownership', variant: 'standard' },
@@ -38,5 +39,8 @@ export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifier
  *                                 CoinbaseAttestationV2 in that release. This
  *                                 core reads coinbase_attestation as v1 (128
  *                                 public inputs), which refuses every v2 proof.
+ *   CoinbaseAttestationV2AndroidFactory  the factory-provisioned Android
+ *                                 signer's package of the same layout; same
+ *                                 reason.
  */
-export const NOT_PINNED_HERE = new Set(['CoinbaseAppAttestPoc', 'CoinbaseAttestationV2', 'CoinbaseAttestationV2Android']);
+export const NOT_PINNED_HERE = new Set(['CoinbaseAppAttestPoc', 'CoinbaseAttestationV2', 'CoinbaseAttestationV2Android', 'CoinbaseAttestationV2AndroidFactory']);

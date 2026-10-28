@@ -503,8 +503,13 @@ const result = await verifyProofOnChain('coinbase_attestation', parsed, provider
 `oidc_domain_attestation` and `coinbase_attestation` are also proved by an
 Android-signer package (`oidc-domain-attestation-android`,
 `coinbase-attestation-v2-android`): same public inputs, a 2^21 circuit instead
-of 2^20, its own verification key and verifier. `SignerVariant` is
-`'standard' | 'android'`; `CIRCUIT_PACKAGES[circuit][variant]` gives
+of 2^20, its own verification key and verifier. A third package per circuit,
+`android_factory` (`oidc-domain-attestation-android-factory`,
+`coinbase-attestation-v2-android-factory`), serves factory-provisioned devices
+(Google RSA root plus a Play Integrity verdict verified in-circuit); it is also
+2^21, so length cannot tell it from `android` and only the result's field
+decides between them. `SignerVariant` is
+`'standard' | 'android' | 'android_factory'`; `CIRCUIT_PACKAGES[circuit][variant]` gives
 `{ packageDir, vkPath, deployScriptName, logCircuitSize? }`, and
 `getCircuitPackage(circuit, variant)` throws naming the circuit and its
 variants for anything else. `CIRCUIT_VK_PATHS` is the standard package's key.
@@ -540,7 +545,8 @@ node scripts/generate-pinned-verifiers.mjs --check  # exit 1 on drift
 have one. The generator maps `Deploy<Name>*.s.sol` to (circuit, variant) through
 `scripts/pinned-verifier-scripts.mjs`; `Deploy*Android` scripts fill
 `PINNED_VARIANT_VERIFIERS` and an android package with nothing deployed is an
-empty row. `CoinbaseAttestationV2Android` is not pinned here, with
+empty row. `CoinbaseAttestationV2Android` and
+`CoinbaseAttestationV2AndroidFactory` are not pinned here, with
 `CoinbaseAttestationV2`: this core reads coinbase_attestation as v1. The SDK picks the chain per environment from `VERIFICATION_CHAINS`
 (`src/constants.ts`, mirroring the app's `CIRCUIT_NETWORKS`): production uses
 Base 8453 for Coinbase/Country/OIDC, GIWA Sepolia 91342 for GIWA/Dojang, Base

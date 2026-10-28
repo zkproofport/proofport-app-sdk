@@ -62,4 +62,7 @@ export const PINNED_VARIANT_VERIFIERS: Readonly<Record<Exclude<SignerVariant, 's
   android: Object.freeze({
     oidc_domain_attestation: Object.freeze({}),
   }),
+  android_factory: Object.freeze({
+    oidc_domain_attestation: Object.freeze({}),
+  }),
 });

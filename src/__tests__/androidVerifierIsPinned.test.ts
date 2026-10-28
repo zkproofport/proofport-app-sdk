@@ -10,6 +10,7 @@ import { ethers } from 'ethers';
 import { makeRsaKey, oidcPublicInputs, serveJwks, GOOGLE_JWKS_URL } from './helpers/oidcFixtures';
 
 const ANDROID_84532 = '0x00000000000000000000000000000000000a0d01';
+const FACTORY_84532 = '0x00000000000000000000000000000000000fac01';
 
 vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
   const actual = await importOriginal<typeof import('../../packages/core/src/pinnedVerifiers.generated')>();
@@ -19,6 +20,11 @@ vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOrigina
       android: {
         oidc_domain_attestation: {
           84532: { address: ANDROID_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' },
+        },
+      },
+      android_factory: {
+        oidc_domain_attestation: {
+          84532: { address: FACTORY_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/84532/run-latest.json' },
         },
       },
     },
@@ -58,6 +64,25 @@ describe('with an android row pinned', () => {
     const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
     expect(r).toEqual({ valid: true });
     expect(called()).toEqual([ANDROID_84532]);
+  });
+
+  it('an android_factory proof of the same length is judged by the factory contract', async () => {
+    expect(getPinnedVariantVerifier('oidc_domain_attestation', 'android_factory', 84532).address).toBe(FACTORY_84532);
+    const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, undefined, { signerVariant: 'android_factory' });
+    expect(r).toEqual({ valid: true });
+    expect(called()).toEqual([FACTORY_84532]);
+  });
+
+  it('a response naming the android contract for an android_factory proof is refused', async () => {
+    const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, { verifierAddress: ANDROID_84532 }, { signerVariant: 'android_factory' });
+    expect(r).toEqual({ valid: false, error: expect.stringMatching(/Refusing rather than trusting the response/) });
+    expect(Contract).not.toHaveBeenCalled();
+  });
+
+  it('an unknown variant still ends at an error naming it', async () => {
+    const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, undefined, { signerVariant: 'android_factory_v2' });
+    expect(r).toEqual({ valid: false, error: expect.stringContaining('has no "android_factory_v2" signer variant. Known for oidc_domain_attestation: standard, android, android_factory.') });
+    expect(Contract).not.toHaveBeenCalled();
   });
 
   it('a standard proof without the field is judged by the standard contract', async () => {

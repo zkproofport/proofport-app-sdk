@@ -21,6 +21,9 @@
  *              claim finds no pinned verifier in this table and says so; a
  *              configured verifier refuses an android proof; off-chain fetches
  *              the android package's key; the callback URL keeps the field.
+ *   factory    android_factory shares android's 2^21 length: the field alone
+ *              decides between them, a missing field with that length is
+ *              refused, and each has its own key and pinned row.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ethers } from 'ethers';
@@ -76,12 +79,15 @@ afterEach(() => {
 });
 
 describe('the package table', () => {
-  it('every circuit has a standard package; only OIDC and Coinbase KYC have an android one', () => {
+  it('every circuit has a standard package; only OIDC and Coinbase KYC have the two android ones', () => {
     for (const id of ALL_CIRCUIT_IDS) expect(signerVariantsOf(id)[0]).toBe('standard');
-    expect(ALL_CIRCUIT_IDS.filter(id => signerVariantsOf(id).includes('android'))).toEqual([
-      'coinbase_attestation',
-      'oidc_domain_attestation',
-    ]);
+    for (const variant of ['android', 'android_factory'] as const) {
+      expect(ALL_CIRCUIT_IDS.filter(id => signerVariantsOf(id).includes(variant)), variant).toEqual([
+        'coinbase_attestation',
+        'oidc_domain_attestation',
+      ]);
+    }
+    expect(signerVariantsOf('oidc_domain_attestation')).toEqual(['standard', 'android', 'android_factory']);
   });
 
   it('names the android packages the circuits repository builds and deploys', () => {
@@ -97,6 +103,18 @@ describe('the package table', () => {
       deployScriptName: 'CoinbaseAttestationV2Android',
       logCircuitSize: 21,
     });
+    expect(getCircuitPackage('oidc_domain_attestation', 'android_factory')).toEqual({
+      packageDir: 'oidc-domain-attestation-android-factory',
+      vkPath: 'oidc-domain-attestation-android-factory/target/vk/vk',
+      deployScriptName: 'OidcDomainAttestationAndroidFactory',
+      logCircuitSize: 21,
+    });
+    expect(getCircuitPackage('coinbase_attestation', 'android_factory')).toEqual({
+      packageDir: 'coinbase-attestation-v2-android-factory',
+      vkPath: 'coinbase-attestation-v2-android-factory/target/vk/vk',
+      deployScriptName: 'CoinbaseAttestationV2AndroidFactory',
+      logCircuitSize: 21,
+    });
   });
 
   it('CIRCUIT_VK_PATHS is the standard package key path, for every circuit', () => {
@@ -104,13 +122,17 @@ describe('the package table', () => {
     expect(CIRCUIT_VK_PATHS.oidc_domain_attestation).toBe('oidc-domain-attestation/target/vk/vk');
   });
 
-  it('every package of a multi-package circuit has a size, so lengths can tell them apart', () => {
+  it('every package of a multi-package circuit has a size, and the standard length is no other package\'s', () => {
     for (const id of ALL_CIRCUIT_IDS) {
       const variants = signerVariantsOf(id);
       if (variants.length < 2) continue;
       const lengths = variants.map(v => evmProofByteLength(getCircuitPackage(id, v).logCircuitSize!));
-      expect(new Set(lengths).size, id).toBe(variants.length);
+      expect(lengths.slice(1), id).not.toContain(lengths[0]);
     }
+    // Equal sizes, so only the result's field can tell these two apart.
+    expect(getCircuitPackage('oidc_domain_attestation', 'android').logCircuitSize).toBe(
+      getCircuitPackage('oidc_domain_attestation', 'android_factory').logCircuitSize,
+    );
   });
 
   it('is frozen', () => {
@@ -136,9 +158,11 @@ describe('the package table', () => {
     }
   });
 
-  it('the Coinbase KYC android package waits for the release that reads the v2 layout', () => {
+  it('the Coinbase KYC android packages wait for the release that reads the v2 layout', () => {
     expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2Android')).toBe(true);
+    expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2AndroidFactory')).toBe(true);
     expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation).toBeUndefined();
+    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation).toBeUndefined();
   });
 });
 
@@ -151,7 +175,7 @@ describe('lookups end at an error naming the key', () => {
 
   it.each([['ios'], [''], ['Android'], [' android'], ['__proto__'], ['constructor']])('unknown variant %j', variant => {
     expect(() => getCircuitPackage('oidc_domain_attestation', variant)).toThrow(
-      `Circuit 'oidc_domain_attestation' has no '${variant}' signer variant. Known for oidc_domain_attestation: standard, android.`,
+      `Circuit 'oidc_domain_attestation' has no '${variant}' signer variant. Known for oidc_domain_attestation: standard, android, android_factory.`,
     );
     expect(() => getPinnedVariantVerifier('oidc_domain_attestation', variant, 84532)).toThrow(/has no .* signer variant/);
   });
@@ -163,7 +187,9 @@ describe('lookups end at an error naming the key', () => {
   });
 
   it('isSignerVariant', () => {
-    expect(SIGNER_VARIANTS).toEqual(['standard', 'android']);
+    expect(SIGNER_VARIANTS).toEqual(['standard', 'android', 'android_factory']);
+    expect(isSignerVariant('android_factory')).toBe(true);
+    expect(isSignerVariant('android-factory')).toBe(false);
     expect(isSignerVariant('android')).toBe(true);
     for (const v of ['ANDROID', '', null, undefined, 1, {}]) expect(isSignerVariant(v)).toBe(false);
   });
@@ -210,6 +236,7 @@ describe('resolveSignerVariant', () => {
     ['standard claim, standard length', 'standard', STANDARD_OIDC, 'standard'],
     ['android claim, android length', 'android', ANDROID, 'android'],
     ['android claim, a third length', 'android', 64, 'android'],
+    ['android_factory claim, the shared 2^21 length', 'android_factory', ANDROID, 'android_factory'],
   ])('oidc: %s', (_name, claimed, bytes, variant) => {
     expect(resolveSignerVariant('oidc_domain_attestation', claimed, proofOf(bytes))).toEqual({ variant });
   });
@@ -218,7 +245,7 @@ describe('resolveSignerVariant', () => {
     const r = resolveSignerVariant('oidc_domain_attestation', undefined, proofOf(ANDROID));
     expect(r).toEqual({
       error:
-        "This oidc_domain_attestation proof is 10688 bytes, the length of a 'android' proof, but its result does not say which signer made it. " +
+        "This oidc_domain_attestation proof is 10688 bytes, the length of a 'android' or 'android_factory' proof, but its result does not say which signer made it. " +
         "Refusing rather than checking it against the 'standard' verifier. Pass the result's signerVariant through unchanged.",
     });
   });
@@ -226,6 +253,18 @@ describe('resolveSignerVariant', () => {
   it('an android claim with the standard length is refused', () => {
     const r = resolveSignerVariant('oidc_domain_attestation', 'android', proofOf(STANDARD_OIDC));
     expect(r).toEqual({ error: expect.stringMatching(/is 10304 bytes, the length of a 'standard' proof, but its result says signerVariant 'android'/) });
+  });
+
+  it('an android_factory claim with the standard length is refused', () => {
+    const r = resolveSignerVariant('oidc_domain_attestation', 'android_factory', proofOf(STANDARD_OIDC));
+    expect(r).toEqual({ error: expect.stringMatching(/the length of a 'standard' proof, but its result says signerVariant 'android_factory'/) });
+    expect('error' in resolveSignerVariant('coinbase_attestation', 'android_factory', proofOf(STANDARD_KYC))).toBe(true);
+  });
+
+  it('android and android_factory share a length: the claim decides, the length does not object', () => {
+    expect(resolveSignerVariant('oidc_domain_attestation', 'android', proofOf(ANDROID))).toEqual({ variant: 'android' });
+    expect(resolveSignerVariant('oidc_domain_attestation', 'android_factory', proofOf(ANDROID))).toEqual({ variant: 'android_factory' });
+    expect('error' in resolveSignerVariant('coinbase_attestation', undefined, proofOf(ANDROID))).toBe(true);
   });
 
   it('a standard claim with the android length is refused', () => {
@@ -250,7 +289,7 @@ describe('resolveSignerVariant', () => {
 
   it.each([['ios'], [''], ['Android'], [42], [true], [{}], [['android']]])('refuses the claim %j by name', claimed => {
     const r = resolveSignerVariant('oidc_domain_attestation', claimed, proofOf(STANDARD_OIDC));
-    expect(r).toEqual({ error: `Circuit 'oidc_domain_attestation' has no ${JSON.stringify(claimed)} signer variant. Known for oidc_domain_attestation: standard, android.` });
+    expect(r).toEqual({ error: `Circuit 'oidc_domain_attestation' has no ${JSON.stringify(claimed)} signer variant. Known for oidc_domain_attestation: standard, android, android_factory.` });
   });
 
   it('refuses an android claim for a circuit without that package', () => {
@@ -358,6 +397,11 @@ describe('every verify path applies it before anything else runs', () => {
     expect(urls).toEqual(['https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2-android/target/vk/vk']);
     await verifyProofOffChain('coinbase_attestation', proofOf(STANDARD_KYC), kyc);
     expect(urls[1]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation/target/vk/vk');
+    // Same length as android; the field alone picks the factory package's key,
+    // cached apart from the android one.
+    await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { signerVariant: 'android_factory' });
+    expect(urls[2]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2-android-factory/target/vk/vk');
+    expect(urls).toHaveLength(3);
   });
 
   it('SDK verifyResponseOffChain passes the response field through', async () => {
@@ -373,6 +417,7 @@ describe('the callback URL', () => {
 
   it('keeps signerVariant', () => {
     expect(parseProofResponseUrl(`${base}&signerVariant=android`)?.signerVariant).toBe('android');
+    expect(parseProofResponseUrl(`${base}&signerVariant=android_factory`)?.signerVariant).toBe('android_factory');
   });
 
   it('keeps an unknown value as sent, for verification to refuse by name', () => {
