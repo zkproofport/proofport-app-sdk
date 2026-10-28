@@ -70,6 +70,14 @@ const CIRCUIT_BY_SCRIPT = {
 };
 // Deployed by these scripts, and not proof verifiers.
 const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifierRegistry', 'TranscriptLib']);
+// Verifiers this core version deliberately does not pin, each with its reason.
+// Named one by one so a new deploy script still stops the script.
+//   CoinbaseAppAttestPoc    the Coinbase KYC v2 prototype (circuits 33344e2);
+//                           no shipped circuit uses it.
+//   CoinbaseAttestationV2   Coinbase KYC v2 has its own public-input layout;
+//                           core pins it in the core v2 release (circuits-dev.md
+//                           fix list item 9), not as a v1 coinbase_attestation row.
+const NOT_PINNED_HERE = new Set(['CoinbaseAppAttestPoc', 'CoinbaseAttestationV2']);
 
 // Exhaustive over core's circuit ids, read from its source so the two agree.
 const circuitsSource = readFileSync(join(sdkRoot, 'packages/core/src/circuits.ts'), 'utf8');
@@ -87,7 +95,7 @@ for (const path of files) {
   const m = path.match(broadcastRe);
   if (!m) continue;
   const [, name, chain] = m;
-  if (NOT_VERIFIERS.has(name)) continue;
+  if (NOT_VERIFIERS.has(name) || NOT_PINNED_HERE.has(name)) continue;
   const circuit = CIRCUIT_BY_SCRIPT[name];
   if (!circuit) throw new Error(`${path}: deploy script '${name}' is not mapped to a circuit id. Add it to CIRCUIT_BY_SCRIPT or NOT_VERIFIERS.`);
 
@@ -118,7 +126,7 @@ for (const path of files) {
 // A deployments/ record with no broadcast behind it cannot be checked.
 for (const path of files) {
   const m = path.match(/^deployments\/(\d+)\/([A-Za-z0-9]+)\.json$/);
-  if (!m || NOT_VERIFIERS.has(m[2]) || m[2] === 'ZKTranscriptLib') continue;
+  if (!m || NOT_VERIFIERS.has(m[2]) || NOT_PINNED_HERE.has(m[2]) || m[2] === 'ZKTranscriptLib') continue;
   const circuit = CIRCUIT_BY_SCRIPT[m[2]];
   if (!circuit) throw new Error(`${path}: '${m[2]}' is not mapped to a circuit id.`);
   if (!table[circuit][m[1]]) throw new Error(`${path} has no broadcast record at broadcast/Deploy${m[2]}.s.sol/${m[1]}/run-latest.json`);
