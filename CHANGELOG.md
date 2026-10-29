@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0-beta.4](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.3...v0.5.0-beta.4) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** remove the Korean mobile ID circuits
+
+### Features
+
+* **core:** add the android_factory signer variant ([1ff194a](https://github.com/zkproofport/proofport-app-sdk/commit/1ff194ae5f8a3fc75417c86eff278e7518761cb1))
+* **core:** keep a dropped provider key for 1 hour, not 24 ([a5c2df1](https://github.com/zkproofport/proofport-app-sdk/commit/a5c2df163cd86c72ac6065aae5acd91f17564ef0))
+* **core:** pin the OIDC provider-key statement verifiers on the testnets ([304ccac](https://github.com/zkproofport/proofport-app-sdk/commit/304ccac23a6a63dcee0ed66b1715a14d9cb8a509))
+* **core:** remove the Korean mobile ID circuits ([0f62c6f](https://github.com/zkproofport/proofport-app-sdk/commit/0f62c6fd4a04c7384323d8f0975a84f1a9578f51))
+* **core:** verify android-signer proofs by signer variant ([2610f1f](https://github.com/zkproofport/proofport-app-sdk/commit/2610f1feda9d1935a417c4f2fb05ef588af1ea4f))
+* **sdk:** wait 600 s by default for a relay answer ([d6a7f85](https://github.com/zkproofport/proofport-app-sdk/commit/d6a7f855616988257aa8a5b293d3d47039a696ac))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.3.0 to 0.4.0-beta.0
+
 ## [0.5.0-beta.3](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.2...v0.5.0-beta.3) (2026-10-27)
 
 
