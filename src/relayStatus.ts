@@ -15,3 +15,15 @@ void everyStatusListed;
 export function isTerminalRelayStatus(status: string): status is RelayTerminalStatus {
   return (RELAY_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
+
+/**
+ * How long `waitForProof()` / `waitForResult()` wait when the caller passes no
+ * `timeoutMs`: 600 000 ms (10 min).
+ *
+ * The relay answers `expired` itself at 540 s, so with this default a dApp
+ * always gets a terminal status to branch on rather than its own timeout. A
+ * heavy proof on an older phone takes a few minutes after the user confirms;
+ * the earlier 300 000 ms default could fire while such a proof was still being
+ * made.
+ */
+export const DEFAULT_RELAY_WAIT_MS = 600_000;

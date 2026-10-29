@@ -2372,7 +2372,7 @@
 
       try {
         const result = await sdk.waitForProof(requestId, {
-          timeoutMs: 300000,
+          timeoutMs: 600000,
           onStatusChange: (data) => {
             devLog('PROOF', `Status update: ${data.status}`);
           },

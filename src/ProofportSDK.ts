@@ -61,7 +61,7 @@ import {
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
 import { getPinnedVerifier, type VerifierTarget, type OidcRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
-import { isTerminalRelayStatus } from './relayStatus';
+import { DEFAULT_RELAY_WAIT_MS, isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
 
 
@@ -1509,7 +1509,7 @@ export class ProofportSDK {
    * @param requestId - The relay-issued request ID
    * @param options - Polling options
    * @param options.intervalMs - Polling interval in milliseconds (default: 2000)
-   * @param options.timeoutMs - Maximum polling time in milliseconds (default: 300000 = 5 min)
+   * @param options.timeoutMs - Maximum polling time in milliseconds (default: 600000 = 10 min, `DEFAULT_RELAY_WAIT_MS`)
    * @param options.onStatusChange - Callback when status changes
    * @returns Promise resolving to final RelayProofResult
    * @throws Error if timeout or relay error
@@ -1523,7 +1523,7 @@ export class ProofportSDK {
     } = {}
   ): Promise<RelayProofResult> {
     const interval = options.intervalMs || 2000;
-    const timeout = options.timeoutMs || 300000;
+    const timeout = options.timeoutMs || DEFAULT_RELAY_WAIT_MS;
     const startTime = Date.now();
     let lastStatus = '';
 
@@ -1658,7 +1658,7 @@ export class ProofportSDK {
    *
    * @param requestId - The relay-issued request ID
    * @param options - Configuration options
-   * @param options.timeoutMs - Maximum wait time in ms (default: 300000 = 5 min)
+   * @param options.timeoutMs - Maximum wait time in ms (default: 600000 = 10 min, `DEFAULT_RELAY_WAIT_MS`)
    * @param options.onStatusChange - Callback for status updates
    * @returns Promise resolving to final RelayProofResult
    */
@@ -1669,7 +1669,7 @@ export class ProofportSDK {
       onStatusChange?: (result: RelayProofResult | { requestId: string; status: string; deepLink?: string }) => void;
     } = {}
   ): Promise<RelayProofResult> {
-    const timeout = options.timeoutMs || 300000;
+    const timeout = options.timeoutMs || DEFAULT_RELAY_WAIT_MS;
 
     // Try Socket.IO first
     if (this.relayUrl) {

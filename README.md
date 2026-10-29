@@ -626,7 +626,7 @@ if (ProofportSDK.isMobile()) {
 
 ```typescript
 const result = await sdk.waitForProof(relay.requestId, {
-  timeoutMs: 300000, // 5 minutes (default)
+  timeoutMs: 600000, // 10 minutes (default)
   onStatusChange: (update) => {
     console.log('Status:', update.status);
   },
@@ -659,7 +659,7 @@ const once = await sdk.pollResult(relay.requestId);
 // Poll until terminal state
 const result = await sdk.waitForResult(relay.requestId, {
   intervalMs: 2000,
-  timeoutMs: 300000,
+  timeoutMs: 600000,
   onStatusChange: (result) => console.log(result.status),
 });
 ```
@@ -739,7 +739,7 @@ switch (result.status) {
 
 `isTerminalRelayStatus(status)` and `RELAY_TERMINAL_STATUSES` are exported for code that drives `pollResult()` in a loop of its own.
 
-The relay answers `'expired'` before the SDK's default `timeoutMs` (300 000 ms) runs out, so with the defaults you get a result to branch on rather than a thrown timeout. If you pass a much shorter `timeoutMs`, the SDK's own timeout can still fire first and the promise rejects.
+The relay answers `'expired'` before the SDK's default `timeoutMs` (600 000 ms) runs out, so with the defaults you get a result to branch on rather than a thrown timeout. If you pass a much shorter `timeoutMs`, the SDK's own timeout can still fire first and the promise rejects.
 
 #### What is not on the result
 

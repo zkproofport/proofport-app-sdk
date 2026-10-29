@@ -1578,7 +1578,7 @@
               document.getElementById('status-pending').innerHTML = `<span class="spinner"></span>Waiting for proof... (${result.status})`;
             }
           },
-          timeoutMs: 300000, // 5 minutes
+          timeoutMs: 600000, // 10 minutes
         });
 
         console.log('[startPolling] SDK returned result:', JSON.stringify(result, null, 2));
