@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0-beta.1](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.0...core-v0.4.0-beta.1) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** judge Coinbase KYC by the v2 layout and pin its verifiers
+
+### Features
+
+* **core:** judge Coinbase KYC by the v2 layout and pin its verifiers ([fae9d07](https://github.com/zkproofport/proofport-app-sdk/commit/fae9d07284bf5dd2dafff7b6d723a6ad3449940d)), closes [#34](https://github.com/zkproofport/proofport-app-sdk/issues/34)
+
 ## [0.4.0-beta.0](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.3.0...core-v0.4.0-beta.0) (2026-10-29)
 
 
