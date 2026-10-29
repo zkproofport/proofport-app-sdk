@@ -64,7 +64,7 @@ describe('the expected roots are the roots of the published signer lists', () =>
       if (hasRoot) expect(check, id).not.toBeNull();
     }
     expect(Object.entries(CIRCUIT_ISSUER_CHECKS).filter(([, c]) => c === null).map(([id]) => id).sort()).toEqual(
-      ['dojang_playground', 'mdl_kr_age', 'mdl_kr_ownership', 'mdl_kr_region'],
+      ['dojang_playground'],
     );
   });
 

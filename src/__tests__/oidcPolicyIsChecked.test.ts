@@ -377,7 +377,7 @@ describe('the SDK remembers the relay requests it created', () => {
 
   it('does not ask non-OIDC responses for a request', async () => {
     const sdk = ProofportSDK.create('staging');
-    const r = await sdk.verifyResponseOnChain({ ...resp([]), circuit: 'mdl_kr_age', publicInputs: Array(66).fill(field(0)) }, {});
+    const r = await sdk.verifyResponseOnChain({ ...resp([]), circuit: 'dojang_playground', publicInputs: Array(160).fill(field(0)) }, {});
     expect(r.error ?? '').not.toMatch(/request/);
   });
 

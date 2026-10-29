@@ -293,8 +293,8 @@ describe('resolveSignerVariant', () => {
   });
 
   it('refuses an android claim for a circuit without that package', () => {
-    expect(resolveSignerVariant('mdl_kr_age', 'android', proofOf(64))).toEqual({
-      error: `Circuit 'mdl_kr_age' has no "android" signer variant. Known for mdl_kr_age: standard.`,
+    expect(resolveSignerVariant('giwa_attestation', 'android', proofOf(64))).toEqual({
+      error: `Circuit 'giwa_attestation' has no "android" signer variant. Known for giwa_attestation: standard.`,
     });
   });
 

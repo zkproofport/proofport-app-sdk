@@ -372,10 +372,6 @@ const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number
   coinbase_country_attestation: { scope: [86, 117], nullifier: [118, 149] },
   // pubkey_modulus_limbs and the bounded domain sit before scope.
   oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
-  // The Korea mDL circuits open with the pair; signal_hash is commented out.
-  mdl_kr_ownership: { scope: [0, 31], nullifier: [32, 63] },
-  mdl_kr_age: { scope: [0, 31], nullifier: [32, 63] },
-  mdl_kr_region: { scope: [0, 31], nullifier: [32, 63] },
 });
 
 /**

@@ -107,9 +107,6 @@ Scope and nullifier offsets are core's `PUBLIC_INPUT_OFFSETS`
 | `oidc_domain_attestation` | 148 | pubkey_modulus_limbs 0-17 (RSA-2048 modulus as 18 x 120-bit limbs, least significant first), domain storage 18-81, domain length 82, scope 83-114, nullifier 115-146, provider 147 (0 Google, 1 Microsoft) |
 | `giwa_attestation` | 192 | signal_hash 0-31, domain_separator 32-63, action_hash 64-95, signer_list_merkle_root 96-127, scope 128-159, nullifier 160-191 |
 | `dojang_playground` | 160 | signal_hash 0-31, domain_separator 32-63, action_hash 64-95, scope 96-127, nullifier 128-159 |
-| `mdl_kr_ownership` | 97 | scope 0-31, nullifier 32-63, disclose_flags 64, owner_commit 65-96 |
-| `mdl_kr_age` | 66 | scope 0-31, nullifier 32-63, age_threshold 64, current_year 65 |
-| `mdl_kr_region` | 96 | scope 0-31, nullifier 32-63, region_code 64-95 |
 
 This section said Coinbase KYC had 2 public inputs and Country 14, with the
 Country nullifier at 192-223, until 2026-10-23; none of that was ever the
@@ -160,10 +157,6 @@ SDK's `verifyOnChain`, `verifyResponseOnChain`, `verifyResponseOffChain`:
 - `dojang_playground`: no issuer anchor among its public inputs. The faucet
   address and chain id are circuit constants, pinned by the verification key,
   and the issuance is self-signed by design.
-- `mdl_kr_*`: no issuer anchor at all. The circuits verify no issuer signature
-  (`cx_integrity_root` is commented out pending HS256 registration), so the
-  birth date, region and owner data are whatever the prover supplied. There is
-  nothing a verifier can compare; these circuits stay `planned`.
 
 **Country Codes:**
 
@@ -547,10 +540,13 @@ have one. The generator maps `Deploy<Name>*.s.sol` to (circuit, variant) through
 `PINNED_VARIANT_VERIFIERS` and an android package with nothing deployed is an
 empty row. `CoinbaseAttestationV2Android` and
 `CoinbaseAttestationV2AndroidFactory` are not pinned here, with
-`CoinbaseAttestationV2`: this core reads coinbase_attestation as v1. The SDK picks the chain per environment from `VERIFICATION_CHAINS`
+`CoinbaseAttestationV2`: this core reads coinbase_attestation as v1. The three
+`Deploy*` scripts for circuits outside ZKProofport that the circuits repository
+still records are skipped by name in `NOT_PINNED_HERE` and have no circuit id
+in core. The SDK picks the chain per environment from `VERIFICATION_CHAINS`
 (`src/constants.ts`, mirroring the app's `CIRCUIT_NETWORKS`): production uses
-Base 8453 for Coinbase/Country/OIDC, GIWA Sepolia 91342 for GIWA/Dojang, Base
-Sepolia 84532 for Korea Mobile ID; staging/local use 84532 and 91342. An SDK
+Base 8453 for Coinbase/Country/OIDC, GIWA Sepolia 91342 for GIWA/Dojang;
+staging/local use 84532 and 91342. An SDK
 built with `new ProofportSDK(config)` must name one -- `environment: 'local'`
 next to a custom `relayUrl`, as the demo pages do for a LAN relay -- or
 configure verifiers; with neither, verification fails ("No verifier chosen").
@@ -561,7 +557,7 @@ Sepolia and GIWA Sepolia hold the beta.19 verifiers deployed 2026-10-22. The
 Base 8453 and Ethereum 1 entries were deployed 2026-03-05 to 2026-04-17 and are
 still the beta.8 verifiers (circuits-dev.md), so a proof from the beta.19
 toolchain will not verify there until they are redeployed. No mainnet verifier
-exists for GIWA, Dojang or Korea Mobile ID.
+exists for GIWA or Dojang.
 
 #### `getVerifierContract(providerOrSigner: Provider | Signer, verifier: VerifierContract): ethers.Contract`
 
@@ -634,7 +630,6 @@ inputs are too short. Throws on a missing or unknown circuit id.
 | `giwa_attestation` | 160–191 |
 | `coinbase_country_attestation` | 118–149 |
 | `oidc_domain_attestation` | 115–146 |
-| `mdl_kr_ownership` / `mdl_kr_age` / `mdl_kr_region` | 32–63 |
 
 GIWA's are 64 fields further along because `domain_separator` and
 `action_hash` sit between `signal_hash` and the Merkle root. Read under
@@ -670,7 +665,6 @@ are too short. Throws on a missing or unknown circuit id.
 | `giwa_attestation` | 128–159 |
 | `coinbase_country_attestation` | 86–117 |
 | `oidc_domain_attestation` | 83–114 |
-| `mdl_kr_ownership` / `mdl_kr_age` / `mdl_kr_region` | 0–31 |
 
 #### `isNullifierRegistered(nullifier: string, registryAddress: string, provider: Provider): Promise<boolean>`
 

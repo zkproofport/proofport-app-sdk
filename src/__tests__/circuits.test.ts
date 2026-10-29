@@ -33,9 +33,6 @@ const NARGO_CIRCUIT_NAMES = [
   'oidc_domain_attestation',
   'giwa_attestation',
   'dojang_playground',
-  'mdl_kr_ownership',
-  'mdl_kr_age',
-  'mdl_kr_region',
 ];
 
 /** Hyphenated route / directory names from other repos. Never circuit IDs. */
@@ -45,9 +42,6 @@ const FORBIDDEN_ALIASES = [
   'coinbase_kyc',
   'CoinbaseKyc',
   'giwa-kyc',
-  'mdl-kr-ownership',
-  'mdl-kr-age',
-  'mdl-kr-region',
   'oidc-domain-attestation',
 ];
 
@@ -149,12 +143,8 @@ describe('circuit support status', () => {
     expect(Object.keys(CIRCUIT_METADATA)).not.toContain('arc_eligibility');
   });
 
-  it('marks the three mDL circuits as planned', () => {
-    expect([...PLANNED_CIRCUIT_IDS]).toEqual([
-      'mdl_kr_ownership',
-      'mdl_kr_age',
-      'mdl_kr_region',
-    ]);
+  it('has no planned circuit today', () => {
+    expect([...PLANNED_CIRCUIT_IDS]).toEqual([]);
   });
 
   it('partitions every circuit into exactly one of the three buckets', () => {

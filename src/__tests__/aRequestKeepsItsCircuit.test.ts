@@ -1,6 +1,6 @@
 /**
- * createProofRequest used to send every circuit that was not country or Korea
- * Mobile ID to the Coinbase KYC builder, which wrote the literal
+ * createProofRequest used to send every circuit that was not the country
+ * circuit to the Coinbase KYC builder, which wrote the literal
  * 'coinbase_attestation' into the request: a GIWA, Dojang or OIDC request
  * became a Coinbase KYC request without a word.
  */
@@ -17,9 +17,6 @@ const INPUTS: Record<string, Record<string, unknown>> = {
   oidc_domain_attestation: { scope: 'myapp.com', domain: 'example.com' },
   giwa_attestation: { scope: 'myapp.com' },
   dojang_playground: { scope: 'myapp.com' },
-  mdl_kr_ownership: { scope: 'myapp.com', expectedOwnerName: '홍길동', disclose: { name: true } },
-  mdl_kr_age: { scope: 'myapp.com', ageThreshold: 19 },
-  mdl_kr_region: { scope: 'myapp.com', targetRegion: '11' },
 };
 
 describe('a request keeps the circuit it was asked for', () => {

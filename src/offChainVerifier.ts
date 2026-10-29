@@ -19,7 +19,7 @@
  *   The version. `@aztec/bb.js` must be the WASM build of the same bb the
  *   circuits are compiled with -- `BB_VERSION` in circuits/toolchain.env,
  *   4.2.0-aztecnr-rc.2 since the beta.19 toolchain. Versions are not
- *   interchangeable: on the Korea Mobile ID age circuit the 2025 nightly wrote
+ *   interchangeable: on one of our circuits the 2025 nightly wrote
  *   a 16256-byte proof where bb 1.2.0 wrote 16224 for the identical circuit and
  *   witness, with the SAME verification key, so the key cannot warn you. A
  *   mismatch shows up only as verification failing.

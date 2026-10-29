@@ -84,9 +84,6 @@ describe('ProofportSDK - Utility Methods', () => {
       'oidc_domain_attestation',
       'giwa_attestation',
       'dojang_playground',
-      'mdl_kr_ownership',
-      'mdl_kr_age',
-      'mdl_kr_region',
     ]);
   });
 });

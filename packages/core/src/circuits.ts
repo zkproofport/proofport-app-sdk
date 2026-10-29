@@ -18,7 +18,7 @@
  *
  * Each ID is the circuit's `name` in its `Nargo.toml`, verbatim. The format is
  * lowercase with underscores. Hyphenated spellings (`coinbase-kyc`,
- * `mdl-kr-age`) are directory or UI route names in other repositories — they
+ * `oidc-domain`) are directory or UI route names in other repositories — they
  * are **not** circuit IDs, and passing one produces a nullifier mismatch or a
  * failed on-chain lookup rather than a clear error.
  */
@@ -59,12 +59,6 @@ export const CIRCUIT_IDS = Object.freeze({
   GIWA_ATTESTATION: 'giwa_attestation',
   /** Dojang Playground on GIWA Sepolia. Experimental — testnet only. */
   DOJANG_PLAYGROUND: 'dojang_playground',
-  /** Korea Mobile ID ownership. Planned — not officially supported yet. */
-  MDL_KR_OWNERSHIP: 'mdl_kr_ownership',
-  /** Korea Mobile ID age threshold. Planned — not officially supported yet. */
-  MDL_KR_AGE: 'mdl_kr_age',
-  /** Korea Mobile ID si/do region. Planned — not officially supported yet. */
-  MDL_KR_REGION: 'mdl_kr_region',
 } as const);
 
 /**
@@ -87,7 +81,7 @@ export type CircuitId = (typeof CIRCUIT_IDS)[keyof typeof CIRCUIT_IDS];
  * import { CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circuits';
  *
  * CIRCUIT_SUPPORT_STATUS.coinbase_attestation; // 'supported'
- * CIRCUIT_SUPPORT_STATUS.mdl_kr_age;           // 'planned'
+ * CIRCUIT_SUPPORT_STATUS.giwa_attestation;     // 'experimental'
  * ```
  */
 export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportStatus>> =
@@ -103,9 +97,6 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     // Same footing as GIWA: built, verifier deployed on GIWA Sepolia, a real
     // proof verifies there. Testnet only.
     dojang_playground: 'experimental',
-    mdl_kr_ownership: 'planned',
-    mdl_kr_age: 'planned',
-    mdl_kr_region: 'planned',
   } as const);
 
 /**
@@ -182,15 +173,6 @@ const CIRCUIT_PACKAGE_ROWS = {
   dojang_playground: {
     standard: { packageDir: 'dojang-playground', vkPath: 'dojang-playground/target/vk/vk', deployScriptName: 'DojangPlayground' },
   },
-  mdl_kr_ownership: {
-    standard: { packageDir: 'mdl/kr-ownership', vkPath: 'mdl/kr-ownership/target/vk/vk', deployScriptName: 'MdlKrOwnership' },
-  },
-  mdl_kr_age: {
-    standard: { packageDir: 'mdl/kr-age', vkPath: 'mdl/kr-age/target/vk/vk', deployScriptName: 'MdlKrAge' },
-  },
-  mdl_kr_region: {
-    standard: { packageDir: 'mdl/kr-region', vkPath: 'mdl/kr-region/target/vk/vk', deployScriptName: 'MdlKrRegion' },
-  },
 } satisfies Record<CircuitId, { readonly standard: CircuitPackage } & Partial<Record<SignerVariant, CircuitPackage>>>;
 
 // Frozen after the check, not inside it: `satisfies` on Object.freeze's result
@@ -254,12 +236,6 @@ export const SUPPORTED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
 );
 
 /**
- * Circuits whose identifiers are reserved but which are not officially
- * supported yet: GIWA attestation and the three Korea Mobile ID circuits.
- *
- * Derived from {@link CIRCUIT_SUPPORT_STATUS}, so it cannot fall out of sync.
- */
-/**
  * Circuits you can prove today, on a testnet, with everything subject to change.
  *
  * `giwa_attestation` is in this state. Calling it `planned` would be wrong —
@@ -272,6 +248,12 @@ export const EXPERIMENTAL_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
   ALL_CIRCUIT_IDS.filter(id => CIRCUIT_SUPPORT_STATUS[id] === 'experimental'),
 );
 
+/**
+ * Circuits whose identifiers are reserved but which are not officially
+ * supported yet.
+ *
+ * Derived from {@link CIRCUIT_SUPPORT_STATUS}, so it cannot fall out of sync.
+ */
 export const PLANNED_CIRCUIT_IDS: readonly CircuitId[] = Object.freeze(
   ALL_CIRCUIT_IDS.filter((id) => CIRCUIT_SUPPORT_STATUS[id] === 'planned')
 );
@@ -419,7 +401,7 @@ export function resolveSignerVariant(
  * @example
  * ```typescript
  * isSupportedCircuitId('oidc_domain_attestation'); // true
- * isSupportedCircuitId('mdl_kr_age');              // false — planned
+ * isSupportedCircuitId('giwa_attestation');        // false — experimental
  * ```
  */
 export function isSupportedCircuitId(value: unknown): value is CircuitId {
@@ -434,7 +416,7 @@ export function isSupportedCircuitId(value: unknown): value is CircuitId {
  *
  * @example
  * ```typescript
- * getCircuitSupportStatus('giwa_attestation'); // 'planned'
+ * getCircuitSupportStatus('giwa_attestation'); // 'experimental'
  * ```
  */
 export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatus {
@@ -489,9 +471,6 @@ export const CIRCUIT_ACTION_BINDING = {
   giwa_attestation: 'optional',
   // Same branch as GIWA; see dojang-playground/src/main.nr.
   dojang_playground: 'optional',
-  mdl_kr_ownership: 'none',
-  mdl_kr_age: 'none',
-  mdl_kr_region: 'none',
 } satisfies Record<CircuitId, CircuitActionBinding>;
 
 /*
@@ -525,10 +504,6 @@ export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   coinbase_country_attestation: true,
   // The signature is inside the OIDC identity token, checked by the prover.
   oidc_domain_attestation: false,
-  // Web2 (OmniOne CX) flows with no wallet binding at all.
-  mdl_kr_ownership: false,
-  mdl_kr_age: false,
-  mdl_kr_region: false,
   // A GIWA-attested wallet signing an EIP-712 action (or its signal hash).
   // This read `false` while the circuit had always verified a wallet signature
   // -- it sat under the Web2 comment above and was never revisited. A request

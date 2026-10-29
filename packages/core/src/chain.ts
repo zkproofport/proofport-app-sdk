@@ -115,37 +115,6 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
 } as const;
 
 /**
- * Korea Mobile ID (mDL) circuit public input layout (field offsets).
- * All three mDL circuits share the same prefix: scope [0..31] and
- * nullifier_value [32..63], each stored one byte per field element.
- * The suffix differs per predicate circuit:
- * - mdl_kr_ownership (97 inputs): disclose_flags [64], owner_commit [65..96]
- * - mdl_kr_age (66 inputs): age_threshold [64], current_year [65]
- * - mdl_kr_region (96 inputs): region_code [64..95]
- *
- * @example
- * ```typescript
- * const nullifier = publicInputs.slice(
- *   MDL_KR_PUBLIC_INPUT_LAYOUT.NULLIFIER_START,
- *   MDL_KR_PUBLIC_INPUT_LAYOUT.NULLIFIER_END + 1
- * );
- * ```
- */
-export const MDL_KR_PUBLIC_INPUT_LAYOUT = {
-  SCOPE_START: 0,
-  SCOPE_END: 31,
-  NULLIFIER_START: 32,
-  NULLIFIER_END: 63,
-  OWNERSHIP_DISCLOSE_FLAGS: 64,
-  OWNERSHIP_OWNER_COMMIT_START: 65,
-  OWNERSHIP_OWNER_COMMIT_END: 96,
-  AGE_THRESHOLD: 64,
-  AGE_CURRENT_YEAR: 65,
-  REGION_CODE_START: 64,
-  REGION_CODE_END: 95,
-} as const;
-
-/**
  * OIDC Domain Attestation circuit public input layout (field offsets), v2.
  * Defines the field positions in the flattened public inputs array (214 fields total).
  *

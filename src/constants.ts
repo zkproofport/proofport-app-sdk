@@ -27,7 +27,7 @@ export const RELAY_URLS: Record<SDKEnvironment, string> = {
  * Mirrors the mobile app's `CIRCUIT_NETWORKS` (proofport-app
  * src/config/contracts.ts), because a proof is checked where the app said its
  * verifier is: Base for the Coinbase and OIDC circuits, GIWA Sepolia for GIWA
- * and Dojang (testnet-only), Base Sepolia for Korea Mobile ID (testnet-only).
+ * and Dojang (testnet-only).
  * The ADDRESS on that chain always comes from core's pinned table, never from
  * a proof response.
  */
@@ -38,9 +38,6 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 8453,
     giwa_attestation: 91342,
     dojang_playground: 91342,
-    mdl_kr_ownership: 84532,
-    mdl_kr_age: 84532,
-    mdl_kr_region: 84532,
   },
   staging: {
     coinbase_attestation: 84532,
@@ -48,9 +45,6 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 84532,
     giwa_attestation: 91342,
     dojang_playground: 91342,
-    mdl_kr_ownership: 84532,
-    mdl_kr_age: 84532,
-    mdl_kr_region: 84532,
   },
   local: {
     coinbase_attestation: 84532,
@@ -58,9 +52,6 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 84532,
     giwa_attestation: 91342,
     dojang_playground: 91342,
-    mdl_kr_ownership: 84532,
-    mdl_kr_age: 84532,
-    mdl_kr_region: 84532,
   },
 } as const satisfies Record<SDKEnvironment, Record<CircuitType, number>>;
 
@@ -168,27 +159,6 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 160,
     publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'scope', 'nullifier'],
   },
-  // Korea Mobile ID (mDL) circuits. Planned — not officially supported yet.
-  // Counts are byte-flattened field totals from the compiled circuit ABIs:
-  // [u8; 32] arrays contribute 32 inputs each.
-  mdl_kr_ownership: {
-    name: 'Korea Mobile ID — Ownership',
-    description: "Prove valid Korean mobile driver's license ownership with selective disclosure",
-    publicInputsCount: 97,
-    publicInputNames: ['scope', 'nullifier_value', 'disclose_flags', 'owner_commit'],
-  },
-  mdl_kr_age: {
-    name: 'Korea Mobile ID — Age',
-    description: "Prove minimum age from Korean mobile driver's license without revealing birth date",
-    publicInputsCount: 66,
-    publicInputNames: ['scope', 'nullifier_value', 'age_threshold', 'current_year'],
-  },
-  mdl_kr_region: {
-    name: 'Korea Mobile ID — Region',
-    description: "Prove si/do residency from Korean mobile driver's license without revealing address",
-    publicInputsCount: 96,
-    publicInputNames: ['scope', 'nullifier_value', 'region_code'],
-  },
 };
 
 
@@ -232,6 +202,5 @@ export {
   RPC_ENDPOINTS,
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
-  MDL_KR_PUBLIC_INPUT_LAYOUT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from '@zkproofport-app/core';

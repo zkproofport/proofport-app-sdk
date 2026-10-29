@@ -94,7 +94,6 @@ export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
-  MDL_KR_PUBLIC_INPUT_LAYOUT,
 } from './constants';
 
 export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage } from './circuits';
@@ -117,9 +116,6 @@ export type {
   TypedAction,
   CoinbaseCountryInputs,
   OidcDomainInputs,
-  MdlKrOwnershipInputs,
-  MdlKrAgeInputs,
-  MdlKrRegionInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,

@@ -9,9 +9,6 @@ import type {
   CircuitInputs,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
-  MdlKrOwnershipInputs,
-  MdlKrAgeInputs,
-  MdlKrRegionInputs,
   ProofportConfig,
   QRCodeOptions,
   ParsedProof,
@@ -28,7 +25,6 @@ import {
   parseProofRequestUrl,
   parseProofResponseUrl,
   validateProofRequest,
-  validateMdlInputs,
   validateReturnScheme,
   detectReturnScheme,
   isProofportDeepLink,
@@ -229,7 +225,7 @@ export class ProofportSDK {
     const request: ProofRequest = {
       requestId: generateRequestId(),
       // The circuit asked for, always. This used to be the literal
-      // 'coinbase_attestation', and every circuit that was not country or mDL
+      // 'coinbase_attestation', and every circuit that was not country
       // was routed here -- a GIWA, Dojang or OIDC request silently became a
       // Coinbase KYC request.
       circuit,
@@ -358,8 +354,6 @@ export class ProofportSDK {
     switch (builder) {
       case 'country':
         return this.createCoinbaseCountryRequest(inputs as CoinbaseCountryInputs, options);
-      case 'mdl':
-        return this.createMdlKrRequest(circuit as 'mdl_kr_ownership' | 'mdl_kr_age' | 'mdl_kr_region', inputs, options);
       case 'scoped':
         return this.createScopedRequest(circuit, inputs, options);
     }
@@ -376,55 +370,7 @@ export class ProofportSDK {
     oidc_domain_attestation: 'scoped',
     giwa_attestation: 'scoped',
     dojang_playground: 'scoped',
-    mdl_kr_ownership: 'mdl',
-    mdl_kr_age: 'mdl',
-    mdl_kr_region: 'mdl',
-  } as const satisfies Record<CircuitId, 'scoped' | 'country' | 'mdl'>;
-
-  /**
-   * @internal
-   * Creates a Korea Mobile ID (mDL) proof request for any of the three
-   * mDL predicate circuits (ownership / age / region).
-   *
-   * The mobile app collects the license data on-device; the dapp only
-   * supplies the predicate parameters validated here. No wallet signature
-   * is required for mDL circuits.
-   *
-   * @param circuit - 'mdl_kr_ownership' | 'mdl_kr_age' | 'mdl_kr_region'
-   * @param inputs - Predicate inputs (see MdlKr*Inputs types)
-   * @param options - Request configuration options
-   *
-   * @throws Error if the predicate inputs fail validation
-   */
-  private createMdlKrRequest(
-    circuit: 'mdl_kr_ownership' | 'mdl_kr_age' | 'mdl_kr_region',
-    inputs: CircuitInputs,
-    options: {
-      message?: string;
-      dappName?: string;
-      dappIcon?: string;
-      expiresInMs?: number;
-    } = {}
-  ): ProofRequest {
-    const mdlError = validateMdlInputs(circuit, inputs);
-    if (mdlError) {
-      throw new Error(`${mdlError} (circuit: ${circuit})`);
-    }
-
-    const request: ProofRequest = {
-      requestId: generateRequestId(),
-      circuit,
-      inputs,
-      message: options.message,
-      dappName: options.dappName,
-      dappIcon: options.dappIcon,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + (options.expiresInMs || DEFAULT_REQUEST_EXPIRY_MS),
-    };
-
-    this.pendingRequests.set(request.requestId, request);
-    return request;
-  }
+  } as const satisfies Record<CircuitId, 'scoped' | 'country'>;
 
   // ============ Deep Link Generation ============
 
@@ -1373,15 +1319,6 @@ export class ProofportSDK {
 
     if (needsSignature && !this.signer) {
       throw new Error('Signer not set. Call setSigner() first. Wallet signature is required for this circuit.');
-    }
-
-    // mDL circuits: validate predicate inputs client-side before hitting the
-    // relay, so a bad ageThreshold / targetRegion fails fast with a clear error.
-    if (circuit === 'mdl_kr_ownership' || circuit === 'mdl_kr_age' || circuit === 'mdl_kr_region') {
-      const mdlError = validateMdlInputs(circuit, inputs);
-      if (mdlError) {
-        throw new Error(`${mdlError} (circuit: ${circuit})`);
-      }
     }
 
     // The action, per the circuit's entry in CIRCUIT_ACTION_BINDING. Checked

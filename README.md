@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against a testnet deployment and are marked experimental: GIWA attestation and Dojang Playground. The three Korean mobile ID (mDL) identifiers are reserved and planned. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against a testnet deployment and are marked experimental: GIWA attestation and Dojang Playground. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -33,7 +33,7 @@ TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https
 ```
 
 1. Your app creates a proof request through the SDK
-2. The SDK asks the relay for a one-time challenge and a tracked request ID. For the Coinbase circuits it also signs that challenge with your wallet signer (EIP-191); the OIDC and mDL circuits need no signature
+2. The SDK asks the relay for a one-time challenge and a tracked request ID. For the Coinbase circuits it also signs that challenge with your wallet signer (EIP-191); the OIDC circuit needs no signature
 3. Your app shows the returned deep link as a QR code (desktop) or navigates to it (mobile)
 4. The user opens the ZKProofport app, which generates the ZK proof on-device
 5. The proof result flows back through the relay to your app over WebSocket (HTTP polling as fallback)
@@ -100,7 +100,7 @@ if (result.status === 'completed') {
 
 ## Circuit Identifiers
 
-Circuit IDs are canonical, lowercase and case-sensitive: each one is the `name` field of that circuit's `Nargo.toml`, verbatim. Hyphenated spellings such as `coinbase-kyc` or `mdl-kr-age` are route and directory names from elsewhere — they are not circuit IDs, and passing one does not fail with a clear error. It produces a nullifier mismatch or a verifier lookup that finds nothing.
+Circuit IDs are canonical, lowercase and case-sensitive: each one is the `name` field of that circuit's `Nargo.toml`, verbatim. Hyphenated spellings such as `coinbase-kyc` or `oidc-domain` are route and directory names from elsewhere — they are not circuit IDs, and passing one does not fail with a clear error. It produces a nullifier mismatch or a verifier lookup that finds nothing.
 
 This SDK is the single source of truth for that list. Import the constants rather than typing the strings, and a rename becomes a compile error instead of a runtime surprise:
 
@@ -127,28 +127,23 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
 | `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | _Experimental_ |
 | `CIRCUIT_IDS.DOJANG_PLAYGROUND` | `dojang_playground` | _Experimental_ |
-| `CIRCUIT_IDS.MDL_KR_OWNERSHIP` | `mdl_kr_ownership` | Planned |
-| `CIRCUIT_IDS.MDL_KR_AGE` | `mdl_kr_age` | Planned |
-| `CIRCUIT_IDS.MDL_KR_REGION` | `mdl_kr_region` | Planned |
 
 **Supported** means generally available — build a product on it.
 
 **Experimental** means you can prove it today and it verifies, but only against a testnet deployment. Inputs, public-input layout and the verifier address can change without a major version bump, and there is no mainnet to point at. Try it; do not ship on it.
 
-**Planned** means the identifier is reserved and the circuit exists, but it is not officially supported yet: availability, inputs and public-input layout can change without a major version bump.
+**Planned** marks an identifier reserved ahead of official support; inputs and public-input layout can change without a major version bump. No circuit has this status today.
 
-Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, planned ones included, so being assignable is not a support guarantee. Gate on the status, not on the type:
+Every ID appears in `CircuitType` and in `sdk.getSupportedCircuits()`, experimental ones included, so being assignable is not a support guarantee. Gate on the status, not on the type:
 
 ```typescript
 import { CIRCUIT_SUPPORT_STATUS, isSupportedCircuitId } from '@zkproofport-app/sdk';
 
 CIRCUIT_SUPPORT_STATUS.coinbase_attestation; // 'supported'
 CIRCUIT_SUPPORT_STATUS.giwa_attestation;     // 'experimental'
-CIRCUIT_SUPPORT_STATUS.mdl_kr_age;           // 'planned'
 
 isSupportedCircuitId('oidc_domain_attestation'); // true
 isSupportedCircuitId('giwa_attestation');        // false — experimental is not supported
-isSupportedCircuitId('mdl_kr_age');              // false
 isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
 ```
 
@@ -164,14 +159,14 @@ isSupportedCircuitId('coinbase-kyc');            // false — not an ID at all
 | `isCircuitId(value)` | `value is CircuitId` | Narrows an unknown value; `false` for hyphenated names |
 | `isSupportedCircuitId(value)` | `value is CircuitId` | The same, and additionally requires `supported` |
 | `getCircuitSupportStatus(id)` | `CircuitSupportStatus` | Status of one ID; throws on an unknown one |
-| `CircuitId` | type | Union of the eight IDs. `CircuitType` is an alias of it |
-| `CircuitSupportStatus` | type | `'supported' \| 'planned'` |
+| `CircuitId` | type | Union of the five IDs. `CircuitType` is an alias of it |
+| `CircuitSupportStatus` | type | `'supported' \| 'experimental' \| 'planned'` |
 
 Both objects and all three arrays are frozen. `ALL_CIRCUIT_IDS`, `SUPPORTED_CIRCUIT_IDS` and `PLANNED_CIRCUIT_IDS` are derived from `CIRCUIT_SUPPORT_STATUS` at load time, so they cannot disagree with it.
 
 ## Supported Circuits
 
-The circuits below are officially supported. Pass their IDs exactly as written, or use the `CIRCUIT_IDS` constants. `sdk.getSupportedCircuits()` returns every known ID at runtime, planned ones included — see [Circuit Identifiers](#circuit-identifiers).
+The circuits below are officially supported. Pass their IDs exactly as written, or use the `CIRCUIT_IDS` constants. `sdk.getSupportedCircuits()` returns every known ID at runtime, experimental ones included — see [Circuit Identifiers](#circuit-identifiers).
 
 ### `coinbase_attestation`
 
@@ -335,7 +330,7 @@ circuit names are special:
 | What the circuit does with an action | Circuits |
 |---|---|
 | Signs it when present, signs the signal hash when not | `giwa_attestation`, `dojang_playground` |
-| Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain, the three mDL circuits |
+| Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain |
 
 ```typescript
 import { circuitActionBinding } from '@zkproofport-app/sdk';
@@ -347,62 +342,6 @@ circuitActionBinding('coinbase_attestation'); // 'none'
 Sending an action to a circuit that cannot prove one is an error rather than a
 silent drop: a dropped action would leave you believing a proof authorized
 something the circuit never saw.
-
-## Planned Circuits
-
-ZKProofport is registered with the Ministry of the Interior and Safety as a Korea Mobile ID integration service (모바일 신분증 연계서비스). The three circuits below are in beta: `CIRCUIT_SUPPORT_STATUS` reports each of them as `planned`, and their input shape and public-input layout can change without a major version bump.
-
-### `mdl_kr_ownership`
-
-Proves the user holds a valid Korean mobile driver's license (모바일 신분증). The license data stays on-device; only the attributes selected by `discloseFlags` are revealed. No wallet signer is required.
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier for proof uniqueness. Non-empty, 256 characters or fewer, no control characters. |
-| `discloseFlags` | `number` | No | Attribute disclosure bitmask, integer 0–15 (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone). Omit or `0` for a fully anonymous ownership proof. |
-
-```typescript
-// Anonymous "holds a valid Korean mobile ID" proof
-const relay = await sdk.createRelayRequest('mdl_kr_ownership', {
-  scope: 'myapp.com',
-});
-```
-
-### `mdl_kr_age`
-
-Proves the user is at least `ageThreshold` years old according to their Korean mobile driver's license, without revealing the birth date. No wallet signer is required.
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier (same rules as above) |
-| `ageThreshold` | `number` | Yes | Minimum age to prove — integer between 1 and 150 (e.g. `19` for Korean adult verification) |
-
-```typescript
-const relay = await sdk.createRelayRequest('mdl_kr_age', {
-  scope: 'myapp.com',
-  ageThreshold: 19,
-});
-```
-
-### `mdl_kr_region`
-
-Proves the user's registered address is in the specified si/do region without revealing the full address. No wallet signer is required.
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `scope` | `string` | Yes | Application-specific identifier (same rules as above) |
-| `targetRegion` | `string` | Yes | Region (si/do) to prove residency in, in Korean (e.g. `'경기도'`, `'서울특별시'`). Non-empty, 256 characters or fewer, no control characters. |
-
-```typescript
-const relay = await sdk.createRelayRequest('mdl_kr_region', {
-  scope: 'myapp.com',
-  targetRegion: '경기도',
-});
-```
-
-> mDL inputs are checked before the request leaves your process: a missing `scope`, an out-of-range `discloseFlags`, a non-integer `ageThreshold` or an empty `targetRegion` throws locally instead of coming back as a relay error.
-
-> The mDL circuits do not require `setSigner()` — the proof is bound to the license via an on-device nullifier (`nullifier_value` public input), not a wallet address. Use `sdk.extractNullifier(publicInputs, circuit)` for sybil-resistant user identification.
 
 ## Integration Guide
 
@@ -439,7 +378,7 @@ interface WalletSigner {
 
 Any ethers v5/v6 `Signer` is compatible.
 
-> **When you can skip this step:** the OIDC Domain and the three mDL circuits never sign a challenge. Calling `createRelayRequest` for those circuits without a signer works. Calling it for a Coinbase circuit without one throws `Signer not set. Call setSigner() first. Wallet signature is required for this circuit.`
+> **When you can skip this step:** the OIDC Domain circuit never signs a challenge. Calling `createRelayRequest` for it without a signer works. Calling it for a Coinbase circuit without one throws `Signer not set. Call setSigner() first. Wallet signature is required for this circuit.`
 
 #### About challenge-signature
 
@@ -884,7 +823,7 @@ if (sdk.extractScope(publicInputs, circuit) !== expectedScope) {
 The nullifier is a deterministic hash over the user's credential and the scope:
 
 - **Deterministic** — same user, same scope, same nullifier, every time. That is what makes duplicate detection possible.
-- **Privacy-preserving** — the wallet address (Coinbase), the email (OIDC) and the licence (mDL) stay hidden. There is no way back from the nullifier to the person.
+- **Privacy-preserving** — the wallet address (Coinbase) and the email (OIDC) stay hidden. There is no way back from the nullifier to the person.
 - **Scope-bound** — the same user proving to a different scope produces an unrelated nullifier, so your users cannot be correlated across apps.
 
 On your side, it is the primary key of a verified user. Store it once verification succeeds, with a unique constraint, and check it before granting anything:
@@ -932,7 +871,7 @@ import {
   extractDomainFromPublicInputs,
 } from '@zkproofport-app/sdk';
 
-// Scope and nullifier work for all six circuits — the layout is picked from the
+// Scope and nullifier work for all five circuits — the layout is picked from the
 // circuit id, so always pass it:
 const scope = extractScopeFromPublicInputs(publicInputs, 'coinbase_attestation');
 const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
@@ -940,9 +879,6 @@ const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attes
 // OIDC domain attestation uses a different public input layout (214 fields)
 const oidcScope = extractScopeFromPublicInputs(publicInputs, 'oidc_domain_attestation');
 const oidcNullifier = extractNullifierFromPublicInputs(publicInputs, 'oidc_domain_attestation');
-
-// The three mDL circuits share one layout
-const mdlNullifier = extractNullifierFromPublicInputs(publicInputs, 'mdl_kr_age');
 
 // Extract domain from OIDC Domain Attestation
 const domain = extractDomainFromPublicInputs(publicInputs, 'oidc_domain_attestation');
@@ -1054,9 +990,6 @@ import type {
   OidcDomainInputs,
   ActionBoundInputs,
   TypedAction,
-  MdlKrOwnershipInputs,
-  MdlKrAgeInputs,
-  MdlKrRegionInputs,
   CircuitInputs,
   ProofRequest,
   ProofResponse,
@@ -1072,20 +1005,17 @@ import type {
 
 | Type | Description |
 |------|-------------|
-| `CircuitId` | Union of the eight canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'dojang_playground' \| 'mdl_kr_ownership' \| 'mdl_kr_age' \| 'mdl_kr_region'`. Also exported from `@zkproofport-app/sdk/circuits` |
+| `CircuitId` | Union of the five canonical circuit IDs — `'coinbase_attestation' \| 'coinbase_country_attestation' \| 'oidc_domain_attestation' \| 'giwa_attestation' \| 'dojang_playground'`. Also exported from `@zkproofport-app/sdk/circuits` |
 | `TypedAction` | The EIP-712 action a `giwa_attestation` proof binds to: `{ domain, types, primaryType, message }` — the same object `eth_signTypedData_v4` takes |
-| `CircuitSupportStatus` | `'supported' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
+| `CircuitSupportStatus` | `'supported' \| 'experimental' \| 'planned'` — see [Circuit Identifiers](#circuit-identifiers) |
 | `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation`: `{ scope, userAddress?, rawTransaction? }` |
 | `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
-| `MdlKrOwnershipInputs` | Inputs for `mdl_kr_ownership`: `{ scope, discloseFlags? }` |
 | `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — optional for `giwa_attestation` and `dojang_playground` |
 | `GiwaAttestationInputs` | Alias of `ActionBoundInputs`, for `giwa_attestation` |
 | `DojangPlaygroundInputs` | Alias of `ActionBoundInputs`, for `dojang_playground` |
-| `MdlKrAgeInputs` | Inputs for `mdl_kr_age`: `{ scope, ageThreshold }` |
-| `MdlKrRegionInputs` | Inputs for `mdl_kr_region`: `{ scope, targetRegion }` |
 | `CircuitInputs` | Union of every input type above (plus an empty-input form for circuits that need nothing from the dApp) |
 | `ProofRequest` | Request object: `requestId`, `circuit`, `inputs`, `createdAt`, plus optional `message`, `dappName`, `dappIcon`, `returnScheme` (a bare scheme such as `mydapp://`), `expiresAt` |
 | `ProofResponse` | What `verifyResponseOnChain()` takes: `requestId`, `circuit`, `status`, and — when completed — `proof`, `publicInputs`, `verifierAddress`, `chainId`; `error` when it failed. `numPublicInputs` and `timestamp` also exist but the relay never fills them, so omit them. Field by field in [Step 6](#step-6-read-the-result) |
@@ -1119,7 +1049,6 @@ import {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
-  MDL_KR_PUBLIC_INPUT_LAYOUT,
 } from '@zkproofport-app/sdk';
 ```
 
@@ -1182,34 +1111,6 @@ Proofs from the earlier 148-entry version of this circuit bind no audience, expi
 
 Index 147 tells you which issuer signed the token, not whether the account belongs to an organisation. Workspace and Microsoft 365 membership is checked on-device only when you set `provider` in the request; if you did not set it, do not read a membership guarantee out of this field.
 
-### Korea Mobile ID (mDL) — one layout, three circuits
-
-All three mDL circuits share the same first 64 entries and differ after that. Entries are single bytes, except `age_threshold` and `current_year`, which each hold their whole value in one entry.
-
-| Index | Constants | Circuit field | Applies to |
-|-------|-----------|---------------|------------|
-| 0–31 | `SCOPE_START` / `_END` | `scope` | all three |
-| 32–63 | `NULLIFIER_START` / `_END` | `nullifier_value` | all three |
-| 64 | `OWNERSHIP_DISCLOSE_FLAGS` | `disclose_flags` | `mdl_kr_ownership` (97 entries) — the bitmask that was actually proved (`0x01` name, `0x02` birth, `0x04` sex, `0x08` phone) |
-| 65–96 | `OWNERSHIP_OWNER_COMMIT_START` / `_END` | `owner_commit` | `mdl_kr_ownership` — `bytes32` commitment to the disclosed attributes. All zero when `disclose_flags` is `0`, which is the anonymous case |
-| 64 | `AGE_THRESHOLD` | `age_threshold` | `mdl_kr_age` (66 entries) — the age the proof actually clears. Read it back; it is a public input, so confirm it is the threshold you asked for |
-| 65 | `AGE_CURRENT_YEAR` | `current_year` | `mdl_kr_age` — the year the comparison was made in |
-| 64–95 | `REGION_CODE_START` / `_END` | `region_code` | `mdl_kr_region` (96 entries) — `bytes32`, not a readable region name. See below |
-
-`region_code` is `keccak256` over the region name, UTF-8 and zero-padded to 64 bytes. The circuit proves that the region on the licence hashes to this value, but the value itself is a public input — so recompute it from the region you asked for and compare, exactly as you do with the scope:
-
-```typescript
-import { keccak256 } from 'ethers';
-
-const regionCodeFor = (region: string): string => {
-  const padded = new Uint8Array(64);
-  padded.set(new TextEncoder().encode(region));
-  return keccak256(padded);
-};
-
-// regionCodeFor('경기도') — compare against indices 64–95, rebuilt with toBytes32()
-```
-
 ## Error Handling
 
 Async SDK methods throw standard `Error` objects. The messages are stable enough to log, not to switch on:
@@ -1223,9 +1124,9 @@ try {
 }
 
 try {
-  await sdk.createRelayRequest('mdl_kr_age', { scope: 'app.com', ageThreshold: 0 });
+  await sdk.createRelayRequest('coinbase-kyc', { scope: 'app.com' });
 } catch (err) {
-  // "ageThreshold is required and must be an integer between 1 and 150 (circuit: mdl_kr_age)"
+  // "Unknown circuit 'coinbase-kyc'. Expected: coinbase_attestation, ..."
 }
 
 try {

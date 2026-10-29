@@ -42,15 +42,6 @@ export const PINNED_VERIFIERS: Readonly<Record<CircuitId, Readonly<Record<number
   dojang_playground: Object.freeze({
     91342: Object.freeze({ address: '0xad6c9bfa60f3ee618dee9dc2027a69c57f2ad816', deployedAt: '2026-10-22T13:42:56.514Z', circuitsCommit: '35a8df4', record: 'broadcast/DeployDojangPlayground.s.sol/91342/run-latest.json' }),
   }),
-  mdl_kr_ownership: Object.freeze({
-    84532: Object.freeze({ address: '0x49c03b925583aa8528bbfba5a1a4e1f9b157c95a', deployedAt: '2026-10-22T13:41:08.689Z', circuitsCommit: '35a8df4', record: 'broadcast/DeployMdlKrOwnership.s.sol/84532/run-latest.json' }),
-  }),
-  mdl_kr_age: Object.freeze({
-    84532: Object.freeze({ address: '0x45d4850a9b197ceba185b5069fb13ce0be1dc6d6', deployedAt: '2026-10-22T13:41:33.410Z', circuitsCommit: '35a8df4', record: 'broadcast/DeployMdlKrAge.s.sol/84532/run-latest.json' }),
-  }),
-  mdl_kr_region: Object.freeze({
-    84532: Object.freeze({ address: '0x044116df792eb424c9648df2deeda97afa617ac0', deployedAt: '2026-10-22T13:42:20.792Z', circuitsCommit: '35a8df4', record: 'broadcast/DeployMdlKrRegion.s.sol/84532/run-latest.json' }),
-  }),
 });
 
 /**

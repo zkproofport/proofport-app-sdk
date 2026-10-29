@@ -151,15 +151,17 @@ describe.skipIf(!haveArtifacts)('off-chain verification against a real proof', (
   }, 120_000);
 });
 
+// Run on dojang_playground: it has no issuer check, so these reach the input
+// handling instead of stopping at a signer-root or key check first.
 describe('off-chain verification input handling', () => {
   it('reports an empty proof rather than asking Barretenberg about it', async () => {
-    const result = await verifyProofOffChain('mdl_kr_age', '0x', []);
+    const result = await verifyProofOffChain('dojang_playground', '0x', []);
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/empty/i);
   });
 
   it('reports malformed hex clearly', async () => {
-    const result = await verifyProofOffChain('mdl_kr_age', '0xzzzz', ['0x01']);
+    const result = await verifyProofOffChain('dojang_playground', '0xzzzz', ['0x01']);
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/hex/i);
   });
@@ -167,7 +169,7 @@ describe('off-chain verification input handling', () => {
   it('reports an oversized public input instead of silently truncating', async () => {
     // A value longer than a field element cannot be what the circuit committed
     // to. Cutting it to fit would verify something other than what was passed.
-    const result = await verifyProofOffChain('mdl_kr_age', '0x1234', ['0x' + 'aa'.repeat(33)], {
+    const result = await verifyProofOffChain('dojang_playground', '0x1234', ['0x' + 'aa'.repeat(33)], {
       verificationKey: new Uint8Array(1816),
     });
     expect(result.valid).toBe(false);
@@ -184,10 +186,7 @@ describe('off-chain verification input handling', () => {
  * circuit" actually asks.
  *
  * Proofs are not committed; these are the circuits whose build writes one
- * (build.sh with a Prover.toml). The Korea Mobile ID circuits prove through
- * their own acceptance hook, so a proof left on disk there may come from an
- * older toolchain -- they are left out rather than tested against the wrong
- * key. OIDC has no committed witness. Those go through the identical code
+ * (build.sh with a Prover.toml). OIDC has no committed witness. Those go through the identical code
  * path but are NOT exercised end to end here.
  */
 const CIRCUITS_WITH_COMMITTED_PROOFS = [

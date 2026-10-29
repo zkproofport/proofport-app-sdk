@@ -51,13 +51,6 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // PLAYGROUND_FAUCET, GIWA_SEPOLIA_CHAIN_ID), so the verification key already
   // pins them, and the issuance is self-signed by design -- no issuer exists.
   dojang_playground: null,
-  // No issuer anchor at all: the Korea Mobile ID circuits verify no issuer
-  // signature (cx_integrity_root is commented out pending HS256 registration,
-  // mdl/kr-*/src/main.nr), so a verifier has nothing to compare. These proofs
-  // do not show an issuer said anything; they are 'planned' for that reason.
-  mdl_kr_ownership: null,
-  mdl_kr_age: null,
-  mdl_kr_region: null,
 } satisfies Record<CircuitId, IssuerCheck | null>;
 
 /**
