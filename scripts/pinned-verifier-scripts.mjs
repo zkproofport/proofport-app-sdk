@@ -39,16 +39,10 @@ export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifier
  *   CoinbaseAttestationV2AndroidFactory  the factory-provisioned Android
  *                                 signer's package of the same layout; same
  *                                 reason.
- *   MdlKrOwnership, MdlKrAge,     circuits that are not part of ZKProofport;
- *   MdlKrRegion                   core has no circuit id for them, so their
- *                                 testnet records are skipped by name.
  */
 export const NOT_PINNED_HERE = new Set([
   'CoinbaseAppAttestPoc',
   'CoinbaseAttestationV2',
   'CoinbaseAttestationV2Android',
   'CoinbaseAttestationV2AndroidFactory',
-  'MdlKrOwnership',
-  'MdlKrAge',
-  'MdlKrRegion',
 ]);
