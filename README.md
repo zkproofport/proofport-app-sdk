@@ -177,12 +177,16 @@ Proves that a user has completed Coinbase KYC identity verification without reve
 | `scope` | `string` | Yes | Application-specific identifier (e.g., your domain). Ensures proof uniqueness per app. |
 | `userAddress` | `string` | No | Address to prove the attestation for. Omit it and the mobile app asks the user to connect a wallet. |
 | `rawTransaction` | `string` | No | Pre-fetched attestation transaction data. Omit it and the app fetches the attestation itself. |
+| `action` | `TypedAction` | No | One EIP-712 action for the wallet to sign and the proof to carry. Without one the wallet signs the request's signal hash. See [Which circuits take an action](#which-circuits-take-an-action). |
 
 ```typescript
 const relay = await sdk.createRelayRequest('coinbase_attestation', {
   scope: 'myapp.com',
 });
 ```
+
+Its nullifier is `keccak(keccak(wallet ++ keccak("coinbase_attestation")) ++ scope)`:
+one wallet in one scope has exactly one nullifier.
 
 ### `coinbase_country_attestation`
 
@@ -263,7 +267,7 @@ const { deepLink } = await sdk.createRelayRequest(
 **An action is optional here.** Send one
 and the wallet signs EIP-712 typed data, so the person reads named fields and
 the proof carries what they approved. Send none and the wallet signs the
-request's signal hash, exactly as Coinbase KYC does. The circuit itself
+request's signal hash. Coinbase KYC branches the same way. The circuit itself
 branches, and it refuses a request that tries to be both: with an action the
 signal hash must be empty, without one the EIP-712 pair must be.
 
@@ -284,8 +288,8 @@ await sdk.createRelayRequest(
 ```
 
 Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
-`signer_list_merkle_root`, `scope`, `nullifier` — 64 bytes longer than the Coinbase layout it used to share. Anything holding the
-old offsets reads the Merkle root where the nullifier is.
+`signer_list_merkle_root`, `scope`, `nullifier`: Coinbase KYC's order without
+its final `attested_at`.
 
 One more difference worth knowing if you count people: its nullifier is
 `keccak(keccak(wallet ++ keccak("giwa_attestation")) ++ scope)`. The wallet and
@@ -329,14 +333,15 @@ circuit names are special:
 
 | What the circuit does with an action | Circuits |
 |---|---|
-| Signs it when present, signs the signal hash when not | `giwa_attestation`, `dojang_playground` |
-| Has no action inputs — sending one is refused, not ignored | Coinbase KYC, Coinbase country, OIDC domain |
+| Signs it when present, signs the signal hash when not | `coinbase_attestation`, `giwa_attestation`, `dojang_playground` |
+| Has no action inputs — sending one is refused, not ignored | Coinbase country, OIDC domain |
 
 ```typescript
 import { circuitActionBinding } from '@zkproofport-app/sdk';
 
 circuitActionBinding('giwa_attestation');  // 'optional'
-circuitActionBinding('coinbase_attestation'); // 'none'
+circuitActionBinding('coinbase_attestation'); // 'optional'
+circuitActionBinding('coinbase_country_attestation'); // 'none'
 ```
 
 Sending an action to a circuit that cannot prove one is an error rather than a
@@ -615,7 +620,7 @@ When you are done, `sdk.disconnect()` closes any open socket.
   status: 'completed',
   circuit: 'coinbase_attestation',
   proof: '0x1f8b0a…',                       // proof bytes, opaque
-  publicInputs: ['0x00…2f', '0x00…a1', …],  // ordered — 128 entries for this circuit
+  publicInputs: ['0x00…2f', '0x00…a1', …],  // ordered — 193 entries for this circuit
   verifierAddress: '0x…',                   // the verifier the app reports (checked, not trusted)
   chainId: …,                               // the network the app reports (checked, not trusted)
   deepLink: 'zkproofport://proof-request?data=…',
@@ -729,7 +734,7 @@ For OIDC domain proofs the SDK first checks what the proof says about the sign-i
 
 The SDK also checks that the proof was made with a signing key Google or Microsoft actually publishes. That key is part of the proof's public inputs, so a proof made with a self-generated key would otherwise pass the contract. The SDK fetches the provider's published keys, caches them as the provider's own cache headers allow, and returns `{ valid: false, error }` when the key is not among them or the keys cannot be fetched. Every verify method does this; there is nothing to call separately.
 
-For Coinbase KYC, Coinbase country and GIWA proofs the SDK checks that the attestation's signer belongs to the published signer set: the proof carries the root of the signer list it was made against, and a proof made against any other list is refused with `{ valid: false, error }`. This too runs in every verify method.
+For Coinbase KYC, Coinbase country and GIWA proofs the SDK checks that the attestation's signer belongs to the published signer set: the proof carries the root of the signer list it was made against, and a proof made against any other list is refused with `{ valid: false, error }`. A Coinbase KYC proof also names the time its attestation was confirmed unrevoked; it must be within the last 15 minutes (and not more than 5 minutes ahead of your clock), so verify a Coinbase KYC proof when you receive it rather than re-verifying a stored one later. This too runs in every verify method.
 
 The one limit: a proof made with a key the provider has already withdrawn, which this process never saw while it was published, cannot be checked and is refused. Keys seen while published stay acceptable for 1 hour after they were last listed.
 
@@ -885,7 +890,7 @@ const domain = extractDomainFromPublicInputs(publicInputs, 'oidc_domain_attestat
 // domain: 'example.com', or null if the circuit doesn't match or inputs are insufficient
 ```
 
-Omitting the circuit argument falls back to the `coinbase_attestation` layout, which is why the examples above always pass it explicitly.
+The circuit argument is required: the layout differs per circuit, and an omitted or unknown circuit id throws an error naming the known ones.
 
 ## Complete Example
 
@@ -1055,7 +1060,7 @@ import {
 Two rules hold for every table below:
 
 - **Every number is an index into `publicInputs`, and `_END` is inclusive.** Slice with `slice(START, END + 1)`.
-- **One entry is one field element, not one 32-byte value.** A `bytes32` such as a scope or a nullifier is spread over 32 consecutive entries, each holding a single byte in its low byte: `publicInputs[64] === '0x00…2f'` is the byte `0x2f`. Rebuild it by concatenating those 32 low bytes. The one exception is the OIDC RSA modulus, whose 18 entries each hold a 128-bit limb.
+- **One entry is one field element, not one 32-byte value.** A `bytes32` such as a scope or a nullifier is spread over 32 consecutive entries, each holding a single byte in its low byte: `publicInputs[128] === '0x00…2f'` is the byte `0x2f`. Rebuild it by concatenating those 32 low bytes. The one exception is the OIDC RSA modulus, whose 18 entries each hold a 128-bit limb.
 
 ```typescript
 const L = COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT;
@@ -1067,14 +1072,17 @@ const toBytes32 = (fields: string[]): string =>
 const signalHash = toBytes32(publicInputs.slice(L.SIGNAL_HASH_START, L.SIGNAL_HASH_END + 1));
 ```
 
-### `coinbase_attestation` — 128 entries
+### `coinbase_attestation` — 193 entries
 
 | Index | Constants | Circuit field | What it is |
 |-------|-----------|---------------|------------|
-| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge for the request |
-| 32–63 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` root of the Coinbase attestation-signer list the proof was checked against |
-| 64–95 | `SCOPE_START` / `_END` | `scope` | `bytes32` — `keccak256` of your scope string. Compare it (Step 8) |
-| 96–127 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per user and scope |
+| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge for the request; zero when the wallet signed an EIP-712 action |
+| 32–63 | `DOMAIN_SEPARATOR_START` / `_END` | `domain_separator` | EIP-712 domain separator of the signed action; zero without one |
+| 64–95 | `ACTION_HASH_START` / `_END` | `action_hash` | EIP-712 struct hash of the signed action; zero without one |
+| 96–127 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` root of the Coinbase attestation-signer list the proof was checked against |
+| 128–159 | `SCOPE_START` / `_END` | `scope` | `bytes32` — `keccak256` of your scope string. Compare it (Step 8) |
+| 160–191 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per wallet and scope |
+| 192 | `ATTESTED_AT` | `attested_at` | Unix seconds at which the attestation was confirmed unrevoked; checked against your clock by every verify method |
 
 ### `coinbase_country_attestation` — 150 entries
 

@@ -50,33 +50,46 @@ export const RPC_ENDPOINTS: Record<number, string> = {
 };
 
 /**
- * Coinbase Attestation circuit public input layout (byte offsets).
- * Defines the byte positions of each field in the flattened public inputs array.
+ * Coinbase KYC (v2) circuit public input layout (field offsets), 193 fields.
+ * One field per byte of each `[u8; 32]`, in `fn main`'s order
+ * (coinbase-attestation-v2/src/main.nr; giwa_attestation's six, then
+ * `attested_at`):
+ * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
+ * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
+ * - signer_list_merkle_root: 96-127
+ * - scope: 128-159
+ * - nullifier: 160-191, keccak(keccak(wallet ++ keccak("coinbase_attestation")) ++ scope)
+ * - attested_at: 192, unix seconds the signed statement names
  *
- * Public inputs are packed as bytes32 values:
- * - signal_hash: bytes 0-31
- * - merkle_root: bytes 32-63
- * - scope: bytes 64-95
+ * v1's layout (128 fields: signal_hash, root, scope, nullifier) is gone; a v1
+ * proof is refused by its count on every verify path.
  *
  * @example
  * ```typescript
- * const publicInputs = response.publicInputs;
- * const signalHash = publicInputs.slice(
- *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SIGNAL_HASH_START,
- *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SIGNAL_HASH_END + 1
+ * const scope = publicInputs.slice(
+ *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START,
+ *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_END + 1
  * );
  * ```
  */
 export const COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
   SIGNAL_HASH_END: 31,
-  MERKLE_ROOT_START: 32,
-  MERKLE_ROOT_END: 63,
-  SCOPE_START: 64,
-  SCOPE_END: 95,
-  NULLIFIER_START: 96,
-  NULLIFIER_END: 127,
+  DOMAIN_SEPARATOR_START: 32,
+  DOMAIN_SEPARATOR_END: 63,
+  ACTION_HASH_START: 64,
+  ACTION_HASH_END: 95,
+  MERKLE_ROOT_START: 96,
+  MERKLE_ROOT_END: 127,
+  SCOPE_START: 128,
+  SCOPE_END: 159,
+  NULLIFIER_START: 160,
+  NULLIFIER_END: 191,
+  ATTESTED_AT: 192,
 } as const;
+
+/** Coinbase KYC (v2) public input count. A 128-input proof is v1 and refused. */
+export const COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT = 193;
 
 /**
  * Coinbase Country Attestation circuit public input layout (byte offsets).

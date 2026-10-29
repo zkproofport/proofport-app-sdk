@@ -33,6 +33,7 @@ import {
   CIRCUIT_PACKAGES,
   CIRCUIT_VK_PATHS,
   PINNED_VARIANT_VERIFIERS,
+  PINNED_VERIFIERS,
   SIGNER_VARIANTS,
   VERIFIER_ABI,
   evmProofByteLength,
@@ -66,7 +67,7 @@ const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
 const proofOf = (bytes: number) => '0x' + 'ab'.repeat(bytes);
 const STANDARD_OIDC = 10304;
 const ANDROID = 10688;
-const STANDARD_KYC = 9920;
+const STANDARD_KYC = 10304;
 
 beforeEach(() => {
   Contract.mockClear();
@@ -158,11 +159,23 @@ describe('the package table', () => {
     }
   });
 
-  it('the Coinbase KYC android packages wait for the release that reads the v2 layout', () => {
-    expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2Android')).toBe(true);
-    expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2AndroidFactory')).toBe(true);
-    expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation).toBeUndefined();
-    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation).toBeUndefined();
+  it('Coinbase KYC v2 pins all three packages; v1 (CoinbaseAttestation) is not pinned', () => {
+    expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestation')).toBe(true);
+    expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2')).toBe(false);
+    // The mainnet contracts the circuits deployment records name (circuits
+    // 1d41d85 for the standard package, da21683 for the Android ones).
+    expect(getPinnedVerifier('coinbase_attestation', 8453).address).toBe('0x6fc22d3576fb70457d1529b3f70f711a3cba7a7f');
+    expect(getPinnedVerifier('coinbase_attestation', 1).address).toBe('0x0e458610bd79893a0855c8f90ceded70cf7553b6');
+    expect(getPinnedVerifier('coinbase_attestation', 84532).address).toBe('0x1885aa2283db21ad0fc63a2df98efe92f31908e6');
+    expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation?.[8453].address).toBe('0x836d8b0fd01bed4e34220ebcee6d63265951fbf9');
+    expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation?.[1].address).toBe('0x099bacd621d896d9b7618d8e7ec330ae7867c117');
+    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation?.[8453].address).toBe('0x87d9a66cacac95b2bc43bac8e610c59acb67c5e0');
+    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation?.[1].address).toBe('0x5798eee099da12eeb995ad6a09a8ab87c240b72b');
+    // v1's contracts appear nowhere in the table.
+    const all = JSON.stringify([PINNED_VERIFIERS, PINNED_VARIANT_VERIFIERS]);
+    for (const v1 of ['0xf7ded73e7a7fc8fb030c35c5a88d40abe6865382', '0x42d165a48256ae184e1de4e7e6372e870e2bc883', '0xf3d5a09d2c85b28c52ef2905c1be3a852b609d0c']) {
+      expect(all).not.toContain(v1);
+    }
   });
 });
 
@@ -201,11 +214,10 @@ describe('lookups end at an error naming the key', () => {
     );
   });
 
-  // Coinbase KYC's android package is held back by NOT_PINNED_HERE, so it stays
-  // empty when the OIDC android verifiers are deployed and the table regenerated.
-  it('an android package with nothing deployed says so', () => {
-    expect(() => getPinnedVariantVerifier('coinbase_attestation', 'android', 84532)).toThrow(
-      "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain.",
+  // Coinbase KYC v2's standard package has no Ethereum Sepolia deployment.
+  it('a package with no deployment on the chain asked for names the chains that have one', () => {
+    expect(() => getPinnedVariantVerifier('coinbase_attestation', 'standard', 11155111)).toThrow(
+      'No coinbase_attestation verifier is deployed on chain 11155111. Chains with one: 1, 8453, 84532.',
     );
   });
 
@@ -271,7 +283,7 @@ describe('resolveSignerVariant', () => {
     expect('error' in resolveSignerVariant('oidc_domain_attestation', 'standard', proofOf(ANDROID))).toBe(true);
   });
 
-  it('Coinbase KYC: its standard package is 2^19, its android one 2^21', () => {
+  it('Coinbase KYC: its standard package is 2^20, its android one 2^21', () => {
     expect(resolveSignerVariant('coinbase_attestation', undefined, proofOf(STANDARD_KYC))).toEqual({ variant: 'standard' });
     expect('error' in resolveSignerVariant('coinbase_attestation', undefined, proofOf(ANDROID))).toBe(true);
     expect('error' in resolveSignerVariant('coinbase_attestation', 'android', proofOf(STANDARD_KYC))).toBe(true);
@@ -315,7 +327,7 @@ describe('resolveSignerVariant', () => {
 
 describe('every verify path applies it before anything else runs', () => {
   const kyc = attestationInputs('coinbase_attestation');
-  const parsed = (bytes: number) => ({ proofHex: proofOf(bytes), publicInputsHex: kyc, numPublicInputs: 128 });
+  const parsed = (bytes: number) => ({ proofHex: proofOf(bytes), publicInputsHex: kyc, numPublicInputs: 193 });
   const response = (over: Partial<ProofResponse> = {}): ProofResponse => ({
     requestId: 'r1',
     circuit: 'coinbase_attestation',
@@ -343,9 +355,16 @@ describe('every verify path applies it before anything else runs', () => {
     expect(Contract).not.toHaveBeenCalled();
   });
 
-  it('core on-chain: an android proof with nothing pinned names the missing deployment', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
-    expect(r).toEqual({ valid: false, error: "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain." });
+  it.each([['android'], ['android_factory']])('core on-chain: a %s proof verifies on its own pinned contract', async variant => {
+    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 }, undefined, { signerVariant: variant });
+    expect(r).toEqual({ valid: true });
+    expect(String(Contract.mock.calls[0][0]).toLowerCase()).toBe(getPinnedVariantVerifier('coinbase_attestation', variant, 84532).address);
+  });
+
+  it('core on-chain: a response naming the standard contract for an android proof is refused', async () => {
+    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 },
+      { verifierAddress: getPinnedVerifier('coinbase_attestation', 84532).address }, { signerVariant: 'android' });
+    expect(r).toEqual({ valid: false, error: expect.stringMatching(/Refusing rather than trusting the response/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
@@ -367,8 +386,9 @@ describe('every verify path applies it before anything else runs', () => {
     const missing = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID) }), {});
     expect(missing).toEqual({ valid: false, error: expect.stringMatching(/does not say which signer made it/) });
     const claimed = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID), signerVariant: 'android' }), {});
-    expect(claimed).toEqual({ valid: false, error: "No coinbase_attestation verifier for the 'android' signer is deployed on chain 84532. It has no verifier deployed on any chain." });
-    expect(Contract).toHaveBeenCalledTimes(1);
+    expect(claimed).toEqual({ valid: true });
+    expect(Contract).toHaveBeenCalledTimes(2);
+    expect(String(Contract.mock.calls[1][0]).toLowerCase()).toBe(getPinnedVariantVerifier('coinbase_attestation', 'android', 84532).address);
   });
 
   it('SDK verifyOnChain takes the variant as an option', async () => {
@@ -385,8 +405,6 @@ describe('every verify path applies it before anything else runs', () => {
   });
 
   it("off-chain: an android proof is checked against the android package's key", async () => {
-    // A Coinbase KYC android proof carries the v2 layout, which this core
-    // refuses by count; a v1-shaped input list gets past that to the fetch.
     const urls: string[] = [];
     global.fetch = vi.fn(async (url: string) => {
       urls.push(url);
@@ -396,7 +414,7 @@ describe('every verify path applies it before anything else runs', () => {
     expect(r).toEqual({ valid: true });
     expect(urls).toEqual(['https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2-android/target/vk/vk']);
     await verifyProofOffChain('coinbase_attestation', proofOf(STANDARD_KYC), kyc);
-    expect(urls[1]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation/target/vk/vk');
+    expect(urls[1]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2/target/vk/vk');
     // Same length as android; the field alone picks the factory package's key,
     // cached apart from the android one.
     await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { signerVariant: 'android_factory' });

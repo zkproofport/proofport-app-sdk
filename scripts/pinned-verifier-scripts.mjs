@@ -10,7 +10,9 @@
 
 /** Deploy script name -> the circuit id and signer variant its verifier judges. */
 export const VERIFIER_BY_SCRIPT = Object.freeze({
-  CoinbaseAttestation: { circuit: 'coinbase_attestation', variant: 'standard' },
+  CoinbaseAttestationV2: { circuit: 'coinbase_attestation', variant: 'standard' },
+  CoinbaseAttestationV2Android: { circuit: 'coinbase_attestation', variant: 'android' },
+  CoinbaseAttestationV2AndroidFactory: { circuit: 'coinbase_attestation', variant: 'android_factory' },
   CoinbaseCountryAttestation: { circuit: 'coinbase_country_attestation', variant: 'standard' },
   OidcDomainAttestation: { circuit: 'oidc_domain_attestation', variant: 'standard' },
   OidcDomainAttestationAndroid: { circuit: 'oidc_domain_attestation', variant: 'android' },
@@ -25,24 +27,15 @@ export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifier
 /**
  * Verifiers this core version deliberately does not pin, each with its reason.
  * Named one by one so a new deploy script still stops the generator.
- *   CoinbaseAppAttestPoc          the Coinbase KYC v2 prototype (circuits
- *                                 33344e2); no shipped circuit uses it.
- *   CoinbaseAttestationV2         Coinbase KYC v2 has its own public-input
- *                                 layout; core pins it in the core v2 release
- *                                 (circuits-dev.md fix list item 9), not as a
- *                                 v1 coinbase_attestation row.
- *   CoinbaseAttestationV2Android  the Android signer's package of the same
- *                                 Coinbase KYC v2 layout; pinned with
- *                                 CoinbaseAttestationV2 in that release. This
- *                                 core reads coinbase_attestation as v1 (128
- *                                 public inputs), which refuses every v2 proof.
- *   CoinbaseAttestationV2AndroidFactory  the factory-provisioned Android
- *                                 signer's package of the same layout; same
- *                                 reason.
+ *   CoinbaseAppAttestPoc   the Coinbase KYC v2 prototype (circuits 33344e2); no
+ *                          shipped circuit uses it.
+ *   CoinbaseAttestation    Coinbase KYC v1 (128 public inputs). core judges
+ *                          coinbase_attestation by the v2 layout (193), which
+ *                          refuses every v1 proof by count, so pinning v1's
+ *                          contracts would only name verifiers no accepted
+ *                          proof can reach.
  */
 export const NOT_PINNED_HERE = new Set([
   'CoinbaseAppAttestPoc',
-  'CoinbaseAttestationV2',
-  'CoinbaseAttestationV2Android',
-  'CoinbaseAttestationV2AndroidFactory',
+  'CoinbaseAttestation',
 ]);

@@ -359,8 +359,9 @@ export function getVerifierChainId(
  * it would report one person.
  */
 const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number, number]; nullifier: readonly [number, number] }>> = Object.freeze({
-  // signal_hash, signer_list_merkle_root, scope, nullifier
-  coinbase_attestation: { scope: [64, 95], nullifier: [96, 127] },
+  // Coinbase KYC v2: GIWA's order (signal_hash, domain_separator,
+  // action_hash, merkle root, scope, nullifier), then attested_at.
+  coinbase_attestation: { scope: [128, 159], nullifier: [160, 191] },
   // No longer Coinbase's layout. The GIWA circuit gained the EIP-712 pair, so
   // it reads: signal_hash, domain_separator, action_hash, merkle root, then
   // scope and nullifier 64 bytes further along than Coinbase.

@@ -56,7 +56,7 @@ function generate(repo: string, extra: string[] = []) {
 
 const STANDARD = {
   'broadcast/DeployOidcDomainAttestation.s.sol/84532/run-latest.json': broadcast(84532, address(1)),
-  'broadcast/DeployCoinbaseAttestation.s.sol/84532/run-latest.json': broadcast(84532, address(2)),
+  'broadcast/DeployCoinbaseAttestationV2.s.sol/84532/run-latest.json': broadcast(84532, address(2)),
 };
 
 describe('generate-pinned-verifiers.mjs', () => {
@@ -65,9 +65,10 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(r.status, r.stderr).toBe(0);
     const text = r.text();
     expect(text).toContain(`84532: Object.freeze({ address: '${address(1)}'`);
+    expect(text).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {4}84532: Object\\.freeze\\(\\{ address: '${address(2)}'`));
     expect(text).toContain('export const PINNED_VARIANT_VERIFIERS');
-    expect(text).toMatch(/android: Object\.freeze\(\{\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
-    expect(text).toMatch(/android_factory: Object\.freeze\(\{\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
+    expect(text).toMatch(/android: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
+    expect(text).toMatch(/android_factory: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
   });
 
   it('a DeployOidcDomainAttestationAndroid broadcast becomes an android row, not a standard one', () => {
@@ -122,17 +123,25 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(check.stderr).toMatch(/is out of date/);
   });
 
-  it('CoinbaseAttestationV2Android and ...AndroidFactory are not pinned by this core', () => {
+  it('Coinbase KYC v2 pins its three packages; v1 (DeployCoinbaseAttestation) is not pinned', () => {
     const r = generate(circuitsRepo({
       ...STANDARD,
+      'broadcast/DeployCoinbaseAttestation.s.sol/84532/run-latest.json': broadcast(84532, address(0xc1)),
+      'deployments/84532/CoinbaseAttestation.json': JSON.stringify({ address: address(0xc1) }),
       'broadcast/DeployCoinbaseAttestationV2Android.s.sol/84532/run-latest.json': broadcast(84532, address(0xb1)),
       'deployments/84532/CoinbaseAttestationV2Android.json': JSON.stringify({ address: address(0xb1) }),
       'broadcast/DeployCoinbaseAttestationV2AndroidFactory.s.sol/84532/run-latest.json': broadcast(84532, address(0xb2)),
       'deployments/84532/CoinbaseAttestationV2AndroidFactory.json': JSON.stringify({ address: address(0xb2) }),
     }));
     expect(r.status, r.stderr).toBe(0);
-    expect(r.text()).not.toContain(address(0xb1));
-    expect(r.text()).not.toContain(address(0xb2));
+    const [standardPart, variants] = r.text().split('export const PINNED_VARIANT_VERIFIERS');
+    const [androidPart, factoryPart] = variants.split('  android_factory: Object.freeze({');
+    expect(r.text()).not.toContain(address(0xc1));
+    expect(standardPart).toContain(address(2));
+    expect(androidPart).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {6}84532: Object\\.freeze\\(\\{ address: '${address(0xb1)}'`));
+    expect(factoryPart).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {6}84532: Object\\.freeze\\(\\{ address: '${address(0xb2)}'`));
+    expect(androidPart).not.toContain(address(0xb2));
+    expect(factoryPart).not.toContain(address(0xb1));
   });
 
   it('an Android deploy script nobody mapped stops the generator, naming it', () => {

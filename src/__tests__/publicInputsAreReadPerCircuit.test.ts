@@ -45,12 +45,12 @@ describe('public inputs are read per circuit', () => {
     });
     expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'aa'.repeat(32));
     expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'bb'.repeat(32));
-    // The old behaviour, spelled out so its return value is visibly wrong.
-    expect(extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + 'ee'.repeat(32));
+    // v1 Coinbase's nullifier offset (96) holds GIWA's root: never read there.
+    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + 'ee'.repeat(32));
   });
 
   it('reads Coinbase and OIDC at their own offsets', () => {
-    const coinbase = fieldsWith({ ...block(64, 0x11), ...block(96, 0x22) });
+    const coinbase = fieldsWith({ ...block(128, 0x11), ...block(160, 0x22) });
     expect(extractScopeFromPublicInputs(coinbase, 'coinbase_attestation')).toBe('0x' + '11'.repeat(32));
     expect(extractNullifierFromPublicInputs(coinbase, 'coinbase_attestation')).toBe('0x' + '22'.repeat(32));
 
@@ -91,10 +91,17 @@ describe('public inputs are read per circuit', () => {
     }
   });
 
-  it('reads Coinbase at signal_hash, merkle root, scope, nullifier', () => {
-    const fields = fieldsWith({ ...block(64, 0x55), ...block(96, 0x66) });
+  it('reads Coinbase KYC v2 after signal_hash, the EIP-712 pair and the merkle root', () => {
+    // v2: signal_hash 0-31, domain_separator 32-63, action_hash 64-95, root
+    // 96-127, scope 128-159, nullifier 160-191, attested_at 192. v1's scope
+    // (64) is now action_hash and its nullifier (96) the merkle root.
+    const fields = fieldsWith({ ...block(64, 0x44), ...block(96, 0xee), ...block(128, 0x55), ...block(160, 0x66) }, 193);
     expect(extractScopeFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '55'.repeat(32));
     expect(extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '66'.repeat(32));
+    // A v1 proof (128 fields) has no bytes at v2's offsets: null, not v1's values.
+    const v1 = fieldsWith({ ...block(64, 0x55), ...block(96, 0x66) }, 128);
+    expect(extractScopeFromPublicInputs(v1, 'coinbase_attestation')).toBeNull();
+    expect(extractNullifierFromPublicInputs(v1, 'coinbase_attestation')).toBeNull();
   });
 
   it('reads GIWA two fields further along, because it gained the EIP-712 pair', () => {

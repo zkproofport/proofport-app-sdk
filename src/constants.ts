@@ -93,7 +93,7 @@ export const DEEP_LINK_HOSTS = {
  * ```typescript
  * const metadata = CIRCUIT_METADATA['coinbase_attestation'];
  * console.log(metadata.name); // "Coinbase KYC"
- * console.log(metadata.publicInputsCount); // 128
+ * console.log(metadata.publicInputsCount); // 193
  * ```
  */
 export const CIRCUIT_METADATA: Record<CircuitType, {
@@ -104,13 +104,14 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
 }> = {
   coinbase_attestation: {
     name: 'Coinbase KYC',
-    description: 'Prove Coinbase identity verification',
-    // 4 x `pub [u8; 32]` in coinbase-attestation/src/main.nr, flattened to
-    // bytes: signal_hash, signer_list_merkle_root, scope, nullifier.
-    // Read 2 here until 2026-09-04, which was wrong under any reading —
-    // the circuit has never had two public inputs, logical or flattened.
-    publicInputsCount: 128,
-    publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
+    description: 'Prove Coinbase identity verification, optionally authorizing one EIP-712 action',
+    // Coinbase KYC v2 (coinbase-attestation-v2/src/main.nr): GIWA's six
+    // `pub [u8; 32]` in its order, then `attested_at: pub u64` = 193 fields.
+    // signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
+    // signer_list_merkle_root 96-127, scope 128-159, nullifier 160-191,
+    // attested_at 192. v1's 128 fields are refused on every verify path.
+    publicInputsCount: 193,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'attested_at'],
   },
   coinbase_country_attestation: {
     name: 'Coinbase Country',

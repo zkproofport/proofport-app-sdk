@@ -50,9 +50,9 @@ describe('ProofportSDK - Utility Methods', () => {
     const metadata = sdk.getCircuitMetadata('coinbase_attestation');
     expect(metadata).toEqual({
       name: 'Coinbase KYC',
-      description: 'Prove Coinbase identity verification',
-      publicInputsCount: 128,
-      publicInputNames: ['signal_hash', 'signer_list_merkle_root'],
+      description: 'Prove Coinbase identity verification, optionally authorizing one EIP-712 action',
+      publicInputsCount: 193,
+      publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'attested_at'],
     });
   });
 

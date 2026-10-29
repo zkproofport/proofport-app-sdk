@@ -22,7 +22,7 @@ const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
 const ATTACKER = '0x000000000000000000000000000000000000dEaD';
 const PINNED_BASE_SEPOLIA_KYC = PINNED_VERIFIERS.coinbase_attestation[84532].address;
 const provider = {};
-const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: attestationInputs('coinbase_attestation'), numPublicInputs: 128 };
+const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: attestationInputs('coinbase_attestation'), numPublicInputs: 193 };
 
 const response = (over: Partial<ProofResponse> = {}): ProofResponse => ({
   requestId: 'r1',
@@ -66,7 +66,7 @@ describe('core verifyProofOnChain', () => {
   });
 
   it('accepts the pinned address in checksum case', async () => {
-    const checksummed = '0x42D165A48256ae184E1de4E7e6372e870E2Bc883';
+    const checksummed = '0x1885aA2283DB21ad0fc63A2Df98efe92F31908E6';
     expect(checksummed.toLowerCase()).toBe(PINNED_BASE_SEPOLIA_KYC);
     const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
       verifierAddress: checksummed,
@@ -128,7 +128,7 @@ describe('getPinnedVerifier', () => {
     for (const id of ALL_CIRCUIT_IDS) {
       for (const v of Object.values(PINNED_VERIFIERS[id])) {
         expect(v.address).toMatch(/^0x[0-9a-f]{40}$/);
-        expect(v.record).toMatch(/^broadcast\/Deploy[A-Za-z]+\.s\.sol\/\d+\/run-latest\.json$/);
+        expect(v.record).toMatch(/^broadcast\/Deploy[A-Za-z0-9]+\.s\.sol\/\d+\/run-latest\.json$/);
       }
     }
   });

@@ -11,6 +11,7 @@ import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
 import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
+import { checkCoinbaseAttestationProof } from './coinbasePolicy';
 
 /**
  * What a verify function passes down: the JWKS fetch timeout, and the request
@@ -39,8 +40,9 @@ export async function checkOidcProof(
  * nobody reads `null` as a check someone forgot.
  */
 export const CIRCUIT_ISSUER_CHECKS = {
-  // signer_list_merkle_root is chosen by the prover; see ./signerRoots.
-  coinbase_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_attestation),
+  // signer_list_merkle_root is chosen by the prover (./signerRoots), and
+  // attested_at by the statement's signer (./coinbasePolicy).
+  coinbase_attestation: checkCoinbaseAttestationProof,
   coinbase_country_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_country_attestation),
   // pubkey_modulus_limbs is chosen by the prover (./oidcProviderKeys), and the
   // audience, nonce and time it exposes need judging (./oidcPolicy).

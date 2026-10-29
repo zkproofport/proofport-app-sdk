@@ -47,8 +47,9 @@ describe('a dapp hears about a bad action from the SDK', () => {
     // An action sent to a circuit with no slots for it would otherwise be
     // dropped and leave the dapp believing something was authorized.
     await expect(
-      sdk().createRelayRequest('coinbase_attestation', {
+      sdk().createRelayRequest('oidc_domain_attestation', {
         scope: 'myapp.com',
+        domain: 'example.com',
         action: GOOD_ACTION,
       } as never),
     ).rejects.toThrow(/no action inputs/);
@@ -83,12 +84,13 @@ describe('a dapp hears about a bad action from the SDK', () => {
   it('names the circuit in the message, so a multi-circuit dapp knows which call', async () => {
     // The refusal: an action sent where nothing can prove it.
     const err = await sdk()
-      .createRelayRequest('coinbase_attestation', {
+      .createRelayRequest('oidc_domain_attestation', {
         scope: 'myapp.com',
+        domain: 'example.com',
         action: GOOD_ACTION,
       } as never)
       .catch((e: Error) => e.message);
-    expect(err).toContain('coinbase_attestation');
+    expect(err).toContain('oidc_domain_attestation');
   });
 
   it('lets a complete action through to the relay', async () => {

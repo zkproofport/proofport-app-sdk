@@ -147,15 +147,15 @@ export interface CircuitPackage {
  * The packages behind each circuit id, by signer variant. Exhaustive over
  * {@link CircuitId}: every circuit id has a `standard` package.
  *
- * `coinbase_attestation`'s `standard` package is still v1
- * (`coinbase-attestation`, 128 public inputs); its `android` package is the
- * Coinbase KYC v2 layout, and so is its `android_factory` package. This core judges coinbase_attestation by the v1
- * layout, so an android Coinbase proof is refused by its public input count
- * and neither has a pinned verifier until the release that adopts the v2 layout.
+ * `coinbase_attestation` is Coinbase KYC v2 in all three packages
+ * (`coinbase-attestation-v2`, `-android`, `-android-factory`): 193 public
+ * inputs, read by the layout in ./chain. The v1 package (`coinbase-attestation`,
+ * 128 public inputs) is not served here: its proofs are refused by count, and
+ * its verifiers are not pinned (scripts/pinned-verifier-scripts.mjs says why).
  */
 const CIRCUIT_PACKAGE_ROWS = {
   coinbase_attestation: {
-    standard: { packageDir: 'coinbase-attestation', vkPath: 'coinbase-attestation/target/vk/vk', deployScriptName: 'CoinbaseAttestation', logCircuitSize: 19 },
+    standard: { packageDir: 'coinbase-attestation-v2', vkPath: 'coinbase-attestation-v2/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2', logCircuitSize: 20 },
     android: { packageDir: 'coinbase-attestation-v2-android', vkPath: 'coinbase-attestation-v2-android/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2Android', logCircuitSize: 21 },
     android_factory: { packageDir: 'coinbase-attestation-v2-android-factory', vkPath: 'coinbase-attestation-v2-android-factory/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2AndroidFactory', logCircuitSize: 21 },
   },
@@ -462,7 +462,10 @@ export function getCircuitSupportStatus(circuit: CircuitId): CircuitSupportStatu
 export type CircuitActionBinding = 'none' | 'required' | 'optional';
 
 export const CIRCUIT_ACTION_BINDING = {
-  coinbase_attestation: 'none',
+  // Coinbase KYC v2 branches like GIWA: with an action the wallet signs the
+  // typed data, without one it personal_signs signal_hash
+  // (coinbase-attestation-v2/src/main.nr, coinbase_libs::signed_message).
+  coinbase_attestation: 'optional',
   coinbase_country_attestation: 'none',
   // The signature lives inside the identity token; no wallet, no action.
   oidc_domain_attestation: 'none',

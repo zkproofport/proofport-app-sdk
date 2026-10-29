@@ -19,10 +19,9 @@ export const PINNED_VERIFIERS_SOURCE_COMMIT = '2a0694263983ae42726fe5676aaa57a6b
 
 export const PINNED_VERIFIERS: Readonly<Record<CircuitId, Readonly<Record<number, PinnedVerifier>>>> = Object.freeze({
   coinbase_attestation: Object.freeze({
-    1: Object.freeze({ address: '0xf3d5a09d2c85b28c52ef2905c1be3a852b609d0c', deployedAt: '2026-04-17T08:54:35.827Z', circuitsCommit: 'a9a2d7c', record: 'broadcast/DeployCoinbaseAttestation.s.sol/1/run-latest.json' }),
-    8453: Object.freeze({ address: '0xf7ded73e7a7fc8fb030c35c5a88d40abe6865382', deployedAt: '2026-03-05T13:32:18.796Z', circuitsCommit: 'b69eacc', record: 'broadcast/DeployCoinbaseAttestation.s.sol/8453/run-latest.json' }),
-    84532: Object.freeze({ address: '0x42d165a48256ae184e1de4e7e6372e870e2bc883', deployedAt: '2026-10-22T13:39:54.784Z', circuitsCommit: '35a8df4', record: 'broadcast/DeployCoinbaseAttestation.s.sol/84532/run-latest.json' }),
-    11155111: Object.freeze({ address: '0x7fc2059a73cef2b572c8deee911c72963dcb4a8a', deployedAt: '2026-10-22T15:19:28.461Z', circuitsCommit: '2ef5613', record: 'broadcast/DeployCoinbaseAttestation.s.sol/11155111/run-latest.json' }),
+    1: Object.freeze({ address: '0x0e458610bd79893a0855c8f90ceded70cf7553b6', deployedAt: '2026-10-28T04:33:18.094Z', circuitsCommit: '9a1f9ce', record: 'broadcast/DeployCoinbaseAttestationV2.s.sol/1/run-latest.json' }),
+    8453: Object.freeze({ address: '0x6fc22d3576fb70457d1529b3f70f711a3cba7a7f', deployedAt: '2026-10-28T04:16:58.406Z', circuitsCommit: '9a1f9ce', record: 'broadcast/DeployCoinbaseAttestationV2.s.sol/8453/run-latest.json' }),
+    84532: Object.freeze({ address: '0x1885aa2283db21ad0fc63a2df98efe92f31908e6', deployedAt: '2026-10-27T16:18:55.246Z', circuitsCommit: '128a04b', record: 'broadcast/DeployCoinbaseAttestationV2.s.sol/84532/run-latest.json' }),
   }),
   coinbase_country_attestation: Object.freeze({
     1: Object.freeze({ address: '0x2eb64d21fb29f26cd58901767ad232841a945d46', deployedAt: '2026-10-28T04:34:06.946Z', circuitsCommit: '9a1f9ce', record: 'broadcast/DeployCoinbaseCountryAttestation.s.sol/1/run-latest.json' }),
@@ -51,6 +50,12 @@ export const PINNED_VERIFIERS: Readonly<Record<CircuitId, Readonly<Record<number
  */
 export const PINNED_VARIANT_VERIFIERS: Readonly<Record<Exclude<SignerVariant, 'standard'>, Readonly<Partial<Record<CircuitId, Readonly<Record<number, PinnedVerifier>>>>>>> = Object.freeze({
   android: Object.freeze({
+    coinbase_attestation: Object.freeze({
+      1: Object.freeze({ address: '0x099bacd621d896d9b7618d8e7ec330ae7867c117', deployedAt: '2026-10-29T05:00:02.473Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployCoinbaseAttestationV2Android.s.sol/1/run-latest.json' }),
+      8453: Object.freeze({ address: '0x836d8b0fd01bed4e34220ebcee6d63265951fbf9', deployedAt: '2026-10-29T04:56:07.839Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployCoinbaseAttestationV2Android.s.sol/8453/run-latest.json' }),
+      84532: Object.freeze({ address: '0x395b3bcc27e7e405ec909a81374243fd0b44aacc', deployedAt: '2026-10-28T10:42:10.124Z', circuitsCommit: 'ee0c43c', record: 'broadcast/DeployCoinbaseAttestationV2Android.s.sol/84532/run-latest.json' }),
+      11155111: Object.freeze({ address: '0x9432c87835c23d0a1dd88d1ba9f2b1996805b794', deployedAt: '2026-10-28T10:44:46.133Z', circuitsCommit: 'ee0c43c', record: 'broadcast/DeployCoinbaseAttestationV2Android.s.sol/11155111/run-latest.json' }),
+    }),
     oidc_domain_attestation: Object.freeze({
       1: Object.freeze({ address: '0x6f36db49fd28ae37475dbcf216ab5d700c6dbca0', deployedAt: '2026-10-29T04:58:37.233Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/1/run-latest.json' }),
       8453: Object.freeze({ address: '0x3d99a36b39231bc35f6e840f18ac443bf5d229de', deployedAt: '2026-10-29T04:55:13.087Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/8453/run-latest.json' }),
@@ -59,6 +64,12 @@ export const PINNED_VARIANT_VERIFIERS: Readonly<Record<Exclude<SignerVariant, 's
     }),
   }),
   android_factory: Object.freeze({
+    coinbase_attestation: Object.freeze({
+      1: Object.freeze({ address: '0x5798eee099da12eeb995ad6a09a8ab87c240b72b', deployedAt: '2026-10-29T05:00:49.912Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployCoinbaseAttestationV2AndroidFactory.s.sol/1/run-latest.json' }),
+      8453: Object.freeze({ address: '0x87d9a66cacac95b2bc43bac8e610c59acb67c5e0', deployedAt: '2026-10-29T04:56:53.880Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployCoinbaseAttestationV2AndroidFactory.s.sol/8453/run-latest.json' }),
+      84532: Object.freeze({ address: '0xbfaf9390c36d14d596556e42eb52d984de040aa1', deployedAt: '2026-10-28T10:43:01.522Z', circuitsCommit: 'ee0c43c', record: 'broadcast/DeployCoinbaseAttestationV2AndroidFactory.s.sol/84532/run-latest.json' }),
+      11155111: Object.freeze({ address: '0xeb1010791fe29b5f89ce1b9098ec4f4fafe04100', deployedAt: '2026-10-28T10:46:29.545Z', circuitsCommit: 'ee0c43c', record: 'broadcast/DeployCoinbaseAttestationV2AndroidFactory.s.sol/11155111/run-latest.json' }),
+    }),
     oidc_domain_attestation: Object.freeze({
       1: Object.freeze({ address: '0xe60947dd3b01586eb26e9cea647f059557ec2880', deployedAt: '2026-10-29T04:59:22.836Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/1/run-latest.json' }),
       8453: Object.freeze({ address: '0x1b8e60db8b51015cdb1983f64c1210ac40d8f532', deployedAt: '2026-10-29T04:55:38.611Z', circuitsCommit: 'fda216f', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/8453/run-latest.json' }),

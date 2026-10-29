@@ -71,7 +71,6 @@ describe('the expected roots are the roots of the published signer lists', () =>
   // The real proofs the circuits build writes (not committed; present where
   // the circuits were built). Their root is what a genuine mobile proof carries.
   const REAL = [
-    ['coinbase_attestation', 'coinbase-attestation'],
     ['coinbase_country_attestation', 'coinbase-country-attestation'],
     ['giwa_attestation', 'giwa-attestation'],
   ] as const;
@@ -82,6 +81,18 @@ describe('the expected roots are the roots of the published signer lists', () =>
     const inputs: string[] = [];
     for (let i = 0; i < bytes.length; i += 32) inputs.push('0x' + bytes.subarray(i, i + 32).toString('hex'));
     expect(await checkProofIssuer(circuit, inputs)).toEqual({ ok: true });
+  });
+
+  it('accepts the root inside a real Coinbase KYC v2 proof (committed fixture)', async () => {
+    const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'coinbaseKycV2SyntheticAnchors.json'), 'utf8'));
+    const attestedAt = Number(BigInt(fixture.publicInputs[192]));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(attestedAt * 1000 + 60_000);
+      expect(await checkProofIssuer('coinbase_attestation', fixture.publicInputs)).toEqual({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

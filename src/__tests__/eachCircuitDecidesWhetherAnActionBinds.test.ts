@@ -69,12 +69,14 @@ describe('the table itself', () => {
     const canBind = ALL_CIRCUIT_IDS.filter(
       id => CIRCUIT_ACTION_BINDING[id] !== 'none',
     );
-    expect(canBind.sort()).toEqual(['dojang_playground', 'giwa_attestation']);
+    expect(canBind.sort()).toEqual(['coinbase_attestation', 'dojang_playground', 'giwa_attestation']);
     // Nothing is 'required' today; the value stays in the union because a
     // circuit with only an EIP-712 path is a legitimate thing to build, and
     // the callers already handle it.
     expect(CIRCUIT_ACTION_BINDING.giwa_attestation).toBe('optional');
     expect(CIRCUIT_ACTION_BINDING.dojang_playground).toBe('optional');
+    // Coinbase KYC v2 branches in-circuit exactly like GIWA.
+    expect(CIRCUIT_ACTION_BINDING.coinbase_attestation).toBe('optional');
   });
 
   it('refuses a circuit it has never heard of instead of assuming none', () => {
@@ -133,8 +135,17 @@ describe('a deep link, per circuit', () => {
   it('refuses an action on a circuit that cannot prove one', () => {
     // Dropping it silently is the failure that matters: the dapp would believe
     // the proof authorized something the circuit never saw.
-    const r = validateProofRequest(request('coinbase_attestation', { scope: 'x', action: ACTION }));
+    const r = validateProofRequest(request('coinbase_country_attestation', { scope: 'x', countryList: ['US'], isIncluded: true, action: ACTION }));
     expect(r.valid).toBe(false);
     expect(r.error).toMatch(/no action inputs/i);
+  });
+
+  it('Coinbase KYC takes an action or none, and checks a present one', () => {
+    expect(validateProofRequest(request('coinbase_attestation', { scope: 'x' })).valid).toBe(true);
+    expect(validateProofRequest(request('coinbase_attestation', { scope: 'x', action: ACTION })).valid).toBe(true);
+    const broken = { ...ACTION, message: { delegate: '0x00' } };
+    const r = validateProofRequest(request('coinbase_attestation', { scope: 'x', action: broken }));
+    expect(r.valid).toBe(false);
+    expect(r.error).toMatch(/missing/i);
   });
 });
