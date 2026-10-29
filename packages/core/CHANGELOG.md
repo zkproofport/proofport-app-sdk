@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0-beta.0](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.3.0...core-v0.4.0-beta.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** remove the Korean mobile ID circuits
+
+### Features
+
+* **core:** add the android_factory signer variant ([1ff194a](https://github.com/zkproofport/proofport-app-sdk/commit/1ff194ae5f8a3fc75417c86eff278e7518761cb1))
+* **core:** keep a dropped provider key for 1 hour, not 24 ([a5c2df1](https://github.com/zkproofport/proofport-app-sdk/commit/a5c2df163cd86c72ac6065aae5acd91f17564ef0))
+* **core:** pin the Android signer verifiers on the two testnets ([abf5291](https://github.com/zkproofport/proofport-app-sdk/commit/abf5291437f639d2f30cc9a25ceea6e527aef57d))
+* **core:** pin the OIDC and Android signer verifiers on Base and Ethereum mainnet ([2f6a0da](https://github.com/zkproofport/proofport-app-sdk/commit/2f6a0da606f1aebdaf85a6a09f4ec8c758a0f46e))
+* **core:** pin the OIDC claim-quote fix verifiers on the two testnets ([43a9098](https://github.com/zkproofport/proofport-app-sdk/commit/43a90980b04bbe89ae34d349a63e765422882ad0))
+* **core:** pin the OIDC provider-key statement verifiers on the testnets ([304ccac](https://github.com/zkproofport/proofport-app-sdk/commit/304ccac23a6a63dcee0ed66b1715a14d9cb8a509))
+* **core:** remove the Korean mobile ID circuits ([0f62c6f](https://github.com/zkproofport/proofport-app-sdk/commit/0f62c6fd4a04c7384323d8f0975a84f1a9578f51))
+* **core:** verify android-signer proofs by signer variant ([2610f1f](https://github.com/zkproofport/proofport-app-sdk/commit/2610f1feda9d1935a417c4f2fb05ef588af1ea4f))
+
 ## [0.3.0](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.2.0...core-v0.3.0) (2026-10-27)
 
 
