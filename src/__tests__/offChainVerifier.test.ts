@@ -217,8 +217,10 @@ describe('off-chain verification input handling', () => {
  * OIDC has no committed witness. Those go through the identical code
  * path but are NOT exercised end to end here.
  */
+// Coinbase Country is not here: the proof its v1 build writes is refused by the
+// v2 layout (coinbaseCountryV2IsJudged.test.ts), and v2 is covered from its
+// committed fixture there.
 const CIRCUITS_WITH_COMMITTED_PROOFS = [
-  {circuit: 'coinbase_country_attestation' as const, dir: ['coinbase-country-attestation']},
   {circuit: 'giwa_attestation' as const, dir: ['giwa-attestation']},
   {circuit: 'dojang_playground' as const, dir: ['dojang-playground']},
 ];

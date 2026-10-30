@@ -13,7 +13,9 @@ export const VERIFIER_BY_SCRIPT = Object.freeze({
   CoinbaseAttestationV2: { circuit: 'coinbase_attestation', variant: 'standard' },
   CoinbaseAttestationV2Android: { circuit: 'coinbase_attestation', variant: 'android' },
   CoinbaseAttestationV2AndroidFactory: { circuit: 'coinbase_attestation', variant: 'android_factory' },
-  CoinbaseCountryAttestation: { circuit: 'coinbase_country_attestation', variant: 'standard' },
+  CoinbaseCountryAttestationV2: { circuit: 'coinbase_country_attestation', variant: 'standard' },
+  CoinbaseCountryAttestationV2Android: { circuit: 'coinbase_country_attestation', variant: 'android' },
+  CoinbaseCountryAttestationV2AndroidFactory: { circuit: 'coinbase_country_attestation', variant: 'android_factory' },
   OidcDomainAttestation: { circuit: 'oidc_domain_attestation', variant: 'standard' },
   OidcDomainAttestationAndroid: { circuit: 'oidc_domain_attestation', variant: 'android' },
   OidcDomainAttestationAndroidFactory: { circuit: 'oidc_domain_attestation', variant: 'android_factory' },
@@ -34,8 +36,12 @@ export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifier
  *                          refuses every v1 proof by count, so pinning v1's
  *                          contracts would only name verifiers no accepted
  *                          proof can reach.
+ *   CoinbaseCountryAttestation  Coinbase Country v1 (150 public inputs); core
+ *                          judges coinbase_country_attestation by the v2
+ *                          layout (215), so the same reason.
  */
 export const NOT_PINNED_HERE = new Set([
   'CoinbaseAppAttestPoc',
   'CoinbaseAttestation',
+  'CoinbaseCountryAttestation',
 ]);

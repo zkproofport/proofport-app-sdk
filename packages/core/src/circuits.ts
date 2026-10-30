@@ -152,6 +152,11 @@ export interface CircuitPackage {
  * inputs, read by the layout in ./chain. The v1 package (`coinbase-attestation`,
  * 128 public inputs) is not served here: its proofs are refused by count, and
  * its verifiers are not pinned (scripts/pinned-verifier-scripts.mjs says why).
+ *
+ * `coinbase_country_attestation` is Coinbase Country v2 in the same three
+ * shapes (`coinbase-country-attestation-v2`, `-android`, `-android-factory`):
+ * 215 public inputs. Its v1 package (`coinbase-country-attestation`, 150) is
+ * refused by count and not pinned, as for KYC.
  */
 const CIRCUIT_PACKAGE_ROWS = {
   coinbase_attestation: {
@@ -160,7 +165,9 @@ const CIRCUIT_PACKAGE_ROWS = {
     android_factory: { packageDir: 'coinbase-attestation-v2-android-factory', vkPath: 'coinbase-attestation-v2-android-factory/target/vk/vk', deployScriptName: 'CoinbaseAttestationV2AndroidFactory', logCircuitSize: 21 },
   },
   coinbase_country_attestation: {
-    standard: { packageDir: 'coinbase-country-attestation', vkPath: 'coinbase-country-attestation/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestation' },
+    standard: { packageDir: 'coinbase-country-attestation-v2', vkPath: 'coinbase-country-attestation-v2/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestationV2', logCircuitSize: 20 },
+    android: { packageDir: 'coinbase-country-attestation-v2-android', vkPath: 'coinbase-country-attestation-v2-android/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestationV2Android', logCircuitSize: 21 },
+    android_factory: { packageDir: 'coinbase-country-attestation-v2-android-factory', vkPath: 'coinbase-country-attestation-v2-android-factory/target/vk/vk', deployScriptName: 'CoinbaseCountryAttestationV2AndroidFactory', logCircuitSize: 21 },
   },
   oidc_domain_attestation: {
     standard: { packageDir: 'oidc-domain-attestation', vkPath: 'oidc-domain-attestation/target/vk/vk', deployScriptName: 'OidcDomainAttestation', logCircuitSize: 20 },
@@ -466,7 +473,9 @@ export const CIRCUIT_ACTION_BINDING = {
   // typed data, without one it personal_signs signal_hash
   // (coinbase-attestation-v2/src/main.nr, coinbase_libs::signed_message).
   coinbase_attestation: 'optional',
-  coinbase_country_attestation: 'none',
+  // Coinbase Country v2 takes the same branch
+  // (coinbase-country-attestation-v2/src/main.nr).
+  coinbase_country_attestation: 'optional',
   // The signature lives inside the identity token; no wallet, no action.
   oidc_domain_attestation: 'none',
   // Branches in-circuit: with an action the wallet signs the typed data,

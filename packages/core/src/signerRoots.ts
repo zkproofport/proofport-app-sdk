@@ -32,13 +32,13 @@ export interface SignerRootLayout {
 }
 
 /**
- * Per circuit, read off its `fn main` (and CIRCUIT_METADATA): Country puts
- * the root second (32-63); GIWA and Coinbase KYC v2 put signal_hash,
- * domain_separator and action_hash first, so their root is at 96-127.
+ * Per circuit, read off its `fn main` (and CIRCUIT_METADATA): GIWA, Coinbase
+ * KYC v2 and Coinbase Country v2 put signal_hash, domain_separator and
+ * action_hash first, so their root is at 96-127.
  */
 export const SIGNER_ROOT_LAYOUTS = Object.freeze({
   coinbase_attestation: { rootStart: 96, publicInputCount: 193, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
-  coinbase_country_attestation: { rootStart: 32, publicInputCount: 150, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
+  coinbase_country_attestation: { rootStart: 96, publicInputCount: 215, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
   giwa_attestation: { rootStart: 96, publicInputCount: 192, set: GIWA_SIGNER_SET, issuer: 'the GIWA attester' },
 } as const satisfies Record<string, SignerRootLayout>);
 

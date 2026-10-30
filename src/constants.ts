@@ -115,11 +115,15 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   },
   coinbase_country_attestation: {
     name: 'Coinbase Country',
-    description: 'Prove Coinbase country verification',
-    // 32 + 32 + (10 x 2) + 1 + 1 + 32 + 32 = 150, counted off
-    // coinbase-country-attestation/src/main.nr. Read 14 until 2026-09-04.
-    publicInputsCount: 150,
-    publicInputNames: ['signal_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included'],
+    description: 'Prove Coinbase country verification, optionally authorizing one EIP-712 action',
+    // Coinbase Country v2 (coinbase-country-attestation-v2/src/main.nr):
+    // signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
+    // signer_list_merkle_root 96-127, country_list 128-147 (10 x 2 bytes),
+    // country_list_length 148, is_included 149, scope 150-181,
+    // nullifier 182-213, attested_at 214 = 215 fields. v1's 150 fields are
+    // refused on every verify path.
+    publicInputsCount: 215,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included', 'scope', 'nullifier', 'attested_at'],
   },
   oidc_domain_attestation: {
     name: 'OIDC Domain',
@@ -203,5 +207,6 @@ export {
   RPC_ENDPOINTS,
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from '@zkproofport-app/core';

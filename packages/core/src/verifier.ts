@@ -369,8 +369,9 @@ const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number
   // signal_hash, domain_separator, action_hash, scope, nullifier: GIWA's
   // order without the merkle root, since there is no issuer list.
   dojang_playground: { scope: [96, 127], nullifier: [128, 159] },
-  // country_list, country_list_length and is_included sit before scope.
-  coinbase_country_attestation: { scope: [86, 117], nullifier: [118, 149] },
+  // Coinbase Country v2: Coinbase KYC v2's first four, then country_list,
+  // country_list_length and is_included before scope; attested_at last.
+  coinbase_country_attestation: { scope: [150, 181], nullifier: [182, 213] },
   // pubkey_modulus_limbs and the bounded domain sit before scope.
   oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
 });

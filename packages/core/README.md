@@ -29,3 +29,9 @@ a verifier needs:
   that an app proof's nonce is bound to that request (`checkOidcPolicy`,
   `deriveOidcNonceBinding`). A 148-input proof from the earlier circuit version
   is refused.
+- **Coinbase KYC and Coinbase country** (`coinbase_attestation`, 193 public
+  inputs; `coinbase_country_attestation`, 215): `attested_at`, when the
+  attestation was seen unrevoked, must be within 15 minutes behind and 5
+  minutes ahead of the verifier's clock (`checkCoinbaseAttestationProof`,
+  `checkCoinbaseCountryAttestationProof`). A proof from either circuit's
+  earlier version (128 or 150 public inputs) is refused by name.

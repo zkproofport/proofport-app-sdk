@@ -93,6 +93,7 @@ export type { OidcRequestContext, OidcAudience, OidcNonceMode } from './verifier
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from './constants';
 

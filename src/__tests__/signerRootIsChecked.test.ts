@@ -70,8 +70,9 @@ describe('the expected roots are the roots of the published signer lists', () =>
 
   // The real proofs the circuits build writes (not committed; present where
   // the circuits were built). Their root is what a genuine mobile proof carries.
+  // Coinbase Country v1's real proof is not here: the v2 layout refuses it by
+  // count (coinbaseCountryV2IsJudged.test.ts reads it for that).
   const REAL = [
-    ['coinbase_country_attestation', 'coinbase-country-attestation'],
     ['giwa_attestation', 'giwa-attestation'],
   ] as const;
   it.each(REAL)('accepts the root inside a real %s proof', async (circuit, dir) => {

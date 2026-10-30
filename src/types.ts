@@ -54,6 +54,8 @@ export interface CoinbaseKycInputs {
  * @property countryList - List of ISO 3166-1 alpha-2 country codes (e.g., ['US', 'KR']) (required)
  * @property isIncluded - If true, proves user IS from countries; if false, proves user is NOT from countries (required)
  * @property scope - Application-specific identifier for proof uniqueness
+ * @property action - Optional EIP-712 action the wallet signs instead of the signal hash;
+ *   the proof's public inputs then carry its domain separator and struct hash
  *
  * @example
  * ```typescript
@@ -71,6 +73,11 @@ export interface CoinbaseCountryInputs {
   countryList: string[];
   isIncluded: boolean;
   scope: string;
+  /**
+   * The EIP-712 action this proof authorizes. Optional: without one the wallet
+   * personal_signs the request's signal hash (Coinbase Country v2, like KYC v2).
+   */
+  action?: TypedAction;
 }
 
 /**

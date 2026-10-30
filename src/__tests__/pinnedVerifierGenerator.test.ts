@@ -67,8 +67,8 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(text).toContain(`84532: Object.freeze({ address: '${address(1)}'`);
     expect(text).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {4}84532: Object\\.freeze\\(\\{ address: '${address(2)}'`));
     expect(text).toContain('export const PINNED_VARIANT_VERIFIERS');
-    expect(text).toMatch(/android: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
-    expect(text).toMatch(/android_factory: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
+    expect(text).toMatch(/android: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}coinbase_country_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
+    expect(text).toMatch(/android_factory: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}coinbase_country_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
   });
 
   it('a DeployOidcDomainAttestationAndroid broadcast becomes an android row, not a standard one', () => {

@@ -92,20 +92,26 @@ export const COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
 export const COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT = 193;
 
 /**
- * Coinbase Country Attestation circuit public input layout (byte offsets).
- * Defines the byte positions of each field in the flattened public inputs array.
+ * Coinbase Country (v2) circuit public input layout (field offsets), 215 fields.
+ * One field per byte of each `[u8; 32]` and of each country code, in `fn main`'s
+ * order (coinbase-country-attestation-v2/src/main.nr: Coinbase KYC v2's order
+ * with v1's country fields after the signer root, then `attested_at`):
+ * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
+ * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
+ * - signer_list_merkle_root: 96-127
+ * - country_list: 128-147, ten ISO 3166-1 alpha-2 codes, two ASCII bytes each
+ * - country_list_length: 148 (1 to 10; entries at or past it are ignored)
+ * - is_included: 149 (1 inclusion, 0 exclusion)
+ * - scope: 150-181
+ * - nullifier: 182-213, keccak(keccak(wallet ++ keccak("coinbase_country_attestation")) ++ scope)
+ * - attested_at: 214, unix seconds the signed statement names
  *
- * Public inputs are packed as bytes32 values:
- * - signal_hash: bytes 0-31
- * - merkle_root: bytes 32-63
- * - country_list: bytes 64-83 (20 bytes for 10 countries)
- * - country_list_length: byte 84
- * - is_included: byte 85
- * - scope: bytes 86-117
+ * v1's layout (150 fields: signal_hash, root, country list, length, inclusion,
+ * scope, nullifier) is gone; a v1 proof is refused by its count on every
+ * verify path.
  *
  * @example
  * ```typescript
- * const publicInputs = response.publicInputs;
  * const countryList = publicInputs.slice(
  *   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.COUNTRY_LIST_START,
  *   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.COUNTRY_LIST_END + 1
@@ -115,17 +121,25 @@ export const COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT = 193;
 export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
   SIGNAL_HASH_END: 31,
-  MERKLE_ROOT_START: 32,
-  MERKLE_ROOT_END: 63,
-  COUNTRY_LIST_START: 64,
-  COUNTRY_LIST_END: 83,
-  COUNTRY_LIST_LENGTH: 84,
-  IS_INCLUDED: 85,
-  SCOPE_START: 86,
-  SCOPE_END: 117,
-  NULLIFIER_START: 118,
-  NULLIFIER_END: 149,
+  DOMAIN_SEPARATOR_START: 32,
+  DOMAIN_SEPARATOR_END: 63,
+  ACTION_HASH_START: 64,
+  ACTION_HASH_END: 95,
+  MERKLE_ROOT_START: 96,
+  MERKLE_ROOT_END: 127,
+  COUNTRY_LIST_START: 128,
+  COUNTRY_LIST_END: 147,
+  COUNTRY_LIST_LENGTH: 148,
+  IS_INCLUDED: 149,
+  SCOPE_START: 150,
+  SCOPE_END: 181,
+  NULLIFIER_START: 182,
+  NULLIFIER_END: 213,
+  ATTESTED_AT: 214,
 } as const;
+
+/** Coinbase Country (v2) public input count. A 150-input proof is v1 and refused. */
+export const COINBASE_COUNTRY_PUBLIC_INPUT_COUNT = 215;
 
 /**
  * OIDC Domain Attestation circuit public input layout (field offsets), v2.

@@ -62,14 +62,19 @@ describe('ProofportSDK - Utility Methods', () => {
     const metadata = sdk.getCircuitMetadata('coinbase_country_attestation');
     expect(metadata).toEqual({
       name: 'Coinbase Country',
-      description: 'Prove Coinbase country verification',
-      publicInputsCount: 150,
+      description: 'Prove Coinbase country verification, optionally authorizing one EIP-712 action',
+      publicInputsCount: 215,
       publicInputNames: [
         'signal_hash',
+        'domain_separator',
+        'action_hash',
         'signer_list_merkle_root',
         'country_list',
         'country_list_length',
         'is_included',
+        'scope',
+        'nullifier',
+        'attested_at',
       ],
     });
   });

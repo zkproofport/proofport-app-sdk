@@ -80,11 +80,12 @@ afterEach(() => {
 });
 
 describe('the package table', () => {
-  it('every circuit has a standard package; only OIDC and Coinbase KYC have the two android ones', () => {
+  it('every circuit has a standard package; only OIDC, Coinbase KYC and Coinbase Country have the two android ones', () => {
     for (const id of ALL_CIRCUIT_IDS) expect(signerVariantsOf(id)[0]).toBe('standard');
     for (const variant of ['android', 'android_factory'] as const) {
       expect(ALL_CIRCUIT_IDS.filter(id => signerVariantsOf(id).includes(variant)), variant).toEqual([
         'coinbase_attestation',
+        'coinbase_country_attestation',
         'oidc_domain_attestation',
       ]);
     }
@@ -102,6 +103,24 @@ describe('the package table', () => {
       packageDir: 'coinbase-attestation-v2-android',
       vkPath: 'coinbase-attestation-v2-android/target/vk/vk',
       deployScriptName: 'CoinbaseAttestationV2Android',
+      logCircuitSize: 21,
+    });
+    expect(getCircuitPackage('coinbase_country_attestation', 'standard')).toEqual({
+      packageDir: 'coinbase-country-attestation-v2',
+      vkPath: 'coinbase-country-attestation-v2/target/vk/vk',
+      deployScriptName: 'CoinbaseCountryAttestationV2',
+      logCircuitSize: 20,
+    });
+    expect(getCircuitPackage('coinbase_country_attestation', 'android')).toEqual({
+      packageDir: 'coinbase-country-attestation-v2-android',
+      vkPath: 'coinbase-country-attestation-v2-android/target/vk/vk',
+      deployScriptName: 'CoinbaseCountryAttestationV2Android',
+      logCircuitSize: 21,
+    });
+    expect(getCircuitPackage('coinbase_country_attestation', 'android_factory')).toEqual({
+      packageDir: 'coinbase-country-attestation-v2-android-factory',
+      vkPath: 'coinbase-country-attestation-v2-android-factory/target/vk/vk',
+      deployScriptName: 'CoinbaseCountryAttestationV2AndroidFactory',
       logCircuitSize: 21,
     });
     expect(getCircuitPackage('oidc_domain_attestation', 'android_factory')).toEqual({
@@ -194,8 +213,8 @@ describe('lookups end at an error naming the key', () => {
   });
 
   it('a variant the circuit has no package for names the ones it has', () => {
-    expect(() => getCircuitPackage('coinbase_country_attestation', 'android')).toThrow(
-      "Circuit 'coinbase_country_attestation' has no 'android' signer variant. Known for coinbase_country_attestation: standard.",
+    expect(() => getCircuitPackage('giwa_attestation', 'android')).toThrow(
+      "Circuit 'giwa_attestation' has no 'android' signer variant. Known for giwa_attestation: standard.",
     );
   });
 
@@ -295,7 +314,7 @@ describe('resolveSignerVariant', () => {
   });
 
   it('a single-package circuit has nothing to tell apart and ignores the length', () => {
-    expect(resolveSignerVariant('coinbase_country_attestation', undefined, proofOf(ANDROID))).toEqual({ variant: 'standard' });
+    expect(resolveSignerVariant('dojang_playground', undefined, proofOf(ANDROID))).toEqual({ variant: 'standard' });
     expect(resolveSignerVariant('giwa_attestation', 'standard', 'not hex')).toEqual({ variant: 'standard' });
   });
 

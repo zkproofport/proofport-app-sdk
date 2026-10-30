@@ -16,6 +16,7 @@ import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
 import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
 import { validateTypedAction } from './typedAction';
 import { circuitActionBinding } from './circuits';
+import { countryListError } from '@zkproofport-app/core';
 
 /**
  * Generates a unique request ID for proof requests.
@@ -595,11 +596,9 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
       return { valid: false, error: 'Invalid userAddress format' };
     }
-    if (!inputs.countryList || !Array.isArray(inputs.countryList) || inputs.countryList.length === 0) {
-      return { valid: false, error: 'countryList is required and must be a non-empty array' };
-    }
-    if (!inputs.countryList.every(c => typeof c === 'string')) {
-      return { valid: false, error: 'countryList must contain only strings' };
+    const listError = countryListError(inputs.countryList);
+    if (listError) {
+      return { valid: false, error: listError };
     }
     if (typeof inputs.isIncluded !== 'boolean') {
       return { valid: false, error: 'isIncluded is required and must be a boolean' };

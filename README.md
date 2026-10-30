@@ -190,13 +190,14 @@ one wallet in one scope has exactly one nullifier.
 
 ### `coinbase_country_attestation`
 
-Proves a user's country based on Coinbase verification, supporting inclusion and exclusion checks, without revealing the actual country. Requires a wallet signer.
+Proves a user's country based on Coinbase verification, supporting inclusion and exclusion checks, without revealing the actual country. Requires a wallet signer. Like Coinbase KYC, it can authorize one EIP-712 action, and the attestation is confirmed unrevoked — for the very country being proved — right before proving (`attested_at`, checked against your clock).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `scope` | `string` | Yes | Application-specific identifier |
-| `countryList` | `string[]` | Yes | ISO 3166-1 alpha-2 country codes (e.g., `['US', 'KR']`) |
+| `countryList` | `string[]` | Yes | 1 to 10 upper-case ISO 3166-1 alpha-2 country codes (e.g., `['US', 'KR']`); anything else is refused when the request is created |
 | `isIncluded` | `boolean` | Yes | `true` = prove user IS from listed countries; `false` = prove user is NOT |
+| `action` | `TypedAction` | No | An EIP-712 action the wallet signs instead of the request's signal hash |
 | `userAddress` | `string` | No | Address to prove the attestation for (optional, as above) |
 | `rawTransaction` | `string` | No | Pre-fetched attestation transaction data (optional, as above) |
 
@@ -207,6 +208,8 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
   isIncluded: true,
 });
 ```
+
+Its nullifier is `keccak(keccak(wallet ++ keccak("coinbase_country_attestation")) ++ scope)`.
 
 ### `oidc_domain_attestation`
 
@@ -333,15 +336,16 @@ circuit names are special:
 
 | What the circuit does with an action | Circuits |
 |---|---|
-| Signs it when present, signs the signal hash when not | `coinbase_attestation`, `giwa_attestation`, `dojang_playground` |
-| Has no action inputs — sending one is refused, not ignored | Coinbase country, OIDC domain |
+| Signs it when present, signs the signal hash when not | `coinbase_attestation`, `coinbase_country_attestation`, `giwa_attestation`, `dojang_playground` |
+| Has no action inputs — sending one is refused, not ignored | OIDC domain |
 
 ```typescript
 import { circuitActionBinding } from '@zkproofport-app/sdk';
 
 circuitActionBinding('giwa_attestation');  // 'optional'
 circuitActionBinding('coinbase_attestation'); // 'optional'
-circuitActionBinding('coinbase_country_attestation'); // 'none'
+circuitActionBinding('coinbase_country_attestation'); // 'optional'
+circuitActionBinding('oidc_domain_attestation'); // 'none'
 ```
 
 Sending an action to a circuit that cannot prove one is an error rather than a
@@ -1016,7 +1020,7 @@ import type {
 | `CircuitType` | Alias of `CircuitId`. Kept as the name used throughout `ProofRequest`, `ProofResponse` and the SDK methods |
 | `ProofRequestStatus` | `'pending' \| 'completed' \| 'error' \| 'cancelled'` — the status on a `ProofResponse` |
 | `CoinbaseKycInputs` | Inputs for `coinbase_attestation`: `{ scope, userAddress?, rawTransaction? }` |
-| `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, userAddress?, rawTransaction? }` |
+| `CoinbaseCountryInputs` | Inputs for `coinbase_country_attestation`: `{ scope, countryList, isIncluded, action?, userAddress?, rawTransaction? }` |
 | `OidcDomainInputs` | Inputs for `oidc_domain_attestation`: `{ domain, scope, provider? }` |
 | `ActionBoundInputs` | Inputs for the circuits that can bind an EIP-712 action: `{ scope, action?, userAddress?, rawTransaction? }`. Whether the action is required is the circuit's property, in `CIRCUIT_ACTION_BINDING` — optional for `giwa_attestation` and `dojang_playground` |
 | `GiwaAttestationInputs` | Alias of `ActionBoundInputs`, for `giwa_attestation` |
@@ -1084,19 +1088,22 @@ const signalHash = toBytes32(publicInputs.slice(L.SIGNAL_HASH_START, L.SIGNAL_HA
 | 160–191 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per wallet and scope |
 | 192 | `ATTESTED_AT` | `attested_at` | Unix seconds at which the attestation was confirmed unrevoked; checked against your clock by every verify method |
 
-### `coinbase_country_attestation` — 150 entries
+### `coinbase_country_attestation` — 215 entries
 
 | Index | Constants | Circuit field | What it is |
 |-------|-----------|---------------|------------|
-| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge |
-| 32–63 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` signer-list root |
-| 64–83 | `COUNTRY_LIST_START` / `_END` | `country_list` | 10 slots of 2 ASCII bytes, one byte per entry — entries 64–65 are the first code, 66–67 the second, and so on, in the order you sent them. Only the first `country_list_length` slots are meaningful; the rest are zero |
-| 84 | `COUNTRY_LIST_LENGTH` | `country_list_length` | How many of those 10 slots count |
-| 85 | `IS_INCLUDED` | `is_included` | `1` = the user **is** in the list, `0` = the user is **not** |
-| 86–117 | `SCOPE_START` / `_END` | `scope` | `bytes32` scope hash |
-| 118–149 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per user and scope |
+| 0–31 | `SIGNAL_HASH_START` / `_END` | `signal_hash` | `bytes32` anti-replay challenge; zero when the wallet signed an EIP-712 action |
+| 32–63 | `DOMAIN_SEPARATOR_START` / `_END` | `domain_separator` | EIP-712 domain separator of the signed action; zero without one |
+| 64–95 | `ACTION_HASH_START` / `_END` | `action_hash` | EIP-712 struct hash of the signed action; zero without one |
+| 96–127 | `MERKLE_ROOT_START` / `_END` | `signer_list_merkle_root` | `bytes32` signer-list root |
+| 128–147 | `COUNTRY_LIST_START` / `_END` | `country_list` | 10 slots of 2 ASCII bytes, one byte per entry — entries 128–129 are the first code, 130–131 the second, and so on, in the order you sent them. Only the first `country_list_length` slots are meaningful; the rest are zero |
+| 148 | `COUNTRY_LIST_LENGTH` | `country_list_length` | How many of those 10 slots count |
+| 149 | `IS_INCLUDED` | `is_included` | `1` = the user **is** in the list, `0` = the user is **not** |
+| 150–181 | `SCOPE_START` / `_END` | `scope` | `bytes32` scope hash |
+| 182–213 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per wallet and scope |
+| 214 | `ATTESTED_AT` | `attested_at` | Unix seconds at which the attestation was confirmed unrevoked; checked against your clock by every verify method |
 
-The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. Read indices 64–85 back and confirm they are the list and the direction you asked for; a valid proof against a different list is still a valid proof.
+The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. Read indices 128–149 back and confirm they are the list and the direction you asked for; a valid proof against a different list is still a valid proof.
 
 ### `oidc_domain_attestation` — 214 entries
 

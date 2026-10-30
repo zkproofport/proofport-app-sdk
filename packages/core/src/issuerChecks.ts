@@ -11,7 +11,7 @@ import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
 import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
-import { checkCoinbaseAttestationProof } from './coinbasePolicy';
+import { checkCoinbaseAttestationProof, checkCoinbaseCountryAttestationProof } from './coinbasePolicy';
 
 /**
  * What a verify function passes down: the JWKS fetch timeout, and the request
@@ -43,7 +43,8 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // signer_list_merkle_root is chosen by the prover (./signerRoots), and
   // attested_at by the statement's signer (./coinbasePolicy).
   coinbase_attestation: checkCoinbaseAttestationProof,
-  coinbase_country_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.coinbase_country_attestation),
+  // The same two, at Country v2's offsets.
+  coinbase_country_attestation: checkCoinbaseCountryAttestationProof,
   // pubkey_modulus_limbs is chosen by the prover (./oidcProviderKeys), and the
   // audience, nonce and time it exposes need judging (./oidcPolicy).
   oidc_domain_attestation: checkOidcProof,

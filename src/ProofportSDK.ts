@@ -55,7 +55,7 @@ import {
   VERIFICATION_CHAINS,
 } from './constants';
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
-import { getPinnedVerifier, type VerifierTarget, type OidcRequestContext } from './verifier';
+import { countryListError, getPinnedVerifier, type VerifierTarget, type OidcRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { DEFAULT_RELAY_WAIT_MS, isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -289,6 +289,13 @@ export class ProofportSDK {
     }
     if (typeof inputs.isIncluded !== 'boolean') {
       throw new Error('isIncluded is required for coinbase_country_attestation circuit');
+    }
+    const listError = countryListError(inputs.countryList);
+    if (listError) throw new Error(`${listError} (circuit: coinbase_country_attestation)`);
+    // Coinbase Country v2 binds an action or none, like Coinbase KYC v2.
+    if (inputs.action !== undefined) {
+      const actionError = validateTypedAction(inputs.action);
+      if (actionError) throw new Error(`${actionError} (circuit: coinbase_country_attestation)`);
     }
 
     const request: ProofRequest = {
