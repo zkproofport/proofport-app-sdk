@@ -1,6 +1,6 @@
 {
   "name": "@zkproofport-app/sdk",
-  "version": "0.5.0-beta.8",
+  "version": "0.5.0-beta.9",
   "description": "ZKProofport SDK for requesting zero-knowledge proofs from the ZKProofport mobile app and verifying them on-chain",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -42,7 +42,7 @@
     "buffer": "^6.0.3",
     "qrcode": "^1.5.3",
     "socket.io-client": "^4.8.0",
-    "@zkproofport-app/core": "0.4.0-beta.4"
+    "@zkproofport-app/core": "0.4.0-beta.5"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
