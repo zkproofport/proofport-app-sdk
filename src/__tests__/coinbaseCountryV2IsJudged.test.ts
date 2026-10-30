@@ -49,6 +49,8 @@ import {
   resolveSignerVariant,
   verifyProofOnChain,
   VERIFIER_ABI,
+  getPinnedVerifier,
+  getPinnedVariantVerifier,
 } from '../verifier';
 import { verifyProofOffChain } from '../offChainVerifier';
 import { ProofportSDK } from '../ProofportSDK';
@@ -234,6 +236,42 @@ describe('wiring', () => {
     const r = await verifyProofOffChain('coinbase_country_attestation', '0x' + 'ab'.repeat(64), withAttestedAt(field(NOW - 3600)));
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('pinned verifiers', () => {
+  // From circuits a49fd29 (deploy records of 2026-10-30). Ethereum mainnet
+  // (chain 1) has no Country v2 verifier yet: it must throw by name, never
+  // fall back to another chain or to v1's contract. Update this table when the
+  // chain-1 records land and the pinned table is regenerated.
+  const DEPLOYED = {
+    standard: { 84532: '0xc5363d7587bd580148373d0d8b7909be423242cb', 11155111: '0x99489796751b4939879dcaf5db35eb4964c58f6c', 8453: '0x509dee10cc1578361b450fed7475ea3bd69c6e8d' },
+    android: { 84532: '0x98013abb7ac83b6c985dcfbd5748ad2ae04c8c12', 11155111: '0x00f5ab7c6450a6ea91d2db8a91409c1b7504f3cc', 8453: '0xb57182062141f59ddbb98da73764ec1676689832' },
+    android_factory: { 84532: '0xd7bfd6d7bcc6c627da12cfcdf39fca6f64fdc0b9', 11155111: '0x81a7bb9c81d244d80f98ebeec455f252ee585911', 8453: '0x1f2975abd0711cf6b98084829e04712ee105d8f7' },
+  } as const;
+  it.each(Object.entries(DEPLOYED.standard))('standard on chain %s', (chain, address) => {
+    expect(getPinnedVerifier('coinbase_country_attestation', Number(chain)).address).toBe(address);
+  });
+  it.each([
+    ...Object.entries(DEPLOYED.android).map(([c, a]) => ['android', c, a] as const),
+    ...Object.entries(DEPLOYED.android_factory).map(([c, a]) => ['android_factory', c, a] as const),
+  ])('%s on chain %s', (variant, chain, address) => {
+    expect(getPinnedVariantVerifier('coinbase_country_attestation', variant, Number(chain)).address).toBe(address);
+  });
+  it("v1's Country contracts are not pinned anywhere", () => {
+    for (const v1 of ['0x2eb64d21fb29f26cd58901767ad232841a945d46', '0x8e89f11e65f219203f5be9d6a69a4da084630c56', '0x9deea2189ae694d7a36f65fb7d7dbe9f75abddce', '0x0b3af3dfc67dc65e0145c37ee00230139d579f64']) {
+      for (const chain of [1, 8453, 84532, 11155111]) {
+        let address: string | undefined;
+        try { address = getPinnedVerifier('coinbase_country_attestation', chain).address; } catch { /* not pinned */ }
+        expect(address).not.toBe(v1);
+      }
+    }
+  });
+  it('chain 1 throws by name for every variant until its verifiers are deployed', () => {
+    expect(() => getPinnedVerifier('coinbase_country_attestation', 1)).toThrow(/coinbase_country_attestation.*chain 1/);
+    for (const variant of ['android', 'android_factory'] as const) {
+      expect(() => getPinnedVariantVerifier('coinbase_country_attestation', variant, 1)).toThrow(/coinbase_country_attestation/);
+    }
   });
 });
 
