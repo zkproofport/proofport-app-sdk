@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0-beta.5](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.4...core-v0.4.0-beta.5) (2026-10-30)
+
+
+### Features
+
+* **core:** human_passport_score -- Human Passport issuer root, scorer, threshold and time checked on every verify path ([6850941](https://github.com/zkproofport/proofport-app-sdk/commit/6850941f1a35efed3a831a85cc1d497c402036f2))
+
+
+### Bug Fixes
+
+* **scripts:** read signer lists only from the provers, OpenStoa holds none since it verifies through core ([fd717d6](https://github.com/zkproofport/proofport-app-sdk/commit/fd717d671c71530ddcfb02806084728f66818436))
+
 ## [0.4.0-beta.4](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.3...core-v0.4.0-beta.4) (2026-10-30)
 
 
