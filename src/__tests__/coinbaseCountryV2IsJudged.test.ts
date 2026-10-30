@@ -240,15 +240,12 @@ describe('wiring', () => {
 });
 
 describe('pinned verifiers', () => {
-  // From circuits fc629d0 (deploy records of 2026-10-30). Ethereum mainnet
-  // (chain 1) has the standard and android contracts; android_factory is not
-  // deployed there yet and must throw by name, never fall back to another
-  // chain, another variant or v1's contract. Update this table when its
-  // record lands and the pinned table is regenerated.
+  // From circuits ad0df5e (deploy records of 2026-10-30): every package on
+  // Base Sepolia, Ethereum Sepolia, Base and Ethereum.
   const DEPLOYED = {
     standard: { 84532: '0xc5363d7587bd580148373d0d8b7909be423242cb', 11155111: '0x99489796751b4939879dcaf5db35eb4964c58f6c', 8453: '0x509dee10cc1578361b450fed7475ea3bd69c6e8d', 1: '0xcd23a61d194d3b00906c49457774cb7e207ccc7b' },
     android: { 84532: '0x98013abb7ac83b6c985dcfbd5748ad2ae04c8c12', 11155111: '0x00f5ab7c6450a6ea91d2db8a91409c1b7504f3cc', 8453: '0xb57182062141f59ddbb98da73764ec1676689832', 1: '0xc0255ef1eb2a77e441a4745df9b61859e586ae83' },
-    android_factory: { 84532: '0xd7bfd6d7bcc6c627da12cfcdf39fca6f64fdc0b9', 11155111: '0x81a7bb9c81d244d80f98ebeec455f252ee585911', 8453: '0x1f2975abd0711cf6b98084829e04712ee105d8f7' },
+    android_factory: { 84532: '0xd7bfd6d7bcc6c627da12cfcdf39fca6f64fdc0b9', 11155111: '0x81a7bb9c81d244d80f98ebeec455f252ee585911', 8453: '0x1f2975abd0711cf6b98084829e04712ee105d8f7', 1: '0xeab893ce6cc1e0d149fba880595038e48430a25e' },
   } as const;
   it.each(Object.entries(DEPLOYED.standard))('standard on chain %s', (chain, address) => {
     expect(getPinnedVerifier('coinbase_country_attestation', Number(chain)).address).toBe(address);
@@ -268,8 +265,9 @@ describe('pinned verifiers', () => {
       }
     }
   });
-  it('android_factory on chain 1 throws by name until its verifier is deployed', () => {
-    expect(() => getPinnedVariantVerifier('coinbase_country_attestation', 'android_factory', 1)).toThrow(/coinbase_country_attestation/);
+  it('a chain with no deployment throws by name, never falls back', () => {
+    expect(() => getPinnedVerifier('coinbase_country_attestation', 91342)).toThrow(/coinbase_country_attestation/);
+    expect(() => getPinnedVariantVerifier('coinbase_country_attestation', 'android_factory', 91342)).toThrow(/coinbase_country_attestation/);
   });
 });
 
