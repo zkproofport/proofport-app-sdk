@@ -55,7 +55,7 @@ import {
   VERIFICATION_CHAINS,
 } from './constants';
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
-import { countryListError, getPinnedVerifier, type VerifierTarget, type OidcRequestContext } from './verifier';
+import { countryListError, getPinnedVerifier, type CountryCondition, type VerifierTarget, type OidcRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { DEFAULT_RELAY_WAIT_MS, isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -107,6 +107,12 @@ export class ProofportSDK {
   private relayRequests: Map<string, OidcRequestContext> = new Map();
   /** Bound on {@link relayRequests}; a dApp that verifies later can pass the request explicitly. */
   static readonly MAX_REMEMBERED_RELAY_REQUESTS = 1000;
+  /**
+   * requestId -> the country list and direction of the Coinbase Country relay
+   * requests this instance created, so verifyResponse* can hold the proof to
+   * them. Bounded like {@link relayRequests}.
+   */
+  private countryRequests: Map<string, CountryCondition> = new Map();
   private signer: WalletSigner | null = null;
   private relayUrl: string;
   private socket: any = null;
@@ -752,7 +758,7 @@ export class ProofportSDK {
     proof: string,
     publicInputs: string[],
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext; signerVariant?: string } = {}
+    options: { request?: OidcRequestContext; signerVariant?: string; countryCondition?: CountryCondition } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -763,6 +769,7 @@ export class ProofportSDK {
     return verifyProofOnChain(circuit, parsedProof, providerOrSigner, this.verifierTarget(circuit), undefined, {
       request: options.request,
       signerVariant: options.signerVariant,
+      countryCondition: options.countryCondition,
     });
   }
 
@@ -810,6 +817,46 @@ export class ProofportSDK {
   }
 
   /**
+   * The country list and direction a `coinbase_country_attestation` response
+   * must have been proved against: the one the caller passed, else the relay
+   * request this instance created under the response's requestId, else the
+   * deep-link request still pending under it. `{ error }` when there is none:
+   * the proof's list is the prover's choice, so a response this SDK cannot
+   * place is refused rather than accepted for whatever list it carries.
+   */
+  private countryConditionFor(
+    response: ProofResponse,
+    explicit: CountryCondition | undefined,
+  ): { condition: CountryCondition } | { error: string } {
+    if (explicit !== undefined) return { condition: explicit };
+    const remembered = this.countryRequests.get(response.requestId);
+    if (remembered) return { condition: remembered };
+    const pending = this.pendingRequests.get(response.requestId);
+    const inputs = pending?.circuit === 'coinbase_country_attestation' ? (pending.inputs as CoinbaseCountryInputs) : undefined;
+    if (inputs && Array.isArray(inputs.countryList) && typeof inputs.isIncluded === 'boolean') {
+      return { condition: { countryList: [...inputs.countryList], isIncluded: inputs.isIncluded } };
+    }
+    return {
+      error:
+        `No Coinbase Country request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the ` +
+        "proof's country list cannot be checked against what was asked. Pass { countryCondition: { countryList, " +
+        'isIncluded } } -- the list and direction of the request you created.',
+    };
+  }
+
+  /** @internal Remember a Coinbase Country relay request's list and direction for verifyResponse*. */
+  private rememberCountryRequest(requestId: unknown, inputs: unknown): void {
+    const i = inputs as Partial<CoinbaseCountryInputs> | null | undefined;
+    if (typeof requestId !== 'string' || !i || !Array.isArray(i.countryList) || typeof i.isIncluded !== 'boolean') return;
+    this.countryRequests.delete(requestId);
+    this.countryRequests.set(requestId, { countryList: [...i.countryList], isIncluded: i.isIncluded });
+    while (this.countryRequests.size > ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS) {
+      const oldest = this.countryRequests.keys().next().value as string;
+      this.countryRequests.delete(oldest);
+    }
+  }
+
+  /**
    * The verifier for a circuit: the one the dApp configured, otherwise the
    * pinned deployment on the chain this SDK's environment verifies that
    * circuit on. `undefined` when neither exists, which core reports as an
@@ -835,6 +882,10 @@ export class ProofportSDK {
    * @param options.request - For `oidc_domain_attestation`: the `{ scope, requestId }`
    *   the response answers. Not needed for a relay request this SDK instance
    *   created; an OIDC response this instance cannot place is refused without it.
+   * @param options.countryCondition - For `coinbase_country_attestation`: the
+   *   `{ countryList, isIncluded }` the request asked for. Not needed for a
+   *   request this SDK instance created (relay or deep link); a Country response
+   *   this instance cannot place is refused without it.
    *
    * @returns Promise resolving to verification result with valid boolean and optional error message
    *
@@ -864,7 +915,7 @@ export class ProofportSDK {
   async verifyResponseOnChain(
     response: ProofResponse,
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext } = {}
+    options: { request?: OidcRequestContext; countryCondition?: CountryCondition } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
@@ -875,6 +926,12 @@ export class ProofportSDK {
       const found = this.oidcRequestFor(response, options.request);
       if ('error' in found) return { valid: false, error: found.error };
       request = found.request;
+    }
+    let countryCondition: CountryCondition | undefined;
+    if (response.circuit === 'coinbase_country_attestation') {
+      const found = this.countryConditionFor(response, options.countryCondition);
+      if ('error' in found) return { valid: false, error: found.error };
+      countryCondition = found.condition;
     }
 
     const parsedProof = parseProofForOnChain(
@@ -890,7 +947,7 @@ export class ProofportSDK {
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    }, { request, signerVariant: response.signerVariant });
+    }, { request, signerVariant: response.signerVariant, countryCondition });
   }
 
   /**
@@ -930,11 +987,17 @@ export class ProofportSDK {
       if ('error' in found) return { valid: false, error: found.error };
       request = found.request;
     }
+    let countryCondition: CountryCondition | undefined;
+    if (response.circuit === 'coinbase_country_attestation') {
+      const found = this.countryConditionFor(response, options?.countryCondition);
+      if ('error' in found) return { valid: false, error: found.error };
+      countryCondition = found.condition;
+    }
     return verifyProofOffChain(
       response.circuit,
       response.proof,
       response.publicInputs,
-      { ...options, request, signerVariant: response.signerVariant }
+      { ...options, request, countryCondition, signerVariant: response.signerVariant }
     );
   }
 
@@ -1351,6 +1414,15 @@ export class ProofportSDK {
       }
     }
 
+    // A Coinbase Country list the circuit would refuse is refused here, before a
+    // challenge is burned, as createProofRequest does.
+    if (circuit === 'coinbase_country_attestation') {
+      const c = inputs as Partial<CoinbaseCountryInputs>;
+      const listError = countryListError(c.countryList);
+      if (listError) throw new Error(`${listError} (circuit: ${circuit})`);
+      if (typeof c.isIncluded !== 'boolean') throw new Error('isIncluded is required for coinbase_country_attestation circuit');
+    }
+
     // Return target: validated before we burn a challenge, so a typo surfaces
     // as a local error instead of a relay 400 on the second round trip.
     if (options.returnScheme !== undefined) {
@@ -1408,6 +1480,7 @@ export class ProofportSDK {
 
     const created = await response.json() as RelayProofRequest;
     this.rememberRelayRequest(created.requestId, scope);
+    if (circuit === 'coinbase_country_attestation') this.rememberCountryRequest(created.requestId, inputs);
     return created;
   }
 

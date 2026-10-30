@@ -35,7 +35,7 @@
  * two pieces, so nothing is joined back here.
  */
 import { ALL_CIRCUIT_IDS, getCircuitPackage, isCircuitId, resolveSignerVariant, type CircuitId, type SignerVariant } from './circuits';
-import { checkProofIssuer, type OidcRequestContext } from '@zkproofport-app/core';
+import { checkProofIssuer, type CountryCondition, type OidcRequestContext } from '@zkproofport-app/core';
 
 /**
  * Where verification keys are published.
@@ -80,6 +80,13 @@ export interface OffChainVerifyOptions {
    * is given).
    */
   signerVariant?: string;
+  /**
+   * For `coinbase_country_attestation`: the country list and direction the
+   * request asked for. The proof's list is a public input the prover chose, so
+   * a proof is refused unless it was made against exactly this condition. See
+   * core's `checkCountryListMatches`.
+   */
+  countryCondition?: CountryCondition;
 }
 
 /**
@@ -246,7 +253,7 @@ export async function verifyProofOffChain(
   // their trust anchor as a public input the prover chooses. For OIDC that is
   // the RSA key -- see core's oidcProviderKeys. Checked here so a dApp that
   // verifies off-chain gets the same answer as one that verifies on-chain.
-  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request });
+  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request, countryCondition: options.countryCondition });
   if (!issuer.ok) {
     return { valid: false, error: issuer.error };
   }

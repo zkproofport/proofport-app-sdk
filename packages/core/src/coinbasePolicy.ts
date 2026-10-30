@@ -153,3 +153,117 @@ export function countryListError(countryList: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** The list and direction a Coinbase Country request asked for. */
+export interface CountryCondition {
+  /** ISO 3166-1 alpha-2 codes, upper case, 1 to 10 of them. */
+  countryList: readonly string[];
+  /** `true`: the person's country must be in the list; `false`: must not be. */
+  isIncluded: boolean;
+}
+
+/**
+ * The list and direction a `coinbase_country_attestation` proof was made
+ * against, read from its public inputs (128-149), or why they cannot be read.
+ * Strict: every list byte is an upper-case ASCII letter inside the length and
+ * zero past it, the length is 1 to 10, the flag 0 or 1 -- what every honest
+ * prover writes. The circuit ignores the bytes past the length, so a prover
+ * could put anything there; refusing that costs an honest proof nothing.
+ */
+export function readCountryCondition(
+  publicInputs: readonly string[],
+): { ok: true; condition: CountryCondition } | { ok: false; error: string } {
+  if (!Array.isArray(publicInputs) || publicInputs.length !== COINBASE_COUNTRY_PUBLIC_INPUT_COUNT) {
+    return {
+      ok: false,
+      error: `Expected ${COINBASE_COUNTRY_PUBLIC_INPUT_COUNT} public inputs; got ${Array.isArray(publicInputs) ? publicInputs.length : typeof publicInputs}.`,
+    };
+  }
+  const L = COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT;
+  const at = (i: number): bigint | undefined => {
+    try {
+      return BigInt(publicInputs[i]);
+    } catch {
+      return undefined;
+    }
+  };
+  const length = at(L.COUNTRY_LIST_LENGTH);
+  if (length === undefined || length < 1n || length > BigInt(COINBASE_COUNTRY_LIST_MAX)) {
+    return { ok: false, error: `Public input ${L.COUNTRY_LIST_LENGTH} (country_list_length) is not 1 to ${COINBASE_COUNTRY_LIST_MAX}: ${publicInputs[L.COUNTRY_LIST_LENGTH]}.` };
+  }
+  const flag = at(L.IS_INCLUDED);
+  if (flag !== 0n && flag !== 1n) {
+    return { ok: false, error: `Public input ${L.IS_INCLUDED} (is_included) is not 0 or 1: ${publicInputs[L.IS_INCLUDED]}.` };
+  }
+  const countryList: string[] = [];
+  for (let slot = 0; slot < COINBASE_COUNTRY_LIST_MAX; slot++) {
+    const i = L.COUNTRY_LIST_START + 2 * slot;
+    const a = at(i);
+    const b = at(i + 1);
+    if (slot < Number(length)) {
+      const letter = (v: bigint | undefined) => v !== undefined && v >= 0x41n && v <= 0x5an;
+      if (!letter(a) || !letter(b)) {
+        return { ok: false, error: `Public inputs ${i}-${i + 1} (country_list[${slot}]) are not an upper-case country code.` };
+      }
+      countryList.push(String.fromCharCode(Number(a), Number(b)));
+    } else if (a !== 0n || b !== 0n) {
+      return { ok: false, error: `Public inputs ${i}-${i + 1} (country_list[${slot}]) lie past country_list_length and are not zero.` };
+    }
+  }
+  return { ok: true, condition: { countryList, isIncluded: flag === 1n } };
+}
+
+/**
+ * Whether a `coinbase_country_attestation` proof was made against the list
+ * and direction the request asked for.
+ *
+ * The wallet's signature does not cover the list (the circuit takes it as a
+ * public input), so a proof against ['KR'] verifies just as well as one
+ * against the ['US'] a dApp asked for. Only this comparison makes the proof
+ * answer the dApp's question. The lists are compared as sets of codes: the
+ * order a list was written in does not change which countries it names.
+ * Never throws for anything the proof's sender controls.
+ */
+export function checkCountryListMatches(
+  publicInputs: readonly string[],
+  requested: CountryCondition,
+): IssuerCheckResult {
+  const want = requested as CountryCondition | null | undefined;
+  if (!want || typeof want !== 'object' || typeof want.isIncluded !== 'boolean') {
+    return { ok: false, error: 'The requested country condition is missing or has no isIncluded flag.' };
+  }
+  const listError = countryListError(want.countryList);
+  if (listError) return { ok: false, error: `The requested country list cannot be compared: ${listError}.` };
+  const read = readCountryCondition(publicInputs);
+  if (!read.ok) return read;
+  const got = read.condition;
+  if (got.isIncluded !== want.isIncluded) {
+    return {
+      ok: false,
+      error: `The proof is ${got.isIncluded ? 'an inclusion' : 'an exclusion'} check, but the request asked for ${want.isIncluded ? 'inclusion' : 'exclusion'}.`,
+    };
+  }
+  const key = (list: readonly string[]) => [...new Set(list)].sort().join(',');
+  if (key(got.countryList) !== key(want.countryList)) {
+    return {
+      ok: false,
+      error: `The proof's country list [${got.countryList.join(', ')}] is not the requested [${want.countryList.join(', ')}].`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * The Coinbase Country issuer check: count, signer root and attested_at
+ * always; the list and direction too when the verifying caller knows the
+ * request (`countryCondition`).
+ */
+export async function checkCoinbaseCountryProof(
+  publicInputs: readonly string[],
+  options: { countryCondition?: CountryCondition } = {},
+): Promise<IssuerCheckResult> {
+  const base = await checkCoinbaseCountryAttestationProof(publicInputs);
+  if (!base.ok) return base;
+  if (options.countryCondition === undefined) return base;
+  return checkCountryListMatches(publicInputs, options.countryCondition);
+}

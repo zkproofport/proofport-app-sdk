@@ -41,12 +41,14 @@ import {
   COINBASE_ATTESTED_AT_MAX_FUTURE_SECONDS,
   COINBASE_COUNTRY_LIST_MAX,
   checkCoinbaseCountryAttestationProof,
+  checkCoinbaseCountryProof,
   checkProofIssuer,
   countryListError,
   extractNullifierFromPublicInputs,
   extractScopeFromPublicInputs,
   resolveSignerVariant,
   verifyProofOnChain,
+  VERIFIER_ABI,
 } from '../verifier';
 import { verifyProofOffChain } from '../offChainVerifier';
 import { ProofportSDK } from '../ProofportSDK';
@@ -207,13 +209,14 @@ describe('attested_at', () => {
 
 describe('wiring', () => {
   it('the issuer table runs this check for coinbase_country_attestation', async () => {
-    expect(CIRCUIT_ISSUER_CHECKS.coinbase_country_attestation).toBe(checkCoinbaseCountryAttestationProof);
+    expect(CIRCUIT_ISSUER_CHECKS.coinbase_country_attestation).toBe(checkCoinbaseCountryProof);
     expect((await checkProofIssuer('coinbase_country_attestation', withAttestedAt(field(NOW - 3600)))).ok).toBe(false);
   });
 
   it('on-chain verify refuses a stale proof before calling any contract', async () => {
     const stale = withAttestedAt(field(NOW - 3600));
-    const r = await verifyProofOnChain('coinbase_country_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: stale, numPublicInputs: 215 }, {}, { chainId: 84532 });
+    const target = { address: '0x' + '42'.repeat(20), chainId: 84532, abi: VERIFIER_ABI };
+    const r = await verifyProofOnChain('coinbase_country_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: stale, numPublicInputs: 215 }, {}, target);
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(Contract).not.toHaveBeenCalled();
   });

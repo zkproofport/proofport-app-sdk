@@ -11,13 +11,17 @@ import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
 import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
-import { checkCoinbaseAttestationProof, checkCoinbaseCountryAttestationProof } from './coinbasePolicy';
+import { checkCoinbaseAttestationProof, checkCoinbaseCountryProof, type CountryCondition } from './coinbasePolicy';
 
 /**
- * What a verify function passes down: the JWKS fetch timeout, and the request
- * the proof answers (only `oidc_domain_attestation` reads it; see ./oidcPolicy).
+ * What a verify function passes down: the JWKS fetch timeout, the request the
+ * proof answers (only `oidc_domain_attestation` reads it; see ./oidcPolicy),
+ * and the country list and direction a Coinbase Country request asked for
+ * (only `coinbase_country_attestation` reads it; see ./coinbasePolicy).
  */
-export interface ProofCheckOptions extends OidcKeyCheckOptions, OidcPolicyOptions {}
+export interface ProofCheckOptions extends OidcKeyCheckOptions, OidcPolicyOptions {
+  countryCondition?: CountryCondition;
+}
 
 export type IssuerCheck = (publicInputs: readonly string[], options: ProofCheckOptions) => Promise<IssuerCheckResult>;
 
@@ -43,8 +47,9 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // signer_list_merkle_root is chosen by the prover (./signerRoots), and
   // attested_at by the statement's signer (./coinbasePolicy).
   coinbase_attestation: checkCoinbaseAttestationProof,
-  // The same two, at Country v2's offsets.
-  coinbase_country_attestation: checkCoinbaseCountryAttestationProof,
+  // The same two, at Country v2's offsets, and the requested country list and
+  // direction when the caller knows the request.
+  coinbase_country_attestation: checkCoinbaseCountryProof,
   // pubkey_modulus_limbs is chosen by the prover (./oidcProviderKeys), and the
   // audience, nonce and time it exposes need judging (./oidcPolicy).
   oidc_domain_attestation: checkOidcProof,

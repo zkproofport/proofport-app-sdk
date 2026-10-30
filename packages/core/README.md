@@ -35,3 +35,7 @@ a verifier needs:
   minutes ahead of the verifier's clock (`checkCoinbaseAttestationProof`,
   `checkCoinbaseCountryAttestationProof`). A proof from either circuit's
   earlier version (128 or 150 public inputs) is refused by name.
+- **Coinbase country list** (`coinbase_country_attestation`): when the caller
+  passes `countryCondition: { countryList, isIncluded }`, the proof's list and
+  direction must be exactly those (as a set of codes); without it core cannot
+  know the request (`checkCountryListMatches`, `readCountryCondition`).

@@ -211,6 +211,22 @@ const relay = await sdk.createRelayRequest('coinbase_country_attestation', {
 
 Its nullifier is `keccak(keccak(wallet ++ keccak("coinbase_country_attestation")) ++ scope)`.
 
+The list and the direction are public inputs the prover chooses; the wallet's
+signature does not cover them. `verifyResponseOnChain` and
+`verifyResponseOffChain` therefore compare them with the request this SDK
+instance created (relay or deep link) and refuse a proof made against any other
+list. A response the instance cannot place is refused; pass the request's
+condition explicitly in that case:
+
+```typescript
+await sdk.verifyResponseOnChain(response, provider, {
+  countryCondition: { countryList: ['US', 'KR'], isIncluded: true },
+});
+```
+
+`checkCountryListMatches(publicInputs, { countryList, isIncluded })` is the same
+check on its own (codes compared as a set, order does not matter).
+
 ### `oidc_domain_attestation`
 
 Prove email domain affiliation via OIDC Sign-In. The mobile app handles authentication and proof generation entirely on-device — the user's email is never revealed. No wallet signer is required.
@@ -1103,7 +1119,7 @@ const signalHash = toBytes32(publicInputs.slice(L.SIGNAL_HASH_START, L.SIGNAL_HA
 | 182–213 | `NULLIFIER_START` / `_END` | `nullifier` | `bytes32`, unique per wallet and scope |
 | 214 | `ATTESTED_AT` | `attested_at` | Unix seconds at which the attestation was confirmed unrevoked; checked against your clock by every verify method |
 
-The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. Read indices 128–149 back and confirm they are the list and the direction you asked for; a valid proof against a different list is still a valid proof.
+The country list and the `is_included` flag are public inputs, which means the proof is only as strong as the list it was proved against. The `verifyResponse*` methods compare them with your request (above); if you verify through another path, call `checkCountryListMatches` or read indices 128–149 back yourself — a valid proof against a different list is still a valid proof.
 
 ### `oidc_domain_attestation` — 214 entries
 
