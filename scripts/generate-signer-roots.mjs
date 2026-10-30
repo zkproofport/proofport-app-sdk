@@ -15,7 +15,8 @@
  *   proofport-app  src/config/contracts.ts   AUTHORIZED_SIGNERS        (mobile prover, Coinbase)
  *   proofport-app  src/utils/giwaKyc.ts      GIWA_AUTHORIZED_SIGNERS   (mobile prover, GIWA)
  *   proofport-ai   src/config/contracts.ts   AUTHORIZED_SIGNERS, GIWA_AUTHORIZED_SIGNERS (server prover)
- *   openstoa       src/lib/proof-issuer.ts   COINBASE_SIGNERS          (cross-check only)
+ *   (openstoa kept a cross-check copy until fb72225, 2026-10-27; it now
+ *   verifies through core and holds no list of its own)
  * The lists must agree, IN ORDER (the order fixes the tree), or this stops.
  *
  * Tree, as both provers build it (proofport-ai src/input/merkleTree.ts, and
@@ -27,7 +28,7 @@
  *   node scripts/generate-signer-roots.mjs --check   # exit 1 on drift
  *
  * Prerequisites: node >= 18, git, ethers installed (npm ci), and the
- * proofport-app, proofport-ai and openstoa checkouts in the superproject.
+ * proofport-app and proofport-ai checkouts in the superproject.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -79,7 +80,6 @@ function merkleRoot(addresses) {
 const coinbaseSources = [
   readList('proofport-app', 'src/config/contracts.ts', 'AUTHORIZED_SIGNERS'),
   readList('proofport-ai', 'src/config/contracts.ts', 'AUTHORIZED_SIGNERS'),
-  readList('openstoa', 'src/lib/proof-issuer.ts', 'COINBASE_SIGNERS'),
 ];
 const giwaSources = [
   readList('proofport-app', 'src/utils/giwaKyc.ts', 'GIWA_AUTHORIZED_SIGNERS'),

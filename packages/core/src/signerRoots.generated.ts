@@ -14,11 +14,11 @@ export interface SignerSet {
 export const COINBASE_SIGNER_SET: SignerSet = Object.freeze({
   signers: Object.freeze(['0x952f32128AF084422539C4Ff96df5C525322E564', '0x8844591D47F17bcA6F5dF8f6B64F4a739F1C0080', '0x88FE64EA2E121f49bb77ABEA6c0A45e93638c3C5', '0x44ACE9abB148e8412AC4492e9A1AE6bd88226803']),
   root: '0xb60da9815c76261b61a1e91f199de5845fc171a6500e57c4240d2ac61d85e2bf',
-  sources: Object.freeze(['proofport-app@eb3e61c:src/config/contracts.ts#AUTHORIZED_SIGNERS', 'proofport-ai@ee900ac:src/config/contracts.ts#AUTHORIZED_SIGNERS', 'openstoa@aa2c016:src/lib/proof-issuer.ts#COINBASE_SIGNERS']),
+  sources: Object.freeze(['proofport-app@f840d40:src/config/contracts.ts#AUTHORIZED_SIGNERS', 'proofport-ai@854ef49:src/config/contracts.ts#AUTHORIZED_SIGNERS']),
 });
 
 export const GIWA_SIGNER_SET: SignerSet = Object.freeze({
   signers: Object.freeze(['0xEE099845CDfF93e73aDcBcB36A9B93578bcCed4b']),
   root: '0xad0e6d81c16211cd9d5d1580bbcea34f90a7dbf861530724a28bcba585360b92',
-  sources: Object.freeze(['proofport-app@eb3e61c:src/utils/giwaKyc.ts#GIWA_AUTHORIZED_SIGNERS', 'proofport-ai@ee900ac:src/config/contracts.ts#GIWA_AUTHORIZED_SIGNERS']),
+  sources: Object.freeze(['proofport-app@f840d40:src/utils/giwaKyc.ts#GIWA_AUTHORIZED_SIGNERS', 'proofport-ai@854ef49:src/config/contracts.ts#GIWA_AUTHORIZED_SIGNERS']),
 });
