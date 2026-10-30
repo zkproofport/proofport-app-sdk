@@ -18,4 +18,5 @@ export * from './oidcPolicy';
 export * from './issuerChecks';
 export * from './signerRoots';
 export * from './coinbasePolicy';
+export * from './humanPassportPolicy';
 export type { CircuitType, ParsedProof, VerifierContract } from './types';

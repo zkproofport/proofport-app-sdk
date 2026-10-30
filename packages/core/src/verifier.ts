@@ -374,6 +374,8 @@ const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number
   coinbase_country_attestation: { scope: [150, 181], nullifier: [182, 213] },
   // pubkey_modulus_limbs and the bounded domain sit before scope.
   oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
+  // GIWA's six first, then min_score, scorer_id and now.
+  human_passport_score: { scope: [128, 159], nullifier: [160, 191] },
 });
 
 /**

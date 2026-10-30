@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@zkproofport-app/sdk)](https://www.npmjs.com/package/@zkproofport-app/sdk)
 [![license](https://img.shields.io/npm/l/@zkproofport-app/sdk)](./LICENSE)
 
-TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Three circuits are officially supported today — Coinbase KYC, Coinbase country attestation, and OIDC email-domain attestation (Google, Microsoft 365). Two more prove today against a testnet deployment and are marked experimental: GIWA attestation and Dojang Playground. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
+TypeScript SDK for requesting zero-knowledge proofs from the [ZKProofport](https://zkproofport.com) mobile app and verifying them on-chain. Four circuits are officially supported today — Coinbase KYC, Coinbase country attestation, OIDC email-domain attestation (Google, Microsoft 365), and Human Passport score. Two more prove today against a testnet deployment and are marked experimental: GIWA attestation and Dojang Playground. [Circuit Identifiers](#circuit-identifiers) has the full list and what each status means.
 
 ## How It Works
 
@@ -125,6 +125,7 @@ import { CIRCUIT_IDS, CIRCUIT_SUPPORT_STATUS } from '@zkproofport-app/sdk/circui
 | `CIRCUIT_IDS.COINBASE_ATTESTATION` | `coinbase_attestation` | **Supported** |
 | `CIRCUIT_IDS.COINBASE_COUNTRY_ATTESTATION` | `coinbase_country_attestation` | **Supported** |
 | `CIRCUIT_IDS.OIDC_DOMAIN_ATTESTATION` | `oidc_domain_attestation` | **Supported** |
+| `CIRCUIT_IDS.HUMAN_PASSPORT_SCORE` | `human_passport_score` | **Supported** |
 | `CIRCUIT_IDS.GIWA_ATTESTATION` | `giwa_attestation` | _Experimental_ |
 | `CIRCUIT_IDS.DOJANG_PLAYGROUND` | `dojang_playground` | _Experimental_ |
 
@@ -267,6 +268,38 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 ```
 
 > When `provider` is set, the mobile app verifies the user's account is managed by the specified workspace provider (e.g., Google Workspace `hd` claim, Microsoft 365 `tid` claim). Without `provider`, only the email domain is verified.
+
+### `human_passport_score`
+
+Proves the wallet holds an unexpired [Human Passport](https://passport.human.tech) score at or above a threshold, without revealing the wallet or the exact score. The score is the one Human Passport attests on Base (scoreV2); the user creates it in Human Passport and records it on Base first. Requires a wallet signer, and can authorize one EIP-712 action like Coinbase KYC.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scope` | `string` | Yes | Application-specific identifier |
+| `minScore` | `number` | Yes | Threshold in Passport points (`20` = 20.0; above 0, at most four decimals) |
+| `action` | `TypedAction` | No | An EIP-712 action the wallet signs instead of the request's signal hash |
+
+```typescript
+const relay = await sdk.createRelayRequest('human_passport_score', {
+  scope: 'myapp.com',
+  minScore: 20,
+});
+```
+
+Its nullifier is `keccak(keccak(wallet ++ keccak("human_passport_score")) ++ scope)`.
+
+The threshold is a public input the prover chooses, so `verifyResponseOnChain`
+and `verifyResponseOffChain` compare it with the request this SDK instance
+created and refuse any other. A response the instance cannot place is refused;
+pass the threshold explicitly in that case:
+
+```typescript
+await sdk.verifyResponseOnChain(response, provider, { minScore: 20 });
+```
+
+Every verify path also requires Human Passport's issuer root, its Base scorer
+(`335`) and a proof time within 15 minutes behind and 5 minutes ahead of your
+clock (`checkHumanPassportProof`).
 
 ## Experimental Circuits
 

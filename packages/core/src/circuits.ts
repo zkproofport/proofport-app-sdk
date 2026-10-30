@@ -59,6 +59,8 @@ export const CIRCUIT_IDS = Object.freeze({
   GIWA_ATTESTATION: 'giwa_attestation',
   /** Dojang Playground on GIWA Sepolia. Experimental — testnet only. */
   DOJANG_PLAYGROUND: 'dojang_playground',
+  /** Human Passport score (scoreV2 on Base) at or above a threshold. Officially supported. */
+  HUMAN_PASSPORT_SCORE: 'human_passport_score',
 } as const);
 
 /**
@@ -97,6 +99,9 @@ export const CIRCUIT_SUPPORT_STATUS: Readonly<Record<CircuitId, CircuitSupportSt
     // Same footing as GIWA: built, verifier deployed on GIWA Sepolia, a real
     // proof verifies there. Testnet only.
     dojang_playground: 'experimental',
+    // Mainnet data (Base) and mainnet verifiers; the issuer is Human
+    // Passport's production key.
+    human_passport_score: 'supported',
   } as const);
 
 /**
@@ -179,6 +184,10 @@ const CIRCUIT_PACKAGE_ROWS = {
   },
   dojang_playground: {
     standard: { packageDir: 'dojang-playground', vkPath: 'dojang-playground/target/vk/vk', deployScriptName: 'DojangPlayground' },
+  },
+  // One package for every signer: the wallet signs, no device attestation.
+  human_passport_score: {
+    standard: { packageDir: 'human-passport-score', vkPath: 'human-passport-score/target/vk/vk', deployScriptName: 'HumanPassportScore' },
   },
 } satisfies Record<CircuitId, { readonly standard: CircuitPackage } & Partial<Record<SignerVariant, CircuitPackage>>>;
 
@@ -483,6 +492,8 @@ export const CIRCUIT_ACTION_BINDING = {
   giwa_attestation: 'optional',
   // Same branch as GIWA; see dojang-playground/src/main.nr.
   dojang_playground: 'optional',
+  // Same branch as GIWA (human-passport-score/src/main.nr, shared signed_digest).
+  human_passport_score: 'optional',
 } satisfies Record<CircuitId, CircuitActionBinding>;
 
 /*
@@ -524,4 +535,93 @@ export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
   // The wallet signs the request, and the same key must have signed its
   // Playground faucet transaction.
   dojang_playground: true,
+  // The wallet the score attestation names signs the request.
+  human_passport_score: true,
 } satisfies Record<CircuitId, boolean>;
+
+// ============ Human Passport (human_passport_score) ============
+
+/**
+ * What a `human_passport_score` proof is anchored to, as data. No imports, so
+ * the app (through `@zkproofport-app/core/circuits`) and both provers read the
+ * same values the verifier checks.
+ *
+ * The circuit (circuits `human-passport-score/src/main.nr`) proves that a
+ * Human Passport scoreV2 attestation request, signed (EIP-712) by an issuer
+ * key under `signer_list_merkle_root`, names the signing wallet, scores it at
+ * least `min_score` by scorer `scorer_id`, and has not expired at `now`. The
+ * root, the scorer and the clock are public inputs the prover chooses, so a
+ * verifier compares each with the values below (./humanPassportPolicy).
+ *
+ * Sources: passportxyz/eas-proxy `deployments/onchainInfo.json` and
+ * `contracts/GitcoinVerifier.sol`; `issuer()` read on Base for both verifiers;
+ * every scoreV2 attestation on Base names scorer 335 and 4 decimals.
+ */
+
+/** Base mainnet: the only chain Human Passport scores are read from. */
+export const HUMAN_PASSPORT_SOURCE_CHAIN_ID = 8453;
+
+/** The scoreV2 EAS schema on Base. */
+export const HUMAN_PASSPORT_SCORE_SCHEMA = '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912';
+
+/** Human Passport's issuer key, `issuer()` on both GitcoinVerifier contracts below. */
+export const HUMAN_PASSPORT_ISSUER = '0x804233b96cbd6d81efeb6517347177ef7bD488ED';
+
+/** The scorer every scoreV2 attestation on Base is computed by. */
+export const HUMAN_PASSPORT_SCORER_ID = 335;
+
+/** Scores are integers in units of 10^-4 (score 20.0 = 200000). */
+export const HUMAN_PASSPORT_SCORE_DECIMALS = 4;
+
+/**
+ * The issuer list, one leaf per GitcoinVerifier on Base the issuer signs for,
+ * in tree order. Leaf = keccak256(issuer ++ EIP-712 domain separator of that
+ * verifier ++ scoreV2 schema). `domainSeparator` is
+ * keccak256(abi.encode(EIP712Domain typehash, keccak("GitcoinVerifier"),
+ * keccak("1"), 8453, verifier)).
+ */
+export const HUMAN_PASSPORT_ISSUER_LEAVES = Object.freeze([
+  Object.freeze({
+    verifier: '0x45fA2E93d79Fc44d44b697A94330031b8ccbF68e',
+    domainSeparator: '0xaf982f5666127029186640687fa6edb600cc0f2f8a710e2f49a89532ac4f5420',
+    leaf: '0xe445d3227cc3b0d2fe4a1dd27f8e5524cea8a40456b4ae3787a17a612a297b4e',
+  }),
+  Object.freeze({
+    verifier: '0x16db23c4b99bbC9A6Bf55dF7a787C9AEFD261185',
+    domainSeparator: '0xe2629762fcce87a38ac0750847169957e216f41ada08b595295a0ec3591c4de7',
+    leaf: '0xc8838bb3948037119f9c6f0701e21ac59676cedb4e8e18097e0e3d90eb48aa13',
+  }),
+] as const);
+
+/**
+ * Root of {@link HUMAN_PASSPORT_ISSUER_LEAVES}: leaves padded with bytes32(0)
+ * to a power of two, parent = keccak256(left ++ right). Two leaves, depth 1.
+ */
+export const HUMAN_PASSPORT_ISSUER_ROOT = '0x3119e41cb3315962b331736523451956c39230dd7cbcad67b335cff512792596';
+
+/** The largest scoreV2 `data` the circuit hashes (MAX_DATA_BYTES in main.nr). */
+export const HUMAN_PASSPORT_MAX_DATA_BYTES = 10240;
+
+/** The largest threshold the circuit's u32 `min_score` holds, in score units. */
+const MAX_MIN_SCORE_UNITS = 0xffffffff;
+
+/**
+ * A score threshold as a person writes it (20, 20.5, 0.0001) in the circuit's
+ * units (score x 10^4). Throws for anything that is not a finite number above
+ * zero with at most four decimals that fits a u32: a threshold of zero proves
+ * only that some score exists, and a rounded one would prove a different
+ * threshold than the one asked for.
+ */
+export function humanPassportScoreUnits(minScore: unknown): number {
+  if (typeof minScore !== 'number' || !Number.isFinite(minScore) || minScore <= 0) {
+    throw new Error(`minScore must be a number above 0; got ${JSON.stringify(minScore)}.`);
+  }
+  const units = Math.round(minScore * 10 ** HUMAN_PASSPORT_SCORE_DECIMALS);
+  if (Math.abs(units - minScore * 10 ** HUMAN_PASSPORT_SCORE_DECIMALS) > 1e-6) {
+    throw new Error(`minScore ${minScore} has more than ${HUMAN_PASSPORT_SCORE_DECIMALS} decimals.`);
+  }
+  if (units < 1 || units > MAX_MIN_SCORE_UNITS) {
+    throw new Error(`minScore ${minScore} is out of range (0.0001 to ${MAX_MIN_SCORE_UNITS / 10 ** HUMAN_PASSPORT_SCORE_DECIMALS}).`);
+  }
+  return units;
+}

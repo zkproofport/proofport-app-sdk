@@ -33,6 +33,7 @@ const NARGO_CIRCUIT_NAMES = [
   'oidc_domain_attestation',
   'giwa_attestation',
   'dojang_playground',
+  'human_passport_score',
 ];
 
 /** Hyphenated route / directory names from other repos. Never circuit IDs. */
@@ -104,11 +105,12 @@ describe('circuit support status', () => {
     }
   });
 
-  it('officially supports Coinbase (both) and OIDC only', () => {
+  it('officially supports Coinbase (both), OIDC and Human Passport only', () => {
     expect([...SUPPORTED_CIRCUIT_IDS]).toEqual([
       'coinbase_attestation',
       'coinbase_country_attestation',
       'oidc_domain_attestation',
+      'human_passport_score',
     ]);
   });
 

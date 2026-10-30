@@ -145,6 +145,24 @@ export type GiwaAttestationInputs = ActionBoundInputs;
 export type DojangPlaygroundInputs = ActionBoundInputs;
 
 /**
+ * Input parameters for `human_passport_score`.
+ *
+ * Proves the wallet holds an unexpired Human Passport score (scoreV2 on Base)
+ * of at least `minScore`, without revealing the wallet or the exact score.
+ *
+ * @property minScore - The threshold in Passport points (20 = 20.0; at most
+ *   four decimals). The proof carries it, and verification compares it with
+ *   the one asked for.
+ * @example
+ * ```typescript
+ * const inputs: HumanPassportScoreInputs = { scope: 'myapp.com', minScore: 20 };
+ * ```
+ */
+export interface HumanPassportScoreInputs extends ActionBoundInputs {
+  minScore: number;
+}
+
+/**
  * Union type of all circuit-specific input types.
  * Each circuit type has a corresponding input interface.
  */
@@ -152,6 +170,7 @@ export type CircuitInputs =
   | CoinbaseKycInputs
   | ActionBoundInputs
   | CoinbaseCountryInputs
+  | HumanPassportScoreInputs
   | OidcDomainInputs
   | EmptyInputs;
 

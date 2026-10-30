@@ -69,7 +69,9 @@ describe('the table itself', () => {
     const canBind = ALL_CIRCUIT_IDS.filter(
       id => CIRCUIT_ACTION_BINDING[id] !== 'none',
     );
-    expect(canBind.sort()).toEqual(['coinbase_attestation', 'coinbase_country_attestation', 'dojang_playground', 'giwa_attestation']);
+    expect(canBind.sort()).toEqual(['coinbase_attestation', 'coinbase_country_attestation', 'dojang_playground', 'giwa_attestation', 'human_passport_score']);
+    // Human Passport takes GIWA's branch (shared signed_digest).
+    expect(CIRCUIT_ACTION_BINDING.human_passport_score).toBe('optional');
     // Nothing is 'required' today; the value stays in the union because a
     // circuit with only an EIP-712 path is a legitimate thing to build, and
     // the callers already handle it.

@@ -89,6 +89,7 @@ describe('ProofportSDK - Utility Methods', () => {
       'oidc_domain_attestation',
       'giwa_attestation',
       'dojang_playground',
+      'human_passport_score',
     ]);
   });
 });

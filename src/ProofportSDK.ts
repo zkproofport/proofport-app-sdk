@@ -9,6 +9,7 @@ import type {
   CircuitInputs,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
+  HumanPassportScoreInputs,
   ProofportConfig,
   QRCodeOptions,
   ParsedProof,
@@ -54,7 +55,7 @@ import {
   RELAY_URLS,
   VERIFICATION_CHAINS,
 } from './constants';
-import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, isCircuitId, type CircuitId } from './circuits';
+import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, humanPassportScoreUnits, isCircuitId, type CircuitId } from './circuits';
 import { countryListError, getPinnedVerifier, type CountryCondition, type VerifierTarget, type OidcRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { DEFAULT_RELAY_WAIT_MS, isTerminalRelayStatus } from './relayStatus';
@@ -113,6 +114,12 @@ export class ProofportSDK {
    * them. Bounded like {@link relayRequests}.
    */
   private countryRequests: Map<string, CountryCondition> = new Map();
+  /**
+   * requestId -> the score threshold of the Human Passport relay requests this
+   * instance created, so verifyResponse* can hold the proof's min_score to it.
+   * Bounded like {@link relayRequests}.
+   */
+  private passportRequests: Map<string, number> = new Map();
   private signer: WalletSigner | null = null;
   private relayUrl: string;
   private socket: any = null;
@@ -367,6 +374,15 @@ export class ProofportSDK {
     switch (builder) {
       case 'country':
         return this.createCoinbaseCountryRequest(inputs as CoinbaseCountryInputs, options);
+      case 'passport': {
+        const minScore = (inputs as Partial<HumanPassportScoreInputs>).minScore;
+        try {
+          humanPassportScoreUnits(minScore);
+        } catch (error) {
+          throw new Error(`${error instanceof Error ? error.message : String(error)} (circuit: ${circuit})`);
+        }
+        return this.createScopedRequest(circuit, inputs, options);
+      }
       case 'scoped':
         return this.createScopedRequest(circuit, inputs, options);
     }
@@ -383,7 +399,9 @@ export class ProofportSDK {
     oidc_domain_attestation: 'scoped',
     giwa_attestation: 'scoped',
     dojang_playground: 'scoped',
-  } as const satisfies Record<CircuitId, 'scoped' | 'country'>;
+    // Scoped, plus the score threshold the proof must carry.
+    human_passport_score: 'passport',
+  } as const satisfies Record<CircuitId, 'scoped' | 'country' | 'passport'>;
 
   // ============ Deep Link Generation ============
 
@@ -758,7 +776,7 @@ export class ProofportSDK {
     proof: string,
     publicInputs: string[],
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext; signerVariant?: string; countryCondition?: CountryCondition } = {}
+    options: { request?: OidcRequestContext; signerVariant?: string; countryCondition?: CountryCondition; minScore?: number } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -770,6 +788,7 @@ export class ProofportSDK {
       request: options.request,
       signerVariant: options.signerVariant,
       countryCondition: options.countryCondition,
+      minScore: options.minScore,
     });
   }
 
@@ -844,6 +863,44 @@ export class ProofportSDK {
     };
   }
 
+  /**
+   * The score threshold a `human_passport_score` response must carry: the one
+   * the caller passed, else the relay request this instance created under the
+   * response's requestId, else the deep-link request still pending under it.
+   * `{ error }` when there is none: the proof's threshold is the prover's
+   * choice, so a response this SDK cannot place is refused rather than
+   * accepted for whatever threshold it carries.
+   */
+  private passportMinScoreFor(
+    response: ProofResponse,
+    explicit: number | undefined,
+  ): { minScore: number } | { error: string } {
+    if (explicit !== undefined) return { minScore: explicit };
+    const remembered = this.passportRequests.get(response.requestId);
+    if (remembered !== undefined) return { minScore: remembered };
+    const pending = this.pendingRequests.get(response.requestId);
+    const inputs = pending?.circuit === 'human_passport_score' ? (pending.inputs as HumanPassportScoreInputs) : undefined;
+    if (inputs && typeof inputs.minScore === 'number') return { minScore: inputs.minScore };
+    return {
+      error:
+        `No Human Passport request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the ` +
+        "proof's score threshold cannot be checked against what was asked. Pass { minScore } -- the threshold of " +
+        'the request you created.',
+    };
+  }
+
+  /** @internal Remember a Human Passport relay request's threshold for verifyResponse*. */
+  private rememberPassportRequest(requestId: unknown, inputs: unknown): void {
+    const minScore = (inputs as Partial<HumanPassportScoreInputs> | null | undefined)?.minScore;
+    if (typeof requestId !== 'string' || typeof minScore !== 'number') return;
+    this.passportRequests.delete(requestId);
+    this.passportRequests.set(requestId, minScore);
+    while (this.passportRequests.size > ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS) {
+      const oldest = this.passportRequests.keys().next().value as string;
+      this.passportRequests.delete(oldest);
+    }
+  }
+
   /** @internal Remember a Coinbase Country relay request's list and direction for verifyResponse*. */
   private rememberCountryRequest(requestId: unknown, inputs: unknown): void {
     const i = inputs as Partial<CoinbaseCountryInputs> | null | undefined;
@@ -915,7 +972,7 @@ export class ProofportSDK {
   async verifyResponseOnChain(
     response: ProofResponse,
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext; countryCondition?: CountryCondition } = {}
+    options: { request?: OidcRequestContext; countryCondition?: CountryCondition; minScore?: number } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
@@ -933,6 +990,12 @@ export class ProofportSDK {
       if ('error' in found) return { valid: false, error: found.error };
       countryCondition = found.condition;
     }
+    let minScore: number | undefined;
+    if (response.circuit === 'human_passport_score') {
+      const found = this.passportMinScoreFor(response, options.minScore);
+      if ('error' in found) return { valid: false, error: found.error };
+      minScore = found.minScore;
+    }
 
     const parsedProof = parseProofForOnChain(
       response.proof,
@@ -947,7 +1010,7 @@ export class ProofportSDK {
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    }, { request, signerVariant: response.signerVariant, countryCondition });
+    }, { request, signerVariant: response.signerVariant, countryCondition, minScore });
   }
 
   /**
@@ -993,11 +1056,17 @@ export class ProofportSDK {
       if ('error' in found) return { valid: false, error: found.error };
       countryCondition = found.condition;
     }
+    let minScore: number | undefined;
+    if (response.circuit === 'human_passport_score') {
+      const found = this.passportMinScoreFor(response, options?.minScore);
+      if ('error' in found) return { valid: false, error: found.error };
+      minScore = found.minScore;
+    }
     return verifyProofOffChain(
       response.circuit,
       response.proof,
       response.publicInputs,
-      { ...options, request, countryCondition, signerVariant: response.signerVariant }
+      { ...options, request, countryCondition, minScore, signerVariant: response.signerVariant }
     );
   }
 
@@ -1414,6 +1483,15 @@ export class ProofportSDK {
       }
     }
 
+    // A Human Passport threshold the circuit cannot carry is refused here too.
+    if (circuit === 'human_passport_score') {
+      try {
+        humanPassportScoreUnits((inputs as Partial<HumanPassportScoreInputs>).minScore);
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)} (circuit: ${circuit})`);
+      }
+    }
+
     // A Coinbase Country list the circuit would refuse is refused here, before a
     // challenge is burned, as createProofRequest does.
     if (circuit === 'coinbase_country_attestation') {
@@ -1481,6 +1559,7 @@ export class ProofportSDK {
     const created = await response.json() as RelayProofRequest;
     this.rememberRelayRequest(created.requestId, scope);
     if (circuit === 'coinbase_country_attestation') this.rememberCountryRequest(created.requestId, inputs);
+    if (circuit === 'human_passport_score') this.rememberPassportRequest(created.requestId, inputs);
     return created;
   }
 

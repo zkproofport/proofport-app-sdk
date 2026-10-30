@@ -8,6 +8,7 @@ import type {
   CircuitInputs,
   CoinbaseKycInputs,
   CoinbaseCountryInputs,
+  HumanPassportScoreInputs,
   OidcDomainInputs,
   DeepLinkComponents,
   CircuitType,
@@ -15,7 +16,7 @@ import type {
 import { DEFAULT_SCHEME, DEEP_LINK_HOSTS } from './constants';
 import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
 import { validateTypedAction } from './typedAction';
-import { circuitActionBinding } from './circuits';
+import { circuitActionBinding, humanPassportScoreUnits } from './circuits';
 import { countryListError } from '@zkproofport-app/core';
 
 /**
@@ -602,6 +603,19 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
     }
     if (typeof inputs.isIncluded !== 'boolean') {
       return { valid: false, error: 'isIncluded is required and must be a boolean' };
+    }
+  } else if (request.circuit === 'human_passport_score') {
+    const inputs = request.inputs as HumanPassportScoreInputs;
+    if (inputs.userAddress && !/^0x[a-fA-F0-9]{40}$/.test(inputs.userAddress)) {
+      return { valid: false, error: 'Invalid userAddress format' };
+    }
+    if (!inputs.scope || typeof inputs.scope !== 'string' || inputs.scope.trim() === '') {
+      return { valid: false, error: 'scope is required and must be a non-empty string' };
+    }
+    try {
+      humanPassportScoreUnits(inputs.minScore);
+    } catch (error) {
+      return { valid: false, error: error instanceof Error ? error.message : String(error) };
     }
   } else if (request.circuit === 'oidc_domain_attestation') {
     const inputs = request.inputs as OidcDomainInputs;

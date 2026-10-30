@@ -35,6 +35,12 @@ a verifier needs:
   minutes ahead of the verifier's clock (`checkCoinbaseAttestationProof`,
   `checkCoinbaseCountryAttestationProof`). A proof from either circuit's
   earlier version (128 or 150 public inputs) is refused by name.
+- **Human Passport score** (`human_passport_score`, 195 public inputs): the
+  issuer root must be Human Passport's (`HUMAN_PASSPORT_ISSUER_ROOT`, its issuer
+  on both Base GitcoinVerifier contracts), `scorer_id` must be `335`, `min_score`
+  must not be 0, and `now` must be within 15 minutes behind and 5 minutes ahead
+  of the verifier's clock. When the caller passes `minScore` (in points), the
+  proof's threshold must be exactly that (`checkHumanPassportProof`).
 - **Coinbase country list** (`coinbase_country_attestation`): when the caller
   passes `countryCondition: { countryList, isIncluded }`, the proof's list and
   direction must be exactly those (as a set of codes); without it core cannot

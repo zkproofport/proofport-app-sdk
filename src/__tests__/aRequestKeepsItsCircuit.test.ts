@@ -17,10 +17,11 @@ const INPUTS: Record<string, Record<string, unknown>> = {
   oidc_domain_attestation: { scope: 'myapp.com', domain: 'example.com' },
   giwa_attestation: { scope: 'myapp.com' },
   dojang_playground: { scope: 'myapp.com' },
+  human_passport_score: { scope: 'myapp.com', minScore: 20 },
 };
 
 describe('a request keeps the circuit it was asked for', () => {
-  it.each(['coinbase_attestation', 'coinbase_country_attestation', 'oidc_domain_attestation', 'giwa_attestation', 'dojang_playground'])(
+  it.each(['coinbase_attestation', 'coinbase_country_attestation', 'oidc_domain_attestation', 'giwa_attestation', 'dojang_playground', 'human_passport_score'])(
     '%s',
     circuit => {
       expect(create(circuit, INPUTS[circuit]).circuit).toBe(circuit);

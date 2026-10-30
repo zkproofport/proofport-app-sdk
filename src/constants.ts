@@ -38,6 +38,7 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 8453,
     giwa_attestation: 91342,
     dojang_playground: 91342,
+    human_passport_score: 8453,
   },
   staging: {
     coinbase_attestation: 84532,
@@ -45,6 +46,7 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 84532,
     giwa_attestation: 91342,
     dojang_playground: 91342,
+    human_passport_score: 84532,
   },
   local: {
     coinbase_attestation: 84532,
@@ -52,6 +54,7 @@ export const VERIFICATION_CHAINS = {
     oidc_domain_attestation: 84532,
     giwa_attestation: 91342,
     dojang_playground: 91342,
+    human_passport_score: 84532,
   },
 } as const satisfies Record<SDKEnvironment, Record<CircuitType, number>>;
 
@@ -164,6 +167,14 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     publicInputsCount: 160,
     publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'scope', 'nullifier'],
   },
+  // human-passport-score/src/main.nr: GIWA's six `pub [u8; 32]`, then
+  // min_score (u32, score x 10^4), scorer_id and now (u64) = 195 fields.
+  human_passport_score: {
+    name: 'Human Passport',
+    description: 'Prove a Human Passport score at or above a threshold, optionally authorizing one EIP-712 action',
+    publicInputsCount: 195,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'min_score', 'scorer_id', 'now'],
+  },
 };
 
 
@@ -209,4 +220,6 @@ export {
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT,
+  HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT,
 } from '@zkproofport-app/core';

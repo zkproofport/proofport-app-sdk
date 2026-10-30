@@ -142,6 +142,41 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
 export const COINBASE_COUNTRY_PUBLIC_INPUT_COUNT = 215;
 
 /**
+ * Human Passport score circuit public input layout (field offsets), 195 fields.
+ * One field per byte of each `[u8; 32]`, in `fn main`'s order
+ * (human-passport-score/src/main.nr; giwa_attestation's six, then three scalars):
+ * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
+ * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
+ * - signer_list_merkle_root: 96-127, root over (issuer, GitcoinVerifier domain,
+ *   scoreV2 schema) leaves; must be HUMAN_PASSPORT_ISSUER_ROOT
+ * - scope: 128-159
+ * - nullifier: 160-191, keccak(keccak(wallet ++ keccak("human_passport_score")) ++ scope)
+ * - min_score: 192, threshold in score units (score x 10^4)
+ * - scorer_id: 193, the Passport scorer the score belongs to
+ * - now: 194, unix seconds the attestation was unexpired at
+ */
+export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT = {
+  SIGNAL_HASH_START: 0,
+  SIGNAL_HASH_END: 31,
+  DOMAIN_SEPARATOR_START: 32,
+  DOMAIN_SEPARATOR_END: 63,
+  ACTION_HASH_START: 64,
+  ACTION_HASH_END: 95,
+  MERKLE_ROOT_START: 96,
+  MERKLE_ROOT_END: 127,
+  SCOPE_START: 128,
+  SCOPE_END: 159,
+  NULLIFIER_START: 160,
+  NULLIFIER_END: 191,
+  MIN_SCORE: 192,
+  SCORER_ID: 193,
+  NOW: 194,
+} as const;
+
+/** Human Passport score public input count. */
+export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT = 195;
+
+/**
  * OIDC Domain Attestation circuit public input layout (field offsets), v2.
  * Defines the field positions in the flattened public inputs array (214 fields total).
  *

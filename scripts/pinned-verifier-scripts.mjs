@@ -21,6 +21,7 @@ export const VERIFIER_BY_SCRIPT = Object.freeze({
   OidcDomainAttestationAndroidFactory: { circuit: 'oidc_domain_attestation', variant: 'android_factory' },
   GiwaAttestation: { circuit: 'giwa_attestation', variant: 'standard' },
   DojangPlayground: { circuit: 'dojang_playground', variant: 'standard' },
+  HumanPassportScore: { circuit: 'human_passport_score', variant: 'standard' },
 });
 
 /** Deployed by these scripts, and not proof verifiers. */

@@ -12,15 +12,19 @@ import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions 
 import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
 import { checkCoinbaseAttestationProof, checkCoinbaseCountryProof, type CountryCondition } from './coinbasePolicy';
+import { checkHumanPassportProof } from './humanPassportPolicy';
 
 /**
  * What a verify function passes down: the JWKS fetch timeout, the request the
  * proof answers (only `oidc_domain_attestation` reads it; see ./oidcPolicy),
  * and the country list and direction a Coinbase Country request asked for
- * (only `coinbase_country_attestation` reads it; see ./coinbasePolicy).
+ * (only `coinbase_country_attestation` reads it; see ./coinbasePolicy), and
+ * the score threshold a Human Passport request asked for, in points
+ * (only `human_passport_score` reads it; see ./humanPassportPolicy).
  */
 export interface ProofCheckOptions extends OidcKeyCheckOptions, OidcPolicyOptions {
   countryCondition?: CountryCondition;
+  minScore?: number;
 }
 
 export type IssuerCheck = (publicInputs: readonly string[], options: ProofCheckOptions) => Promise<IssuerCheckResult>;
@@ -59,6 +63,10 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // PLAYGROUND_FAUCET, GIWA_SEPOLIA_CHAIN_ID), so the verification key already
   // pins them, and the issuance is self-signed by design -- no issuer exists.
   dojang_playground: null,
+  // The issuer root, the scorer and `now` are the prover's choice; the
+  // threshold too, compared when the caller knows the request
+  // (./humanPassportPolicy).
+  human_passport_score: (publicInputs, options) => checkHumanPassportProof(publicInputs, { minScore: options.minScore }),
 } satisfies Record<CircuitId, IssuerCheck | null>;
 
 /**

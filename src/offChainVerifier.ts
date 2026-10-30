@@ -87,6 +87,12 @@ export interface OffChainVerifyOptions {
    * core's `checkCountryListMatches`.
    */
   countryCondition?: CountryCondition;
+  /**
+   * For `human_passport_score`: the score threshold the request asked for, in
+   * Passport points (20 = 20.0). The proof's min_score is the prover's choice,
+   * so it must equal this. See core's `checkHumanPassportProof`.
+   */
+  minScore?: number;
 }
 
 /**
@@ -253,7 +259,7 @@ export async function verifyProofOffChain(
   // their trust anchor as a public input the prover chooses. For OIDC that is
   // the RSA key -- see core's oidcProviderKeys. Checked here so a dApp that
   // verifies off-chain gets the same answer as one that verifies on-chain.
-  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request, countryCondition: options.countryCondition });
+  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request, countryCondition: options.countryCondition, minScore: options.minScore });
   if (!issuer.ok) {
     return { valid: false, error: issuer.error };
   }

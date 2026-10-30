@@ -56,6 +56,11 @@ export {
   signerVariantsOf,
   getCircuitPackage,
   resolveSignerVariant,
+  HUMAN_PASSPORT_ISSUER,
+  HUMAN_PASSPORT_ISSUER_ROOT,
+  HUMAN_PASSPORT_SCORER_ID,
+  HUMAN_PASSPORT_SCORE_SCHEMA,
+  humanPassportScoreUnits,
   evmProofByteLength,
 } from './circuits';
 
@@ -95,6 +100,8 @@ export {
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
   OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT,
+  HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT,
 } from './constants';
 
 export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage } from './circuits';
@@ -116,6 +123,7 @@ export type {
   DojangPlaygroundInputs,
   TypedAction,
   CoinbaseCountryInputs,
+  HumanPassportScoreInputs,
   OidcDomainInputs,
   CircuitInputs,
   ProofRequest,
