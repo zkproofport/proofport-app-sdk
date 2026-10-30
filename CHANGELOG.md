@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0-beta.6](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.5...v0.5.0-beta.6) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** judge Coinbase Country by the v2 layout
+
+### Features
+
+* **core:** hold a Coinbase Country proof to the list it was asked for ([acd8714](https://github.com/zkproofport/proofport-app-sdk/commit/acd87147fd6b6ade6d9fc664ec48d08456898c0e))
+* **core:** judge Coinbase Country by the v2 layout ([abce345](https://github.com/zkproofport/proofport-app-sdk/commit/abce3457cbfb7eabb18748a370f5b26ea4db3b9d))
+* **core:** pin the Coinbase Country v2 verifiers ([2f28885](https://github.com/zkproofport/proofport-app-sdk/commit/2f28885cb53693eb944f6f648f4e31aef621d81a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.1 to 0.4.0-beta.2
+
 ## [0.5.0-beta.5](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.4...v0.5.0-beta.5) (2026-10-29)
 
 
