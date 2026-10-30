@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.8](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.7...v0.5.0-beta.8) (2026-10-30)
+
+
+### Features
+
+* **core:** pin the Coinbase Country v2 factory-key Android verifier on Ethereum mainnet ([266bdaa](https://github.com/zkproofport/proofport-app-sdk/commit/266bdaa1974a246c3e1da362806fb738f0cb61fb))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.3 to 0.4.0-beta.4
+
 ## [0.5.0-beta.7](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.6...v0.5.0-beta.7) (2026-10-30)
 
 
