@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-beta.6](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.5...core-v0.4.0-beta.6) (2026-10-31)
+
+
+### Features
+
+* **core:** accept a Human Passport score from every chain Passport records it on ([aa0507b](https://github.com/zkproofport/proofport-app-sdk/commit/aa0507be4930595d533462205d5efaf3ceda2ec2))
+
 ## [0.4.0-beta.5](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.4...core-v0.4.0-beta.5) (2026-10-30)
 
 
