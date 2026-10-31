@@ -558,46 +558,87 @@ export const CIRCUIT_NEEDS_WALLET_SIGNATURE = {
  * every scoreV2 attestation on Base names scorer 335 and 4 decimals.
  */
 
-/** Base mainnet: the only chain Human Passport scores are read from. */
-export const HUMAN_PASSPORT_SOURCE_CHAIN_ID = 8453;
-
-/** The scoreV2 EAS schema on Base. */
-export const HUMAN_PASSPORT_SCORE_SCHEMA = '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912';
-
-/** Human Passport's issuer key, `issuer()` on both GitcoinVerifier contracts below. */
+/** Human Passport's production issuer key, `issuer()` on every GitcoinVerifier below. */
 export const HUMAN_PASSPORT_ISSUER = '0x804233b96cbd6d81efeb6517347177ef7bD488ED';
-
-/** The scorer every scoreV2 attestation on Base is computed by. */
-export const HUMAN_PASSPORT_SCORER_ID = 335;
 
 /** Scores are integers in units of 10^-4 (score 20.0 = 200000). */
 export const HUMAN_PASSPORT_SCORE_DECIMALS = 4;
 
+/** One chain a person can record their Human Passport score on. */
+export interface HumanPassportChain {
+  readonly chainId: number;
+  readonly name: string;
+  /** The chain's scoreV2 EAS schema uid. */
+  readonly schema: string;
+  /**
+   * The scorer (community) every scoreV2 attestation on this chain names:
+   * 335 everywhere but Shape, whose attestations all name 7922 (Shape's own
+   * scorer; 200 of 200 issuances read 2026-10-31).
+   */
+  readonly scorerId: number;
+}
+
 /**
- * The issuer list, one leaf per GitcoinVerifier on Base the issuer signs for,
- * in tree order. Leaf = keccak256(issuer ++ EIP-712 domain separator of that
- * verifier ++ scoreV2 schema). `domainSeparator` is
- * keccak256(abi.encode(EIP712Domain typehash, keccak("GitcoinVerifier"),
- * keccak("1"), 8453, verifier)).
+ * Every chain Human Passport records production scores on, keyed by chain id.
+ * A person chooses the chain when they record their score, so a proof is
+ * accepted from any of them. Source: passportxyz/passport
+ * deployments/onchainInfo.json (7603b7bb3f); checked 2026-10-31 against every
+ * unexpired scoreV2 attestation on each chain (circuits
+ * human-passport-score/README.md).
+ */
+export const HUMAN_PASSPORT_CHAINS: Readonly<Record<number, HumanPassportChain>> = Object.freeze({
+  8453: Object.freeze({ chainId: 8453, name: 'Base', schema: '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912', scorerId: 335 }),
+  10: Object.freeze({ chainId: 10, name: 'OP Mainnet', schema: '0xda0257756063c891659fed52fd36ef7557f7b45d66f59645fd3c3b263b747254', scorerId: 335 }),
+  42161: Object.freeze({ chainId: 42161, name: 'Arbitrum One', schema: '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912', scorerId: 335 }),
+  59144: Object.freeze({ chainId: 59144, name: 'Linea', schema: '0xa15ea01b11913fd412243156b40a8d5102ee9784172f82f9481e4c953fdd516d', scorerId: 335 }),
+  534352: Object.freeze({ chainId: 534352, name: 'Scroll', schema: '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912', scorerId: 335 }),
+  360: Object.freeze({ chainId: 360, name: 'Shape', schema: '0x1f3dce6501d8aad23563c0cf4f0c32264aed9311cb050056ebf72774f89ba912', scorerId: 7922 }),
+  324: Object.freeze({ chainId: 324, name: 'zkSync Era', schema: '0xb68405dffc0b727188de5a3af2ecbbc544ab01aef5353409c5006ffff342d143', scorerId: 335 }),
+});
+
+/** The chain ids of {@link HUMAN_PASSPORT_CHAINS}, in issuer-list order of first appearance. */
+export const HUMAN_PASSPORT_CHAIN_IDS: readonly number[] = Object.freeze([8453, 10, 42161, 59144, 534352, 360, 324]);
+
+/** The chain row for `chainId`, or an error naming the chains that exist. Never a default. */
+export function humanPassportChain(chainId: unknown): HumanPassportChain {
+  const row = typeof chainId === 'number' && Object.prototype.hasOwnProperty.call(HUMAN_PASSPORT_CHAINS, chainId)
+    ? HUMAN_PASSPORT_CHAINS[chainId]
+    : undefined;
+  if (!row) {
+    throw new Error(`Unknown Human Passport chain ${JSON.stringify(chainId)}. Known: ${HUMAN_PASSPORT_CHAIN_IDS.join(', ')}.`);
+  }
+  return row;
+}
+
+/** Every scorer id a Human Passport proof may name (the chains' scorers). */
+export const HUMAN_PASSPORT_SCORER_IDS: readonly number[] = Object.freeze(
+  [...new Set(HUMAN_PASSPORT_CHAIN_IDS.map(id => HUMAN_PASSPORT_CHAINS[id].scorerId))],
+);
+
+/**
+ * The issuer list, one leaf per GitcoinVerifier the issuer signs for, in tree
+ * order. Leaf = keccak256(issuer ++ EIP-712 domain separator of that verifier
+ * ++ the chain's scoreV2 schema), domainSeparator = keccak256(abi.encode(
+ * EIP712Domain typehash, keccak("GitcoinVerifier"), keccak("1"), chainId,
+ * verifier)). Base has two: the current verifier and the one Passport's docs
+ * named, which carried issuances until 2025-08.
  */
 export const HUMAN_PASSPORT_ISSUER_LEAVES = Object.freeze([
-  Object.freeze({
-    verifier: '0x45fA2E93d79Fc44d44b697A94330031b8ccbF68e',
-    domainSeparator: '0xaf982f5666127029186640687fa6edb600cc0f2f8a710e2f49a89532ac4f5420',
-    leaf: '0xe445d3227cc3b0d2fe4a1dd27f8e5524cea8a40456b4ae3787a17a612a297b4e',
-  }),
-  Object.freeze({
-    verifier: '0x16db23c4b99bbC9A6Bf55dF7a787C9AEFD261185',
-    domainSeparator: '0xe2629762fcce87a38ac0750847169957e216f41ada08b595295a0ec3591c4de7',
-    leaf: '0xc8838bb3948037119f9c6f0701e21ac59676cedb4e8e18097e0e3d90eb48aa13',
-  }),
+  Object.freeze({ chainId: 8453, verifier: '0x45fA2E93d79Fc44d44b697A94330031b8ccbF68e', domainSeparator: '0xaf982f5666127029186640687fa6edb600cc0f2f8a710e2f49a89532ac4f5420', leaf: '0xe445d3227cc3b0d2fe4a1dd27f8e5524cea8a40456b4ae3787a17a612a297b4e' }),
+  Object.freeze({ chainId: 8453, verifier: '0x16db23c4b99bbC9A6Bf55dF7a787C9AEFD261185', domainSeparator: '0xe2629762fcce87a38ac0750847169957e216f41ada08b595295a0ec3591c4de7', leaf: '0xc8838bb3948037119f9c6f0701e21ac59676cedb4e8e18097e0e3d90eb48aa13' }),
+  Object.freeze({ chainId: 10, verifier: '0x5e3fDCbCEB58104E8547D5810EB2ED0Fb42eADf4', domainSeparator: '0x863724969c2ccc2342fbc371b60f432db1e571764e5d3a705bbe935389dfe5b1', leaf: '0xdea69d04691f7e7e624e90cc4b1db0505eae0cdc46173b6dcabc52f2cd6dd495' }),
+  Object.freeze({ chainId: 42161, verifier: '0x62E6BE350d7b7116936EeD5DeB7951ed3AAfC3c4', domainSeparator: '0x0921c348426e8a12663acd02d64ebba490a978c38bc8fbcb2c21580bd25461d2', leaf: '0x214c61c6e68396c31955b13250ef01befeba2a3f5ffaaa06956568d64b04d4a4' }),
+  Object.freeze({ chainId: 59144, verifier: '0xEd551a95f76E96D60e6fE2bD2D845C3b4A6F8cA8', domainSeparator: '0x667816df88a5d1bf84b58712eb0355da1ac58a4d425e98cbf937d6f70d6bfce0', leaf: '0x75e8e37cbdbaec0d00c3f376cc84a2a90961396ab36319e81cea8c692ce17cd2' }),
+  Object.freeze({ chainId: 534352, verifier: '0x0EDEBAEaE920a6BFCFe7115566ceF5120ED2ff4C', domainSeparator: '0x7edbb2dc27a4915121854da8cc8446ffdc969c2a1293530f41552515bc674aae', leaf: '0x89d6de4dd6e311ea29044d51a2a3d168177511af4819b9cd94c24b86a3ca89c3' }),
+  Object.freeze({ chainId: 360, verifier: '0xB2cE7d0470c55be6212e197FF812B8dAE44EFD86', domainSeparator: '0x82f2f27f57b9564e14decd9630548360a403e5422ea4790c104a743b829e10fa', leaf: '0x8aefe777b258f1e6b6a1aa1e5c46d5807e6df57d6461287d18ff08a5a396aff2' }),
+  Object.freeze({ chainId: 324, verifier: '0xcC3eab33A77135A09770AcAF7D911E5FEf6622F2', domainSeparator: '0xcbfafaca3f1207518f48d011e37d1eea1afe0d4fe5e8a213e7c3e33de50313cb', leaf: '0x5282138f8475a8930df310058e96277eba6d438088c07b91f9b4af48c9d8dcc0' }),
 ] as const);
 
 /**
  * Root of {@link HUMAN_PASSPORT_ISSUER_LEAVES}: leaves padded with bytes32(0)
- * to a power of two, parent = keccak256(left ++ right). Two leaves, depth 1.
+ * to a power of two, parent = keccak256(left ++ right). Eight leaves, depth 3.
  */
-export const HUMAN_PASSPORT_ISSUER_ROOT = '0x3119e41cb3315962b331736523451956c39230dd7cbcad67b335cff512792596';
+export const HUMAN_PASSPORT_ISSUER_ROOT = '0xea6d30773f6870aae6384b8aa91f9eb665c40719e13d98acd9afcbe3d79188c8';
 
 /** The largest scoreV2 `data` the circuit hashes (MAX_DATA_BYTES in main.nr). */
 export const HUMAN_PASSPORT_MAX_DATA_BYTES = 10240;

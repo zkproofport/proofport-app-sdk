@@ -49,8 +49,10 @@ import {
   HUMAN_PASSPORT_ISSUER_LEAVES,
   HUMAN_PASSPORT_ISSUER_ROOT,
   HUMAN_PASSPORT_ISSUER,
-  HUMAN_PASSPORT_SCORE_SCHEMA,
-  HUMAN_PASSPORT_SCORER_ID,
+  HUMAN_PASSPORT_CHAINS,
+  HUMAN_PASSPORT_CHAIN_IDS,
+  HUMAN_PASSPORT_SCORER_IDS,
+  humanPassportChain,
   humanPassportScoreUnits,
 } from '../circuits';
 import { ProofportSDK } from '../ProofportSDK';
@@ -88,19 +90,38 @@ afterEach(() => {
 });
 
 describe('Human Passport anchors', () => {
-  it('the root is the positional tree over the published leaves', () => {
-    const T = (s: string) => realKeccak.keccak256(realKeccak.toUtf8Bytes(s));
+  it('the root is the positional tree over the published leaves, one or more per chain', () => {
+    const T = (x: string) => realKeccak.keccak256(realKeccak.toUtf8Bytes(x));
     const enc = realKeccak.AbiCoder.defaultAbiCoder();
     for (const leaf of HUMAN_PASSPORT_ISSUER_LEAVES) {
       const domain = realKeccak.keccak256(enc.encode(
         ['bytes32', 'bytes32', 'bytes32', 'uint256', 'address'],
-        [T('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'), T('GitcoinVerifier'), T('1'), 8453, leaf.verifier],
+        [T('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'), T('GitcoinVerifier'), T('1'), leaf.chainId, leaf.verifier],
       ));
       expect(leaf.domainSeparator).toBe(domain);
-      expect(leaf.leaf).toBe(realKeccak.keccak256(realKeccak.concat([HUMAN_PASSPORT_ISSUER, domain, HUMAN_PASSPORT_SCORE_SCHEMA])));
+      const schema = humanPassportChain(leaf.chainId).schema;
+      expect(leaf.leaf).toBe(realKeccak.keccak256(realKeccak.concat([HUMAN_PASSPORT_ISSUER, domain, schema])));
     }
-    const [a, b] = HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.leaf);
-    expect(HUMAN_PASSPORT_ISSUER_ROOT).toBe(realKeccak.keccak256(realKeccak.concat([a, b])));
+    let level: string[] = HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.leaf);
+    expect(level).toHaveLength(8);
+    while (level.length > 1) {
+      const next: string[] = [];
+      for (let i = 0; i < level.length; i += 2) next.push(realKeccak.keccak256(realKeccak.concat([level[i], level[i + 1]])));
+      level = next;
+    }
+    expect(HUMAN_PASSPORT_ISSUER_ROOT).toBe(level[0]);
+    // Every chain has a leaf, and every leaf's chain is a listed chain.
+    expect([...new Set(HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.chainId))].sort()).toEqual([...HUMAN_PASSPORT_CHAIN_IDS].sort());
+  });
+
+  it('names Base, OP, Arbitrum, Linea, Scroll, Shape and zkSync Era, Shape with its own scorer', () => {
+    expect(HUMAN_PASSPORT_CHAIN_IDS.map(id => HUMAN_PASSPORT_CHAINS[id].name)).toEqual(['Base', 'OP Mainnet', 'Arbitrum One', 'Linea', 'Scroll', 'Shape', 'zkSync Era']);
+    expect(humanPassportChain(360).scorerId).toBe(7922);
+    expect([...HUMAN_PASSPORT_SCORER_IDS].sort()).toEqual([335, 7922]);
+  });
+
+  it.each([1, 11155111, 84532, '8453', null, undefined, NaN, 0, -1, 1.5])('humanPassportChain refuses %p by name', id => {
+    expect(() => humanPassportChain(id)).toThrow(/Unknown Human Passport chain/);
   });
 
   it('converts thresholds in points to score units', () => {
@@ -120,6 +141,7 @@ describe('Human Passport anchors', () => {
 
 describe('checkHumanPassportProof', () => {
   it('accepts a proof anchored to Human Passport, scorer 335 and a fresh clock', async () => {
+    expect(await checkHumanPassportProof(goodInputs({ [L.SCORER_ID]: field(7922) }))).toEqual({ ok: true });
     expect(await checkHumanPassportProof(goodInputs())).toEqual({ ok: true });
   });
 
@@ -152,7 +174,7 @@ describe('checkHumanPassportProof', () => {
     expect((await checkHumanPassportProof(goodInputs({ [L.MERKLE_ROOT_START]: field(256) }))).ok).toBe(false);
   });
 
-  it.each([[0n], [336n], [BigInt(HUMAN_PASSPORT_SCORER_ID) + (1n << 64n)]])('refuses scorer %s', async scorer => {
+  it.each([[0n], [336n], [7921n], [335n + (1n << 64n)]])('refuses scorer %s', async scorer => {
     const r = await checkHumanPassportProof(goodInputs({ [L.SCORER_ID]: field(scorer) }));
     expect(r.ok).toBe(false);
   });

@@ -271,7 +271,7 @@ const relay = await sdk.createRelayRequest('oidc_domain_attestation', {
 
 ### `human_passport_score`
 
-Proves the wallet holds an unexpired [Human Passport](https://passport.human.tech) score at or above a threshold, without revealing the wallet or the exact score. The score is the one Human Passport attests on Base (scoreV2); the user creates it in Human Passport and records it on Base first. Requires a wallet signer, and can authorize one EIP-712 action like Coinbase KYC.
+Proves the wallet holds an unexpired [Human Passport](https://passport.human.tech) score at or above a threshold, without revealing the wallet or the exact score. The score is the one Human Passport attests onchain (scoreV2) on the chain the person chose when recording it: Base, OP Mainnet, Arbitrum One, Linea, Scroll, Shape or zkSync Era. The app asks which one. Requires a wallet signer, and can authorize one EIP-712 action like Coinbase KYC.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -297,8 +297,8 @@ pass the threshold explicitly in that case:
 await sdk.verifyResponseOnChain(response, provider, { minScore: 20 });
 ```
 
-Every verify path also requires Human Passport's issuer root, its Base scorer
-(`335`) and a proof time within 15 minutes behind and 5 minutes ahead of your
+Every verify path also requires Human Passport's issuer root (every chain above),
+one of its scorers (`335`; Shape's scores name `7922`) and a proof time within 15 minutes behind and 5 minutes ahead of your
 clock (`checkHumanPassportProof`).
 
 ## Experimental Circuits

@@ -58,8 +58,10 @@ export {
   resolveSignerVariant,
   HUMAN_PASSPORT_ISSUER,
   HUMAN_PASSPORT_ISSUER_ROOT,
-  HUMAN_PASSPORT_SCORER_ID,
-  HUMAN_PASSPORT_SCORE_SCHEMA,
+  HUMAN_PASSPORT_CHAINS,
+  HUMAN_PASSPORT_CHAIN_IDS,
+  HUMAN_PASSPORT_SCORER_IDS,
+  humanPassportChain,
   humanPassportScoreUnits,
   evmProofByteLength,
 } from './circuits';
@@ -104,7 +106,7 @@ export {
   HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT,
 } from './constants';
 
-export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage } from './circuits';
+export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage, HumanPassportChain } from './circuits';
 // Whether a circuit binds an EIP-712 action, and whether it must. One table,
 // so a dapp does not have to learn which circuit names are special.
 export {

@@ -8,7 +8,8 @@
  * unexpired at 0) verifies on chain. So every verify path compares:
  *
  * - the root at 96-127 with HUMAN_PASSPORT_ISSUER_ROOT (./circuits);
- * - `scorer_id` (193) with HUMAN_PASSPORT_SCORER_ID;
+ * - `scorer_id` (193) with the scorers Human Passport's chains name
+ *   (HUMAN_PASSPORT_SCORER_IDS: 335, and Shape's 7922);
  * - `now` (194) with this verifier's clock, the same window as Coinbase's
  *   `attested_at` and OIDC's `now`, so a stored proof re-verified later is
  *   refused (the attestation may have expired since);
@@ -16,7 +17,7 @@
  *   verifying caller knows it (`minScore`, in points: 20 = 20.0).
  */
 import { HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT, HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT } from './chain';
-import { HUMAN_PASSPORT_ISSUER_ROOT, HUMAN_PASSPORT_SCORER_ID, humanPassportScoreUnits } from './circuits';
+import { HUMAN_PASSPORT_ISSUER_ROOT, HUMAN_PASSPORT_SCORER_IDS, humanPassportScoreUnits } from './circuits';
 import type { IssuerCheckResult } from './oidcProviderKeys';
 import { signerRootCheck } from './signerRoots';
 
@@ -49,7 +50,7 @@ function readScalar(publicInputs: readonly string[], index: number, name: string
 
 /**
  * What a `human_passport_score` proof is anchored to, without its clock: the
- * count, Human Passport's issuer root, scorer 335 and a non-zero threshold.
+ * count, Human Passport's issuer root, one of its scorers and a non-zero threshold.
  * For a verifier re-checking a stored proof against its contract after the
  * `now` window has passed; a fresh answer goes through checkHumanPassportProof.
  */
@@ -60,10 +61,10 @@ export async function checkHumanPassportAnchors(publicInputs: readonly string[])
 
   const scorer = readScalar(publicInputs, L.SCORER_ID, 'scorer_id', U64_MAX);
   if (typeof scorer !== 'bigint') return { ok: false, error: scorer.error };
-  if (scorer !== BigInt(HUMAN_PASSPORT_SCORER_ID)) {
+  if (!HUMAN_PASSPORT_SCORER_IDS.some(id => BigInt(id) === scorer)) {
     return {
       ok: false,
-      error: `The proof's scorer_id is ${scorer}; only Human Passport's scorer ${HUMAN_PASSPORT_SCORER_ID} on Base is accepted.`,
+      error: `The proof's scorer_id is ${scorer}; only Human Passport's scorers ${HUMAN_PASSPORT_SCORER_IDS.join(', ')} are accepted.`,
     };
   }
 
