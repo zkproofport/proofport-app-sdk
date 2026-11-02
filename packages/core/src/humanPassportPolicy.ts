@@ -9,7 +9,7 @@
  *
  * - the root at 96-127 with HUMAN_PASSPORT_ISSUER_ROOT (./circuits);
  * - `scorer_id` (193) with the scorers Human Passport's chains name
- *   (HUMAN_PASSPORT_SCORER_IDS: 335, and Shape's 7922);
+ *   (HUMAN_PASSPORT_SCORER_IDS: 335);
  * - `now` (194) with this verifier's clock, the same window as Coinbase's
  *   `attested_at` and OIDC's `now`, so a stored proof re-verified later is
  *   refused (the attestation may have expired since);

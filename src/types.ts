@@ -147,8 +147,8 @@ export type DojangPlaygroundInputs = ActionBoundInputs;
 /**
  * Input parameters for `human_passport_score`.
  *
- * Proves the wallet holds an unexpired Human Passport score (scoreV2 on Base)
- * of at least `minScore`, without revealing the wallet or the exact score.
+ * Proves the wallet holds an unexpired Human Passport score (scoreV2, on the
+ * chain the person recorded it on) of at least `minScore`, without revealing the wallet or the exact score.
  *
  * @property minScore - The threshold in Passport points (20 = 20.0; at most
  *   four decimals). The proof carries it, and verification compares it with

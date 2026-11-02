@@ -1,7 +1,7 @@
 /**
  * `human_passport_score` is judged on every verify path: 195 public inputs,
  * the issuer root at 96-127 must be Human Passport's, scorer_id (193) must be
- * Base's scorer, `now` (194) is held to the verifier's clock, min_score (192)
+ * Passport's scorer (335), `now` (194) is held to the verifier's clock, min_score (192)
  * is never 0 and equals the threshold the request asked for.
  *
  * Matrix (drawn up before the code):
@@ -11,7 +11,12 @@
  *              the circuit; nullifier = keccak(keccak(wallet ++ keccak(id)) ++ scope)
  *   root       Human Passport's accepted; the fixture's test-issuer root
  *              refused; root bytes above 255 refused
- *   scorer     335 accepted; 0, 336, not a number refused
+ *   scorer     335 accepted; 0, 336, 7922 (Shape's, chain dropped), not a
+ *              number refused
+ *   chains     exactly Base, OP, Arbitrum, Linea, Scroll, zkSync Era; 360
+ *              (Shape), unknown ids, strings in any case, empty, null,
+ *              undefined, NaN, fractions refused naming the known list;
+ *              the previous seven-chain root refused
  *   min_score  0 refused; above u32 refused; equal to the request accepted,
  *              one unit lower or higher refused; request 20 vs 20.0001
  *   now        15 min behind / 5 min ahead accepted, one second past either
@@ -103,7 +108,8 @@ describe('Human Passport anchors', () => {
       expect(leaf.leaf).toBe(realKeccak.keccak256(realKeccak.concat([HUMAN_PASSPORT_ISSUER, domain, schema])));
     }
     let level: string[] = HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.leaf);
-    expect(level).toHaveLength(8);
+    expect(level).toHaveLength(6);
+    while (level.length < 8) level.push('0x' + '00'.repeat(32));
     while (level.length > 1) {
       const next: string[] = [];
       for (let i = 0; i < level.length; i += 2) next.push(realKeccak.keccak256(realKeccak.concat([level[i], level[i + 1]])));
@@ -114,15 +120,26 @@ describe('Human Passport anchors', () => {
     expect([...new Set(HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.chainId))].sort()).toEqual([...HUMAN_PASSPORT_CHAIN_IDS].sort());
   });
 
-  it('names Base, OP, Arbitrum, Linea, Scroll, Shape and zkSync Era, Shape with its own scorer', () => {
-    expect(HUMAN_PASSPORT_CHAIN_IDS.map(id => HUMAN_PASSPORT_CHAINS[id].name)).toEqual(['Base', 'OP Mainnet', 'Arbitrum One', 'Linea', 'Scroll', 'Shape', 'zkSync Era']);
-    expect(humanPassportChain(360).scorerId).toBe(7922);
-    expect([...HUMAN_PASSPORT_SCORER_IDS].sort()).toEqual([335, 7922]);
+  it('names exactly the six chains Passport offers, all with scorer 335', () => {
+    expect(HUMAN_PASSPORT_CHAIN_IDS.map(id => HUMAN_PASSPORT_CHAINS[id].name)).toEqual(['Base', 'OP Mainnet', 'Arbitrum One', 'Linea', 'Scroll', 'zkSync Era']);
+    expect(Object.keys(HUMAN_PASSPORT_CHAINS).map(Number).sort((a, b) => a - b)).toEqual([10, 324, 8453, 42161, 59144, 534352]);
+    expect([...HUMAN_PASSPORT_SCORER_IDS]).toEqual([335]);
+    // One leaf per chain: Base's retired verifier 0x16db... is not in the list.
+    expect(HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.verifier.toLowerCase())).not.toContain('0x16db23c4b99bbc9a6bf55df7a787c9aefd261185');
+    expect(HUMAN_PASSPORT_ISSUER_LEAVES.map(l => l.chainId)).toEqual([...HUMAN_PASSPORT_CHAIN_IDS]);
   });
 
-  it.each([1, 11155111, 84532, '8453', null, undefined, NaN, 0, -1, 1.5])('humanPassportChain refuses %p by name', id => {
-    expect(() => humanPassportChain(id)).toThrow(/Unknown Human Passport chain/);
+  it('refuses Shape (360) by name with the known-chain list, never another chain', () => {
+    expect(() => humanPassportChain(360)).toThrow('Unknown Human Passport chain 360. Known: 8453, 10, 42161, 59144, 534352, 324.');
+    expect(HUMAN_PASSPORT_ISSUER_LEAVES.some(l => l.chainId === 360)).toBe(false);
   });
+
+  it.each([1, 360, 11155111, 84532, '8453', '360', 'shape', 'Shape', 'SHAPE', 'base', 'Base', '', ' ', null, undefined, NaN, 0, -1, 1.5, 8453.0000001, [8453], {}])(
+    'humanPassportChain refuses %p by name, listing the known chains',
+    id => {
+      expect(() => humanPassportChain(id)).toThrow(/Unknown Human Passport chain .*Known: 8453, 10, 42161, 59144, 534352, 324\./);
+    },
+  );
 
   it('converts thresholds in points to score units', () => {
     expect(humanPassportScoreUnits(20)).toBe(200000);
@@ -141,8 +158,20 @@ describe('Human Passport anchors', () => {
 
 describe('checkHumanPassportProof', () => {
   it('accepts a proof anchored to Human Passport, scorer 335 and a fresh clock', async () => {
-    expect(await checkHumanPassportProof(goodInputs({ [L.SCORER_ID]: field(7922) }))).toEqual({ ok: true });
     expect(await checkHumanPassportProof(goodInputs())).toEqual({ ok: true });
+  });
+
+  it('refuses scorer 7922 (Shape\'s scorer) now that Shape is not a listed chain', async () => {
+    const r = await checkHumanPassportProof(goodInputs({ [L.SCORER_ID]: field(7922) }));
+    expect(r).toMatchObject({ ok: false });
+    expect((r as { error: string }).error).toMatch(/scorer_id is 7922; only Human Passport's scorers 335 are accepted/);
+  });
+
+  it('refuses a proof under the previous seven-chain root (it held Shape and Base 0x16db...)', async () => {
+    const inputs = goodInputs();
+    const old = realKeccak.getBytes('0xea6d30773f6870aae6384b8aa91f9eb665c40719e13d98acd9afcbe3d79188c8');
+    for (let i = 0; i < 32; i++) inputs[L.MERKLE_ROOT_START + i] = field(old[i]);
+    expect(await checkHumanPassportProof(inputs)).toMatchObject({ ok: false });
   });
 
   it('runs through the issuer table for human_passport_score', async () => {
