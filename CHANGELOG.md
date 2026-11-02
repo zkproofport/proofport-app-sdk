@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.11](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.10...v0.5.0-beta.11) (2026-11-02)
+
+
+### Features
+
+* **core:** accept Human Passport scores from the six chains Passport offers ([e3ec81f](https://github.com/zkproofport/proofport-app-sdk/commit/e3ec81f0ef3b9636eb81a5a8fbc49a78b60fcb07))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.6 to 0.4.0-beta.7
+
 ## [0.5.0-beta.10](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.9...v0.5.0-beta.10) (2026-10-31)
 
 
