@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.12](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.11...v0.5.0-beta.12) (2026-11-03)
+
+
+### Features
+
+* **core:** pin the Human Passport score verifier on Ethereum mainnet ([2431f58](https://github.com/zkproofport/proofport-app-sdk/commit/2431f58a8b1d8f7defed2ef48dc8599bfd0b061a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.7 to 0.4.0-beta.8
+
 ## [0.5.0-beta.11](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.10...v0.5.0-beta.11) (2026-11-02)
 
 
