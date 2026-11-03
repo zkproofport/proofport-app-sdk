@@ -284,9 +284,13 @@ describe('on-chain verify', () => {
     vi.unstubAllGlobals();
   });
 
-  it('pins a verifier on Base Sepolia and Ethereum Sepolia', () => {
-    expect(getPinnedVerifier('human_passport_score', 84532).address).toMatch(/^0x[0-9a-f]{40}$/);
-    expect(getPinnedVerifier('human_passport_score', 11155111).address).toMatch(/^0x[0-9a-f]{40}$/);
+  it.each([
+    [1, '0xbb8a7e058f86680ddcfe0df00e8f729ebcf27605'],
+    [8453, '0x2d055c42a2b0c1024ac4aa83b4995fc8fd45662e'],
+    [84532, '0x39df92d9c603fe6d229c7b00272a1e874a628ace'],
+    [11155111, '0xc78585718fd27d428d7a90970d09a2121be36066'],
+  ])('pins the verifier on chain %i', (chainId, address) => {
+    expect(getPinnedVerifier('human_passport_score', chainId).address).toBe(address);
   });
 });
 
