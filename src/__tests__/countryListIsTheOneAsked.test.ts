@@ -41,6 +41,19 @@ import {
 import { verifyProofOffChain } from '../offChainVerifier';
 import { ProofportSDK } from '../ProofportSDK';
 import type { ProofResponse } from '../types';
+import { OPRF_TEST_ENVIRONMENT } from './helpers/oprfKeys';
+
+// The fixtures' OPRF answers come from the circuits' per-circuit test keys;
+// staging stands in for them here (helpers/oprfKeys.ts).
+vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
+  const { withFixtureOprfKeys } = await import('./helpers/oprfKeys');
+  return withFixtureOprfKeys(await importOriginal());
+});
+
+/** What the fixtures were made for (circuits scripts/coinbase-attestation-v2/generate-prover-toml.js). */
+const FIXTURE_SCOPE = 'proofport';
+const FIXTURE_OPRF_DOMAIN = 'zkproofport.app';
+const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
 
 interface FixtureProof { proof: string; publicInputs: string[] }
 const FIXTURE = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'coinbaseCountryV2SyntheticAnchors.json'), 'utf8')) as {
@@ -62,10 +75,10 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('the real Coinbase Country v2 proofs', () => {
-  it('are the shape the pinned bb produces for a 2^20 circuit with 215 public inputs', () => {
+  it('are the shape the pinned bb produces for a 2^20 circuit with 155 public inputs', () => {
     expect(VK.length).toBe(1888);
     for (const p of [FIXTURE.action, FIXTURE.serverExclusion]) {
-      expect(p.publicInputs.length).toBe(215);
+      expect(p.publicInputs.length).toBe(155);
       expect((p.proof.length - 2) / 2).toBe(10304);
     }
   });
@@ -80,17 +93,18 @@ describe('the real Coinbase Country v2 proofs', () => {
     ['server kind, exclusion', 'serverExclusion', { countryList: ['US'], isIncluded: false }],
   ] as const)('%s: verifies off-chain against the list it was asked for', async (_label, key, condition) => {
     const p = FIXTURE[key];
-    const r = await verifyProofOffChain('coinbase_country_attestation', p.proof, p.publicInputs, { verificationKey: VK, countryCondition: condition });
+    const r = await verifyProofOffChain('coinbase_country_attestation', p.proof, p.publicInputs, { ...ENV, verificationKey: VK, countryCondition: condition });
     expect(r.error).toBeUndefined();
     expect(r.valid).toBe(true);
   }, 120_000);
 
   it('the signer root and attested_at inside a real proof are accepted at its own time', async () => {
-    expect(await checkProofIssuer('coinbase_country_attestation', FIXTURE.action.publicInputs)).toEqual({ ok: true });
+    expect(await checkProofIssuer('coinbase_country_attestation', FIXTURE.action.publicInputs, ENV)).toEqual({ ok: true });
   });
 
   it('is refused off-chain when the request asked for another list, before Barretenberg', async () => {
     const r = await verifyProofOffChain('coinbase_country_attestation', FIXTURE.action.proof, FIXTURE.action.publicInputs, {
+      ...ENV,
       verificationKey: VK,
       countryCondition: { countryList: ['US'], isIncluded: true },
     });
@@ -102,6 +116,7 @@ describe('the real Coinbase Country v2 proofs', () => {
     const inputs = [...FIXTURE.serverExclusion.publicInputs];
     inputs[L.COUNTRY_LIST_START + 1] = field(0x4b);
     const r = await verifyProofOffChain('coinbase_country_attestation', FIXTURE.serverExclusion.proof, inputs, {
+      ...ENV,
       verificationKey: VK,
       countryCondition: { countryList: ['UK'], isIncluded: false },
     });
@@ -139,7 +154,7 @@ describe('reading the proof\'s list', () => {
     ['a byte above 255', () => { const i = withList(['US']); i[L.COUNTRY_LIST_START] = field(0x155); return i; }, /are not an upper-case/],
     ['a garbage byte', () => { const i = withList(['US']); i[L.COUNTRY_LIST_START] = '%_'; return i; }, /are not an upper-case/],
     ['a non-zero byte past the length', () => withList(['US', 'KR'], 1), /country_list\[1\]\) lie past country_list_length and are not zero/],
-    ['wrong count', () => withList(['US']).slice(0, 214), /Expected 215 public inputs; got 214/],
+    ['wrong count', () => withList(['US']).slice(0, 154), /Expected 155 public inputs; got 154/],
   ])('refuses %s', (_label, make, message) => {
     const r = readCountryCondition(make());
     expect(r.ok).toBe(false);
@@ -174,8 +189,9 @@ describe('comparing it with the request', () => {
 
   it('the issuer check runs it when a condition is passed, and not otherwise', async () => {
     const real = FIXTURE.action.publicInputs;
-    expect(await checkProofIssuer('coinbase_country_attestation', real)).toEqual({ ok: true });
-    expect((await checkProofIssuer('coinbase_country_attestation', real, { countryCondition: { countryList: ['JP'], isIncluded: true } })).ok).toBe(false);
+    expect(await checkProofIssuer('coinbase_country_attestation', real, ENV)).toEqual({ ok: true });
+    expect(await checkProofIssuer('coinbase_country_attestation', real, { ...ENV, countryCondition: { countryList: ['JP'], isIncluded: true } }))
+      .toEqual({ ok: false, error: "The proof's country list [US, KR] is not the requested [JP]." });
   });
 });
 
@@ -184,30 +200,35 @@ describe('the SDK holds a response to the request it answers', () => {
   const resp = (p: FixtureProof, requestId = REQUEST_ID): ProofResponse => ({
     requestId, circuit: 'coinbase_country_attestation', status: 'completed', proof: p.proof, publicInputs: p.publicInputs,
   });
-  const sdkWithVerifier = () => new ProofportSDK({ verifiers: { coinbase_country_attestation: TARGET } } as never);
+  const sdkWithVerifier = () => new ProofportSDK({ environment: OPRF_TEST_ENVIRONMENT, verifiers: { coinbase_country_attestation: TARGET } } as never);
+  // The fixtures are action-bound (signal_hash zero), so any well-formed
+  // request passes the signal_hash binding; passing one lets these tests reach
+  // the country condition they are about. Its scope and OPRF domain are the
+  // fixtures', which the OPRF check compares.
+  const request = { scope: FIXTURE_SCOPE, requestId: REQUEST_ID, oprfDomain: FIXTURE_OPRF_DOMAIN };
 
   it('refuses a response it cannot place, before any contract (on-chain)', async () => {
-    const r = await sdkWithVerifier().verifyResponseOnChain(resp(FIXTURE.action), {});
+    const r = await sdkWithVerifier().verifyResponseOnChain(resp(FIXTURE.action), {}, { request });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/^No Coinbase Country request "req-country-1" was created by this SDK instance/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it('refuses a response it cannot place, before any key (off-chain)', async () => {
-    const r = await sdkWithVerifier().verifyResponseOffChain(resp(FIXTURE.action), { verificationKey: VK });
+    const r = await sdkWithVerifier().verifyResponseOffChain(resp(FIXTURE.action), { verificationKey: VK, request });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/Pass \{ countryCondition: \{ countryList, isIncluded \} \}/) });
   });
 
   it('uses an explicit condition: a match reaches the contract, a mismatch does not', async () => {
     const sdk = sdkWithVerifier();
-    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.action), {}, { countryCondition: { countryList: ['US', 'KR'], isIncluded: true } })).toEqual({ valid: true });
+    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.action), {}, { request, countryCondition: { countryList: ['US', 'KR'], isIncluded: true } })).toMatchObject({ valid: true });
     expect(Contract).toHaveBeenCalledTimes(1);
-    const r = await sdk.verifyResponseOnChain(resp(FIXTURE.action), {}, { countryCondition: { countryList: ['US', 'KR'], isIncluded: false } });
+    const r = await sdk.verifyResponseOnChain(resp(FIXTURE.action), {}, { request, countryCondition: { countryList: ['US', 'KR'], isIncluded: false } });
     expect(r).toEqual({ valid: false, error: 'The proof is an inclusion check, but the request asked for exclusion.' });
     expect(Contract).toHaveBeenCalledTimes(1);
   });
 
   async function sdkWithRelayRequest(inputs: Record<string, unknown>) {
-    const sdk = new ProofportSDK({ relayUrl: 'https://relay.example', verifiers: { coinbase_country_attestation: TARGET } } as never);
+    const sdk = new ProofportSDK({ environment: OPRF_TEST_ENVIRONMENT, relayUrl: 'https://relay.example', verifiers: { coinbase_country_attestation: TARGET } } as never);
     sdk.setSigner({ signMessage: async () => '0x' + '22'.repeat(65), getAddress: async () => '0x' + '33'.repeat(20) } as never);
     const fetchMock = vi.fn(async (url: string) => {
       if (String(url).endsWith('/api/v1/challenge')) {
@@ -224,26 +245,26 @@ describe('the SDK holds a response to the request it answers', () => {
   }
 
   it('remembers a relay request it created: list and direction', async () => {
-    const { sdk } = await sdkWithRelayRequest({ scope: 'myapp.com', countryList: ['KR', 'US'], isIncluded: true });
-    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.action), {})).toEqual({ valid: true });
+    const { sdk } = await sdkWithRelayRequest({ scope: FIXTURE_SCOPE, oprfDomain: FIXTURE_OPRF_DOMAIN, countryList: ['KR', 'US'], isIncluded: true });
+    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.action), {})).toMatchObject({ valid: true });
     const off = await sdk.verifyResponseOffChain(resp(FIXTURE.action), { verificationKey: VK });
     expect(off.error).toBeUndefined();
     expect(off.valid).toBe(true);
   }, 120_000);
 
   it('refuses a proof against another list than the relay request it created', async () => {
-    const { sdk } = await sdkWithRelayRequest({ scope: 'myapp.com', countryList: ['US'], isIncluded: false });
+    const { sdk } = await sdkWithRelayRequest({ scope: FIXTURE_SCOPE, oprfDomain: FIXTURE_OPRF_DOMAIN, countryList: ['US'], isIncluded: false });
     expect(await sdk.verifyResponseOnChain(resp(FIXTURE.action), {})).toEqual({
       valid: false,
       error: 'The proof is an inclusion check, but the request asked for exclusion.',
     });
     expect(Contract).not.toHaveBeenCalled();
-    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.serverExclusion), {})).toEqual({ valid: true });
+    expect(await sdk.verifyResponseOnChain(resp(FIXTURE.serverExclusion), {})).toMatchObject({ valid: true });
   });
 
   it('reads a pending deep-link request', async () => {
     const sdk = sdkWithVerifier();
-    const request = (sdk as any).createProofRequest('coinbase_country_attestation', { scope: 'myapp.com', countryList: ['JP'], isIncluded: true });
+    const request = (sdk as any).createProofRequest('coinbase_country_attestation', { scope: FIXTURE_SCOPE, oprfDomain: FIXTURE_OPRF_DOMAIN, countryList: ['JP'], isIncluded: true });
     const r = await sdk.verifyResponseOnChain(resp(FIXTURE.action, request.requestId), {});
     expect(r).toEqual({ valid: false, error: "The proof's country list [US, KR] is not the requested [JP]." });
     expect(Contract).not.toHaveBeenCalled();

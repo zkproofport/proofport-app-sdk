@@ -23,12 +23,13 @@ import {
 } from './chain';
 import type { IssuerCheckResult } from './oidcProviderKeys';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck, type SignerRootLayout } from './signerRoots';
+import { OPRF_PUBLIC_INPUT_LAYOUTS } from './oprfLayouts';
 
-/** Public inputs of Coinbase KYC v1, which no verify path accepts any more. */
-export const COINBASE_ATTESTATION_V1_PUBLIC_INPUT_COUNT = 128;
+/** Public inputs of Coinbase KYC v1 (with the OPRF nullifier; 128 before it), which no verify path accepts. */
+export const COINBASE_ATTESTATION_V1_PUBLIC_INPUT_COUNT = 68;
 
-/** Public inputs of Coinbase Country v1, which no verify path accepts any more. */
-export const COINBASE_COUNTRY_ATTESTATION_V1_PUBLIC_INPUT_COUNT = 150;
+/** Public inputs of Coinbase Country v1 (with the OPRF nullifier; 150 before it), which no verify path accepts. */
+export const COINBASE_COUNTRY_ATTESTATION_V1_PUBLIC_INPUT_COUNT = 90;
 
 /**
  * How far `attested_at` may lag the verifier's clock. The same window as an
@@ -47,7 +48,8 @@ interface CoinbaseV2Shape {
   /** Name in messages: "Coinbase KYC", "Coinbase Country". */
   label: string;
   count: number;
-  v1Count: number;
+  /** Earlier shapes of this circuit, by count, named in the refusal. */
+  superseded: Readonly<Record<number, string>>;
   attestedAt: number;
   root: SignerRootLayout;
 }
@@ -58,12 +60,13 @@ function coinbaseV2Check(shape: CoinbaseV2Shape) {
     if (!Array.isArray(publicInputs)) {
       return { ok: false, error: `Expected ${shape.count} public inputs; got ${typeof publicInputs}.` };
     }
-    if (publicInputs.length === shape.v1Count) {
+    const earlier = shape.superseded[publicInputs.length];
+    if (earlier !== undefined) {
       return {
         ok: false,
         error:
-          `This is a ${shape.label} v1 proof (${shape.v1Count} public inputs). ` +
-          `Only ${shape.label} v2 proofs (${shape.count} public inputs) are accepted; ` +
+          `This is a ${earlier} (${publicInputs.length} public inputs). ` +
+          `Only ${shape.label} v2 proofs with the OPRF nullifier (${shape.count} public inputs) are accepted; ` +
           'generate the proof again with a current ZKProofport app or prover.',
       };
     }
@@ -99,19 +102,19 @@ function coinbaseV2Check(shape: CoinbaseV2Shape) {
 
 /**
  * Check a `coinbase_attestation` proof's public input count, signer-list root
- * and `attested_at` (192). Never throws for anything the proof's sender controls.
+ * and `attested_at` (132). Never throws for anything the proof's sender controls.
  */
 export const checkCoinbaseAttestationProof: (publicInputs: readonly string[]) => Promise<IssuerCheckResult> = coinbaseV2Check({
   label: 'Coinbase KYC',
   count: COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT,
-  v1Count: COINBASE_ATTESTATION_V1_PUBLIC_INPUT_COUNT,
+  superseded: OPRF_PUBLIC_INPUT_LAYOUTS.coinbase_attestation.superseded,
   attestedAt: COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
   root: SIGNER_ROOT_LAYOUTS.coinbase_attestation,
 });
 
 /**
  * Check a `coinbase_country_attestation` proof's public input count,
- * signer-list root (96) and `attested_at` (214). Never throws for anything the
+ * signer-list root (96) and `attested_at` (154). Never throws for anything the
  * proof's sender controls.
  *
  * The country list and the inclusion flag are public inputs the prover chose;
@@ -121,7 +124,7 @@ export const checkCoinbaseAttestationProof: (publicInputs: readonly string[]) =>
 export const checkCoinbaseCountryAttestationProof: (publicInputs: readonly string[]) => Promise<IssuerCheckResult> = coinbaseV2Check({
   label: 'Coinbase Country',
   count: COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
-  v1Count: COINBASE_COUNTRY_ATTESTATION_V1_PUBLIC_INPUT_COUNT,
+  superseded: OPRF_PUBLIC_INPUT_LAYOUTS.coinbase_country_attestation.superseded,
   attestedAt: COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
   root: SIGNER_ROOT_LAYOUTS.coinbase_country_attestation,
 });

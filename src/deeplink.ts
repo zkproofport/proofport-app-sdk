@@ -18,25 +18,33 @@ import { isCircuitId, ALL_CIRCUIT_IDS } from './circuits';
 import { validateTypedAction } from './typedAction';
 import { circuitActionBinding, humanPassportScoreUnits } from './circuits';
 import { countryListError } from '@zkproofport-app/core';
+import { requestScopeError } from './requestScope';
 
 /**
- * Generates a unique request ID for proof requests.
+ * Generates a request ID for proof requests: "req-{timestamp36}-{32 hex}".
  *
- * Creates an ID by combining a base36-encoded timestamp with a random string,
- * prefixed with "req-". This ensures uniqueness across concurrent requests.
+ * The random part is 16 bytes from `crypto.getRandomValues`. The ID is part of
+ * the proof's signal_hash, which ties a proof to this one request, so it must
+ * not be guessable: an attacker who could predict a dApp's next ID could have a
+ * user prove for it in advance and replay that proof. A runtime without Web
+ * Crypto gets an error, never a weaker random source.
  *
- * @returns A unique string identifier in the format "req-{timestamp}-{random}"
+ * @returns A string identifier in the format "req-{timestamp}-{random}"
  *
  * @example
  * ```typescript
  * const id = generateRequestId();
- * // "req-lh8k3f2g-a9b7c4d2"
+ * // "req-lh8k3f2g-9f0c2a7e4b1d8c6f3a5e7b9d1c2f4a6e"
  * ```
  */
 export function generateRequestId(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 10);
-  return `req-${timestamp}-${random}`;
+  const webCrypto = (globalThis as { crypto?: Crypto }).crypto;
+  if (!webCrypto || typeof webCrypto.getRandomValues !== 'function') {
+    throw new Error('This runtime has no Web Crypto (globalThis.crypto.getRandomValues), which generating a request ID needs.');
+  }
+  const bytes = webCrypto.getRandomValues(new Uint8Array(16));
+  const random = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `req-${Date.now().toString(36)}-${random}`;
 }
 
 /**
@@ -582,6 +590,12 @@ export function validateProofRequest(request: ProofRequest): { valid: boolean; e
 
   if (!request.callbackUrl) {
     return { valid: false, error: 'Missing callbackUrl' };
+  }
+
+  // A wallet credential scope must be a name the OPRF node accepts (./requestScope).
+  {
+    const scopeError = requestScopeError(request.circuit, request.inputs);
+    if (scopeError) return { valid: false, error: scopeError };
   }
 
   // Validate circuit-specific inputs

@@ -12,12 +12,12 @@ const create = (circuit: string, inputs: Record<string, unknown>) =>
   (ProofportSDK.create('staging') as any).createProofRequest(circuit, inputs);
 
 const INPUTS: Record<string, Record<string, unknown>> = {
-  coinbase_attestation: { scope: 'myapp.com' },
-  coinbase_country_attestation: { scope: 'myapp.com', countryList: ['US'], isIncluded: true },
+  coinbase_attestation: { scope: 'myapp.com', oprfDomain: 'myapp.com' },
+  coinbase_country_attestation: { scope: 'myapp.com', oprfDomain: 'myapp.com', countryList: ['US'], isIncluded: true },
   oidc_domain_attestation: { scope: 'myapp.com', domain: 'example.com' },
-  giwa_attestation: { scope: 'myapp.com' },
-  dojang_playground: { scope: 'myapp.com' },
-  human_passport_score: { scope: 'myapp.com', minScore: 20 },
+  giwa_attestation: { scope: 'myapp.com', oprfDomain: 'myapp.com' },
+  dojang_playground: { scope: 'myapp.com', oprfDomain: 'myapp.com' },
+  human_passport_score: { scope: 'myapp.com', oprfDomain: 'myapp.com', minScore: 20 },
 };
 
 describe('a request keeps the circuit it was asked for', () => {
@@ -57,8 +57,10 @@ describe('a request keeps the circuit it was asked for', () => {
   });
 
   it('keeps a UTF-8 scope byte for byte', () => {
-    const scope = '한국어 🚀 mixed\tscope';
-    expect(create('dojang_playground', { scope }).inputs.scope).toBe(scope);
+    const scope = '한국어 🚀 mixed scope';
+    expect(create('dojang_playground', { scope, oprfDomain: 'myapp.com' }).inputs.scope).toBe(scope);
+    // A tab is a control character the OPRF node refuses in a wallet scope.
+    expect(() => create('dojang_playground', { scope: '한국어\tscope' })).toThrow(/control-character/);
   });
 
   it('createRelayRequest names an unknown circuit before asking anything of the relay', async () => {

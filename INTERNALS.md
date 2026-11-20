@@ -176,20 +176,20 @@ Country lists are packed as `uint160` (20 bytes), with each country code occupyi
 
 #### `generateRequestId()`
 
-Generates a unique request ID combining a timestamp and random string.
+Generates a request ID combining a timestamp and a random string.
 
-**Returns:** `string` in format `"req-{timestamp36}-{random8}"`
+**Returns:** `string` in format `"req-{timestamp36}-{random32hex}"`
 
 **Implementation Details:**
 - Timestamp is base36-encoded (8-10 characters)
-- Random suffix is 8 characters of base36 from `Math.random()`
-- Sufficient entropy for concurrent requests
+- Random suffix is 16 bytes from `crypto.getRandomValues`, as 32 hex characters
+- The ID is part of the proof's signal_hash, so it must not be guessable; a runtime without Web Crypto throws
 
 ```typescript
 import { generateRequestId } from '@zkproofport-app/sdk';
 
 const id = generateRequestId();
-// "req-lh8k3f2g-a9b7c4d2"
+// "req-lh8k3f2g-9f0c2a7e4b1d8c6f3a5e7b9d1c2f4a6e"
 ```
 
 #### `encodeData(data: object): string`
@@ -515,10 +515,122 @@ proof has the android package's byte length; a claimed variant whose proof has
 another package's length is refused too. Lengths come from
 `evmProofByteLength(logCircuitSize)` = 32 * (82 + 12 * log), which matches
 bb 4.2.0-aztecnr-rc.2's `calculateProofSize` and the measured 9920 (2^19) and
-10304 (2^20) byte proofs; 2^21 is 10688. The variant only selects among pinned
+10304 (2^20) byte proofs; 2^21 is 10688 (bb 6.0.0 writes the same sizes). The variant only selects among pinned
 verifiers (`getPinnedVariantVerifier(circuit, variant, chainId)`,
 `PINNED_VARIANT_VERIFIERS`); a configured verifier is the standard package's
 and refuses an android proof by name.
+
+#### `ACCEPTED_LEGACY_VERIFIERS` / `getAcceptedVerifiers(circuit, variant, chainId)`
+
+A circuit rebuild redeploys its verifier, and `run-latest.json` then names only
+the new contract. Apps already installed keep the old circuit files, so their
+proofs verify only on the old contract until they update. For that window the
+circuits repository lists the superseded contracts it still vouches for in
+`deployments/accepted-legacy-verifiers.json`:
+
+```json
+{ "version": 1,
+  "entries": [ { "script": "OidcDomainAttestation", "chainId": 8453,
+                 "address": "0x...", "vkRef": "<40-hex circuits commit holding its vk>",
+                 "acceptedUntil": "2027-01-31", "reason": "..." } ] }
+```
+
+The generator refuses an entry unless:
+- its script is pinned;
+- the chain has a current verifier, and the entry's address is not that one;
+- some `broadcast/Deploy<script>.s.sol/<chain>/run-*.json` deployed a HonkVerifier
+  at that address;
+- `<vkRef>:<vkPath>` exists;
+- the date parses and a reason is given.
+
+It writes them to `ACCEPTED_LEGACY_VERIFIERS`.
+
+`getAcceptedVerifiers` returns the current deployment first, then each legacy
+one whose `acceptedUntil` (UTC, inclusive) has not passed. `verifyProofOnChain`
+tries them in that order and reports `verifiedBy: { address, chainId, label }`,
+where the label is `configured`, `current` or `legacy`.
+- A proof carries no marker of the circuit build that made it, so trying the
+  pinned set is the only way to tell. Every candidate is still one this package
+  names.
+- A response's `verifierAddress` may equal any of them; any other address is
+  refused, as before.
+- A revert on one candidate does not hide another that accepts. A refusal while
+  some candidate could not be asked carries an `error` naming it.
+
+`verifyProofOffChain` does the same with keys. It tries the current key (read at
+`VERIFICATION_KEYS_REF`, checked against its sha256; see below) first, then each
+legacy `vkRef`, and reports `verifiedBy.label` `current`, `legacy` (with
+`vkRef`) or `provided`. A legacy key whose `bbVersion` (BB_VERSION in the
+circuits `toolchain.env` at its `vkRef`, recorded by the generator) is not the
+bundled bb.js is not tried: bb.js 6.0.0 answers false for a bb 4.2 proof even
+against its own bb 4.2 key (measured 2026-11-17, held by
+`legacyKeysOffChain.test.ts`), so the refusal says "verify this proof
+on-chain" instead of calling it invalid. A transition across a toolchain
+upgrade is therefore on-chain only; the SDK carries one bb.js.
+
+Retiring a legacy verifier is a data change: delete its entry, or let its date
+pass, and regenerate.
+
+#### `VERIFICATION_KEYS` / `AWAITING_REDEPLOY` (since 2026-11-17)
+
+The same generator writes, from the same circuits source:
+- `VERIFICATION_KEYS[circuit][variant]` = `{ sha256, path }` for every package;
+- `VERIFICATION_KEYS_REF`, the circuits commit they are fetched at;
+- `VERIFICATION_KEY_BB_VERSION`, BB_VERSION from the circuits `toolchain.env`.
+
+`verifyProofOffChain` fetches the current key at that commit and refuses one
+whose sha256 differs. It also refuses, before any fetch or Barretenberg load,
+when `VERIFICATION_KEY_BB_VERSION` is not the bundled bb.js (`BB_JS_VERSION` in
+`src/offChainVerifier.ts`, which a test holds equal to package.json's
+`@aztec-foundation/bb.js`). Until 2026-11-17 the key was read at `main`, so
+every SDK already installed verified against whatever main held: the day main
+moved to keys from another bb, every installed SDK would have refused every
+proof, and an SDK released before the circuits merged would have refused every
+proof until they did.
+
+Each pinned row now carries `vkSha256`, the sha256 of the key at the commit its
+broadcast records (`run.commit`). A deployed verifier whose key there differs
+from the current key was built from a superseded key: it cannot verify a
+current proof, and pinning it would accept proofs of the superseded circuit.
+The generator leaves it out of `PINNED_VERIFIERS` / `PINNED_VARIANT_VERIFIERS`
+and lists it in `AWAITING_REDEPLOY` (`circuit`, `variant`, `chainId`,
+`previousAddress`, `previousVkSha256`, `record`). `getPinnedVerifier` /
+`getPinnedVariantVerifier` then throw "... awaits a redeploy: the contract
+deployed there (0x...) was built from a verification key that is no longer
+this circuit's, so it is not used". The redeploy fills the slot: once the new
+broadcast records a commit holding the current key, the row is pinned again.
+
+`--worktree` reads the circuits working tree over HEAD, for keys rebuilt but
+not yet committed. When any key or `toolchain.env` differs from HEAD,
+`VERIFICATION_KEYS_REF` is `null` (the keys exist at no fetchable commit) and
+`verifyProofOffChain` refuses without a caller-supplied `verificationKey`.
+
+**State on branch `toolchain-upgrade` (2026-11-17, uncommitted):** generated
+with `--worktree` from circuits `toolchain-upgrade` (HEAD 9651df8 plus the
+uncommitted nargo 1.0.0 / bb 6.0.0 rebuild). `VERIFICATION_KEY_BB_VERSION` is
+`6.0.0`, `VERIFICATION_KEYS_REF` is `null`, and all 41 previously pinned
+verifiers are in `AWAITING_REDEPLOY`, so nothing verifies on-chain and the
+current key cannot be fetched. After the circuits commit and the verifier
+redeploy: `git -C ../circuits fetch origin`, then
+`node scripts/generate-pinned-verifiers.mjs --ref <circuits commit>` (or the
+default `origin/main` once merged), and rewrite the tests that hold deployed
+addresses (they now assert each previous address is in `AWAITING_REDEPLOY`).
+
+Tests of the on-chain wiring do not depend on what is deployed: they mock
+`packages/core/src/pinnedVerifiers.generated` through
+`src/__tests__/helpers/redeployedVerifiers.ts`, which turns each waiting row
+into a pinned row at a synthetic `0x5ee7...` address and is a pass-through
+once nothing waits. For that, `vitest.config.ts` resolves
+`@zkproofport-app/core` to its source, not the workspace link's `dist` (which
+also ends the "stale dist reports a pinned chain as missing" trap).
+
+The two real-proof fixtures (`coinbaseKycV2SyntheticAnchors.json`,
+`coinbaseCountryV2SyntheticAnchors.json`) are written by
+`node scripts/export-proof-fixtures.mjs` from the circuits acceptance outputs
+(`<package>-synthetic-anchors/target/{vk,proof,proof_<case>}`); it refuses to
+write a proof the bundled bb.js does not accept and `--check` reports drift.
+`coinbaseKycV2SyntheticAnchorsBb42.json` keeps the last bb 4.2 build as the
+evidence for the cross-version rule above.
 
 #### `PINNED_VERIFIERS` / `getPinnedVerifier(circuit, chainId)`
 

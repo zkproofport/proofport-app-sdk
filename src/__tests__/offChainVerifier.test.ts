@@ -14,10 +14,13 @@
  * in the same file and against no deployed verifier:
  *
  *   proof             10304 bytes (2^20), without the public inputs
- *   public_inputs     193 field elements of 32 bytes
- *   vk                1888 bytes -- the size bb 4.2.0-aztecnr-rc.2 emits; the
- *                     2025 nightly emitted 1816, which is how a stale build
- *                     shows up
+ *   public_inputs     133 field elements of 32 bytes
+ *   vk                1888 bytes -- the size bb 6.0.0 emits, as did
+ *                     4.2.0-aztecnr-rc.2; the 2025 nightly emitted 1816, so
+ *                     the size alone does not tell bb 4.2 from bb 6 (the
+ *                     fixture's `source` names the bb, and
+ *                     scripts/export-proof-fixtures.mjs refuses a proof the
+ *                     bundled bb.js does not accept)
  *
  * That split is also exactly what the mobile app sends through the relay, so
  * these bytes exercise the same shape a caller passes in. The proof's
@@ -28,6 +31,16 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { verifyProofOffChain } from '../offChainVerifier';
 import { COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT } from '../verifier';
+import { OPRF_TEST_ENVIRONMENT } from './helpers/oprfKeys';
+import { fillOprf } from './helpers/signerFixtures';
+
+// The real proofs' OPRF answers come from the circuits' per-circuit test keys;
+// staging stands in for them here (helpers/oprfKeys.ts).
+vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
+  const { withFixtureOprfKeys } = await import('./helpers/oprfKeys');
+  return withFixtureOprfKeys(await importOriginal());
+});
+const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
 
 const FIXTURE = JSON.parse(
   readFileSync(join(__dirname, 'fixtures', 'coinbaseKycV2SyntheticAnchors.json'), 'utf8'),
@@ -66,12 +79,13 @@ describe('off-chain verification against a real proof', () => {
     // built with a different bb and every case below would fail for a reason
     // that has nothing to do with this file.
     expect(vk.length).toBe(1888);
-    expect(publicInputs.length).toBe(193);
+    expect(publicInputs.length).toBe(133);
     expect((proofHex.length - 2) / 2).toBe(10304);
   });
 
   it('accepts a valid proof', async () => {
     const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, {
+      ...ENV,
       verificationKey: vk,
     });
     expect(result.error).toBeUndefined();
@@ -83,12 +97,13 @@ describe('off-chain verification against a real proof', () => {
     // returned true unconditionally would pass every other test in this file.
     //
     // Byte 4000 sits in the sumcheck scalars. A byte inside one of the curve
-    // points at the front (500, say) makes bb 4.x refuse the point outright
-    // ("val.on_curve()"), which is the next case.
+    // points at the front (500, say) makes Barretenberg refuse the point
+    // outright, which is the next case.
     const bytes = fromHex(FIXTURE.proof);
     bytes[4000] = bytes[4000] ^ 0x01;
 
     const result = await verifyProofOffChain('coinbase_attestation', toHex(bytes), publicInputs, {
+      ...ENV,
       verificationKey: vk,
     });
     // `error` must be absent: a rejection has to come from the verifier saying
@@ -99,17 +114,19 @@ describe('off-chain verification against a real proof', () => {
   }, 120_000);
 
   it('rejects a proof whose curve point was corrupted, and says why', async () => {
-    // bb 4.x does not answer false here: it rejects the point before verifying
-    // and throws "Assertion failed: (val.on_curve())". The caller must still
+    // Barretenberg does not answer false here: it rejects the point before
+    // verifying and throws -- "Deserialized point is not on the curve" in bb 6
+    // ("Assertion failed: (val.on_curve())" in bb 4.x). The caller must still
     // get valid: false, with the reason, never an exception.
     const bytes = fromHex(FIXTURE.proof);
     bytes[500] = bytes[500] ^ 0x01;
 
     const result = await verifyProofOffChain('coinbase_attestation', toHex(bytes), publicInputs, {
+      ...ENV,
       verificationKey: vk,
     });
     expect(result.valid).toBe(false);
-    expect(result.error).toMatch(/on_curve/);
+    expect(result.error).toMatch(/not on the curve/);
   }, 120_000);
 
   it('rejects a proof whose public inputs were altered', async () => {
@@ -120,29 +137,34 @@ describe('off-chain verification against a real proof', () => {
     tampered[0] = '0x' + '11'.repeat(32);
 
     const result = await verifyProofOffChain('coinbase_attestation', proofHex, tampered, {
+      ...ENV,
       verificationKey: vk,
     });
     expect(result.error).toBeUndefined();
     expect(result.valid).toBe(false);
   }, 120_000);
 
-  it('refuses a Coinbase KYC v1 proof (128 public inputs) by name', async () => {
-    const v1Inputs = Array.from({ length: 128 }, () => '0x' + '00'.repeat(32));
-    const result = await verifyProofOffChain('coinbase_attestation', proofHex, v1Inputs, { verificationKey: vk });
+  it.each([
+    [68, /Coinbase KYC v1 proof \(68 public inputs\)/],
+    [128, /Coinbase KYC v1 proof made before the OPRF nullifier \(128 public inputs\)/],
+    [193, /Coinbase KYC v2 proof made before the OPRF nullifier .*\(193 public inputs\)/],
+  ])('refuses an earlier Coinbase KYC shape (%i public inputs) by name', async (n, message) => {
+    const old = Array.from({ length: n }, () => '0x' + '00'.repeat(32));
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, old, { ...ENV, verificationKey: vk });
     expect(result.valid).toBe(false);
-    expect(result.error).toMatch(/Coinbase KYC v1 proof \(128 public inputs\)/);
+    expect(result.error).toMatch(message);
   });
 
   it('refuses the same proof once its attested_at is older than 15 minutes', async () => {
     vi.setSystemTime(ATTESTED_AT_MS + 15 * 60_000 + 1_000);
-    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, { verificationKey: vk });
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, { ...ENV, verificationKey: vk });
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/attested_at .* behind this verifier's clock/);
   });
 
   it('refuses it when attested_at is more than 5 minutes ahead of the clock', async () => {
     vi.setSystemTime(ATTESTED_AT_MS - 5 * 60_000 - 1_000);
-    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, { verificationKey: vk });
+    const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, { ...ENV, verificationKey: vk });
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/ahead of this verifier's clock/);
   });
@@ -172,23 +194,28 @@ describe('off-chain verification against a real proof', () => {
     if (!existsSync(otherVk)) return;
 
     const result = await verifyProofOffChain('coinbase_attestation', proofHex, publicInputs, {
+      ...ENV,
       verificationKey: new Uint8Array(readFileSync(otherVk)),
     });
     expect(result.valid).toBe(false);
   }, 120_000);
 });
 
-// Run on dojang_playground: it has no issuer check, so these reach the input
+// Run on dojang_playground: it has no issuer anchor, so with its OPRF four
+// filled in (the only check it has before the proof) these reach the input
 // handling instead of stopping at a signer-root or key check first.
+const dojangInputs = (): string[] =>
+  fillOprf(Array.from({ length: 100 }, () => '0x' + '00'.repeat(32)), 'dojang_playground');
+
 describe('off-chain verification input handling', () => {
   it('reports an empty proof rather than asking Barretenberg about it', async () => {
-    const result = await verifyProofOffChain('dojang_playground', '0x', []);
+    const result = await verifyProofOffChain('dojang_playground', '0x', dojangInputs(), ENV);
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/empty/i);
   });
 
   it('reports malformed hex clearly', async () => {
-    const result = await verifyProofOffChain('dojang_playground', '0xzzzz', ['0x01']);
+    const result = await verifyProofOffChain('dojang_playground', '0xzzzz', dojangInputs(), ENV);
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/hex/i);
   });
@@ -196,7 +223,10 @@ describe('off-chain verification input handling', () => {
   it('reports an oversized public input instead of silently truncating', async () => {
     // A value longer than a field element cannot be what the circuit committed
     // to. Cutting it to fit would verify something other than what was passed.
-    const result = await verifyProofOffChain('dojang_playground', '0x1234', ['0x' + 'aa'.repeat(33)], {
+    const inputs = dojangInputs();
+    inputs[0] = '0x' + 'aa'.repeat(33);
+    const result = await verifyProofOffChain('dojang_playground', '0x1234', inputs, {
+      ...ENV,
       verificationKey: new Uint8Array(1816),
     });
     expect(result.valid).toBe(false);
@@ -239,7 +269,7 @@ describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)(
         circuit,
         toHex(new Uint8Array(readFileSync(proofFile))),
         splitPublicInputs(new Uint8Array(readFileSync(inputsFile))),
-        {verificationKey: new Uint8Array(readFileSync(keyFile))},
+        {...ENV, verificationKey: new Uint8Array(readFileSync(keyFile))},
       );
       expect(result.error).toBeUndefined();
       expect(result.valid).toBe(true);
@@ -256,7 +286,7 @@ describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)(
         circuit,
         toHex(new Uint8Array(readFileSync(join(otherProof, 'proof')))),
         splitPublicInputs(new Uint8Array(readFileSync(join(otherProof, 'public_inputs')))),
-        {verificationKey: new Uint8Array(readFileSync(keyFile))},
+        {...ENV, verificationKey: new Uint8Array(readFileSync(keyFile))},
       );
       expect(result.valid).toBe(false);
     }, 120_000);

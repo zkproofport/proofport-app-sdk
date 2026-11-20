@@ -61,7 +61,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
     const broken = { ...GOOD_ACTION, message: {} };
     await expect(
       sdk().createRelayRequest('giwa_attestation', {
-        scope: 'myapp.com',
+        scope: 'myapp.com', oprfDomain: 'myapp.com',
         action: broken,
       } as never),
     ).rejects.toThrow(/message is missing: amount/);
@@ -75,7 +75,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
     };
     await expect(
       sdk().createRelayRequest('giwa_attestation', {
-        scope: 'myapp.com',
+        scope: 'myapp.com', oprfDomain: 'myapp.com',
         action: broken,
       } as never),
     ).rejects.toThrow(/verifyingContract must be a 20-byte hex address/);
@@ -109,7 +109,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
       });
 
     const req = await sdk().createRelayRequest('giwa_attestation', {
-      scope: 'myapp.com',
+      scope: 'myapp.com', oprfDomain: 'myapp.com',
       action: GOOD_ACTION,
     } as never);
     expect(req.requestId).toBe('r1');
@@ -136,7 +136,7 @@ describe('a dapp hears about a bad action from the SDK', () => {
     const noSigner = ProofportSDK.create('local');
     await expect(
       noSigner.createRelayRequest('giwa_attestation', {
-        scope: 'myapp.com',
+        scope: 'myapp.com', oprfDomain: 'myapp.com',
         action: GOOD_ACTION,
       } as never),
     ).rejects.toThrow(/Signer not set/);

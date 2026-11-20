@@ -1,14 +1,15 @@
 /**
- * `human_passport_score` is judged on every verify path: 195 public inputs,
- * the issuer root at 96-127 must be Human Passport's, scorer_id (193) must be
- * Passport's scorer (335), `now` (194) is held to the verifier's clock, min_score (192)
+ * `human_passport_score` is judged on every verify path: 135 public inputs,
+ * the issuer root at 96-127 must be Human Passport's, scorer_id (133) must be
+ * Passport's scorer (335), `now` (134) is held to the verifier's clock, min_score (132)
  * is never 0 and equals the threshold the request asked for.
  *
  * Matrix (drawn up before the code):
- *   count      195 accepted; 0, 194, 196, a Coinbase v2 proof (193) refused;
+ *   count      135 accepted; 0, 134, 136, a Coinbase v2 proof (133) refused;
  *              not an array
- *   layout     scope 128-159 and nullifier 160-191 read from a REAL proof of
- *              the circuit; nullifier = keccak(keccak(wallet ++ keccak(id)) ++ scope)
+ *   layout     the OPRF four at 128-131 read from a REAL proof of the circuit;
+ *              its nullifier recomputed by core's OPRF client from the test
+ *              wallet and the circuits' test key
  *   root       Human Passport's accepted; the fixture's test-issuer root
  *              refused; root bytes above 255 refused
  *   scorer     335 accepted; 0, 336, 7922 (Shape's, chain dropped), not a
@@ -63,8 +64,31 @@ import {
 import { ProofportSDK } from '../ProofportSDK';
 import { validateProofRequest } from '../deeplink';
 import { verifyProofOffChain } from '../offChainVerifier';
+import { OPRF_TEST_ENVIRONMENT } from './helpers/oprfKeys';
+import vectors from './fixtures/oprf-vectors.json';
+import { oprfQuery, reduceOprfName } from '../../packages/core/src/oprf';
+import { encodeToCurve, scalarMul } from '../../packages/core/src/oprf/babyjubjub';
+import { poseidon2T4 } from '../../packages/core/src/oprf/poseidon2';
+import { OPRF_DS_OUT } from '../../packages/core/src/oprf/client';
 
-vi.mock('@aztec/bb.js', () => ({
+// The real proof's OPRF answer comes from the circuits' per-circuit test key;
+// staging stands in for it here (helpers/oprfKeys.ts).
+vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
+  const { withFixtureOprfKeys } = await import('./helpers/oprfKeys');
+  return withFixtureOprfKeys(await importOriginal());
+});
+const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
+/** What the fixture was made for (circuits scripts/human-passport/generate-fixtures.js). */
+const FIXTURE_REQUEST = { scope: 'human-passport-score-fixture-scope', oprfDomain: 'zkproofport.app' };
+
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
+vi.mock('@aztec-foundation/bb.js', () => ({
   Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },
   UltraHonkVerifierBackend: vi.fn(function (this: any) {
     this.verifyProof = vi.fn(async () => true);
@@ -176,12 +200,12 @@ describe('checkHumanPassportProof', () => {
 
   it('runs through the issuer table for human_passport_score', async () => {
     expect(CIRCUIT_ISSUER_CHECKS.human_passport_score).toBeTypeOf('function');
-    expect(await checkProofIssuer('human_passport_score', fixture.publicInputs)).toMatchObject({ ok: false });
-    expect(await checkProofIssuer('human_passport_score', goodInputs(), { minScore: 23.386 })).toEqual({ ok: true });
+    expect(await checkProofIssuer('human_passport_score', fixture.publicInputs, ENV)).toMatchObject({ ok: false });
+    expect(await checkProofIssuer('human_passport_score', goodInputs(), { ...ENV, minScore: 23.386 })).toEqual({ ok: true });
   });
 
-  it.each([0, 193, 194, 196])('refuses %i public inputs', async count => {
-    const inputs = goodInputs().slice(0, Math.min(count, 195));
+  it.each([0, 133, 134, 136, 195])('refuses %i public inputs', async count => {
+    const inputs = goodInputs().slice(0, Math.min(count, 135));
     while (inputs.length < count) inputs.push(field(0));
     const r = await checkHumanPassportProof(inputs);
     expect(r.ok).toBe(false);
@@ -240,17 +264,19 @@ describe('checkHumanPassportProof', () => {
 });
 
 describe('layout, on a real proof', () => {
-  it('reads scope and nullifier at 128 and 160, and the nullifier is the wallet + circuit-tag rule', () => {
+  it('reads the OPRF four at 128-131, and core recomputes the nullifier from the wallet and the test key', () => {
     expect(fixture.publicInputs).toHaveLength(HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT);
-    expect(fixture.proofBytes).toBe(10688);
+    expect((fixture.proof.length - 2) / 2).toBe(10688);
     const scope = extractScopeFromPublicInputs(fixture.publicInputs, 'human_passport_score');
     const nullifier = extractNullifierFromPublicInputs(fixture.publicInputs, 'human_passport_score');
-    const fixtureScope = realKeccak.keccak256(realKeccak.toUtf8Bytes('human-passport-score-fixture-scope'));
-    expect(scope).toBe(fixtureScope);
+    expect(scope).toBe(reduceOprfName(FIXTURE_REQUEST.scope));
+    expect(fixture.publicInputs[L.OPRF_DOMAIN]).toBe(reduceOprfName(FIXTURE_REQUEST.oprfDomain));
+    const key = vectors.evaluations.find(e => e.note === 'circuits fixture key for human_passport_score (oprf.js fixtureKey)')!;
+    expect(fixture.publicInputs[L.OPRF_KEY_HASH]).toBe(key.keyHash);
     const wallet = new realKeccak.Wallet(realKeccak.keccak256(realKeccak.toUtf8Bytes('zkproofport human_passport_score INSECURE TEST WALLET'))).address;
-    const tag = realKeccak.keccak256(realKeccak.toUtf8Bytes('human_passport_score'));
-    const expected = realKeccak.keccak256(realKeccak.concat([realKeccak.keccak256(realKeccak.concat([wallet, tag])), fixtureScope]));
-    expect(nullifier).toBe(expected);
+    const query = BigInt(oprfQuery({ address: wallet, domain: reduceOprfName(FIXTURE_REQUEST.oprfDomain), scope: scope! }));
+    const p = scalarMul(encodeToCurve(query), BigInt(key.secretKey));
+    expect(nullifier).toBe('0x' + poseidon2T4([OPRF_DS_OUT, query, p.x, p.y])[1].toString(16).padStart(64, '0'));
     expect(Number(BigInt(fixture.publicInputs[L.SCORER_ID]))).toBe(335);
   });
 });
@@ -260,7 +286,7 @@ describe('on-chain verify', () => {
     const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
     Contract.mockClear();
     const inputs = goodInputs({ [L.NOW]: field(NOW - 3600) });
-    const r = await verifyProofOnChain('human_passport_score', { proofHex: '0x' + '00'.repeat(10688), publicInputsHex: inputs, numPublicInputs: 195 }, {}, { chainId: 84532 });
+    const r = await verifyProofOnChain('human_passport_score', { proofHex: '0x' + '00'.repeat(10688), publicInputsHex: inputs, numPublicInputs: 135 }, {}, { chainId: 84532 }, undefined, ENV);
     expect(r.valid).toBe(false);
     expect(r.error).toMatch(/behind this verifier's clock/);
     expect(Contract).not.toHaveBeenCalled();
@@ -269,8 +295,8 @@ describe('on-chain verify', () => {
   it('with a fresh proof reaches the pinned contract', async () => {
     const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
     Contract.mockClear();
-    const r = await verifyProofOnChain('human_passport_score', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: goodInputs(), numPublicInputs: 195 }, {}, { chainId: 84532 });
-    expect(r).toEqual({ valid: true });
+    const r = await verifyProofOnChain('human_passport_score', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: goodInputs(), numPublicInputs: 135 }, {}, { chainId: 84532 }, undefined, ENV);
+    expect(r).toMatchObject({ valid: true });
     expect(Contract).toHaveBeenCalledTimes(1);
     expect(String(Contract.mock.calls[0][0]).toLowerCase()).toBe(getPinnedVerifier('human_passport_score', 84532).address);
   });
@@ -278,7 +304,7 @@ describe('on-chain verify', () => {
   it('off-chain verify refuses a stale proof before fetching a key', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const r = await verifyProofOffChain('human_passport_score', '0x' + 'ab'.repeat(64), goodInputs({ [L.NOW]: field(NOW - 3600) }));
+    const r = await verifyProofOffChain('human_passport_score', '0x' + 'ab'.repeat(64), goodInputs({ [L.NOW]: field(NOW - 3600) }), ENV);
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
@@ -289,8 +315,14 @@ describe('on-chain verify', () => {
     [8453, '0x2d055c42a2b0c1024ac4aa83b4995fc8fd45662e'],
     [84532, '0x39df92d9c603fe6d229c7b00272a1e874a628ace'],
     [11155111, '0xc78585718fd27d428d7a90970d09a2121be36066'],
-  ])('pins the verifier on chain %i', (chainId, address) => {
-    expect(getPinnedVerifier('human_passport_score', chainId).address).toBe(address);
+  ])('the verifier on chain %i (built from a bb 4.2 key) awaits a redeploy and is pinned nowhere', async (chainId, address) => {
+    // The real generated table: this file's mock stands redeployed verifiers in.
+    // After the redeploy, regenerate and write the new addresses here.
+    const real = await vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
+    expect(real.AWAITING_REDEPLOY).toContainEqual(
+      expect.objectContaining({ circuit: 'human_passport_score', variant: 'standard', chainId, previousAddress: address }),
+    );
+    expect(real.PINNED_VERIFIERS.human_passport_score[chainId]).toBeUndefined();
   });
 });
 
@@ -312,8 +344,8 @@ describe('requests', () => {
   });
 
   it('deep-link validation accepts a threshold and an optional action', () => {
-    expect(validateProofRequest(link({ scope: 'myapp.com', minScore: 20 }))).toEqual({ valid: true });
-    expect(validateProofRequest(link({ scope: "x'; DROP TABLE--<script>%_", minScore: 0.0001 }))).toEqual({ valid: true });
+    expect(validateProofRequest(link({ scope: 'myapp.com', minScore: 20 }))).toMatchObject({ valid: true });
+    expect(validateProofRequest(link({ scope: "x'; DROP TABLE--<script>%_", minScore: 0.0001 }))).toMatchObject({ valid: true });
   });
 
   it.each([
@@ -335,14 +367,14 @@ describe('requests', () => {
     const r = await sdk().verifyResponseOnChain({
       requestId: 'unknown', circuit: 'human_passport_score', status: 'completed',
       proof: '0x00', publicInputs: goodInputs(), timestamp: Date.now(),
-    } as any);
+    } as any, undefined, { request: { scope: 'myapp.com', requestId: 'unknown' } });
     expect(r).toMatchObject({ valid: false });
     expect(r.error).toMatch(/minScore/);
   });
 
   it('verifyResponseOnChain checks the threshold of a request it made (deep link)', async () => {
     const s = ProofportSDK.create('staging');
-    const request = (s as any).createProofRequest('human_passport_score', { scope: 'myapp.com', minScore: 20 });
+    const request = (s as any).createProofRequest('human_passport_score', { ...FIXTURE_REQUEST, minScore: 20 });
     const r = await s.verifyResponseOnChain({
       requestId: request.requestId, circuit: 'human_passport_score', status: 'completed',
       proof: '0x' + '00'.repeat(10688), publicInputs: goodInputs({ [L.MIN_SCORE]: field(150000) }), timestamp: Date.now(),

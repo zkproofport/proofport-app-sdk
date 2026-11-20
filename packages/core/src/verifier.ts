@@ -8,8 +8,9 @@ import { ethers } from 'ethers';
 import type { CircuitType, ParsedProof, VerifierContract } from './types';
 import { VERIFIER_ABI, RPC_ENDPOINTS, OIDC_DOMAIN_ATTESTATION_PUBLIC_INPUT_LAYOUT } from './chain';
 import { ALL_CIRCUIT_IDS, isCircuitId, resolveSignerVariant, type CircuitId, type SignerVariant } from './circuits';
-import { getPinnedVariantVerifier, sameAddress } from './pinnedVerifiers';
+import { getAcceptedVerifiers, sameAddress } from './pinnedVerifiers';
 import { checkProofIssuer } from './issuerChecks';
+import { oprfLayoutOf, readFieldPublicInput, type OprfCircuitId } from './oprfLayouts';
 import type { ProofCheckOptions } from './issuerChecks';
 
 // ethers v5/v6 compatibility shims
@@ -101,7 +102,9 @@ export interface ClaimedVerifier {
 /**
  * Options for {@link verifyProofOnChain}: the JWKS fetch timeout; for an
  * `oidc_domain_attestation` proof, the request it answers (`{ scope,
- * requestId }`), which a nonce-bound proof must be bound to; and the
+ * requestId }`), which a nonce-bound proof must be bound to -- and, for every
+ * circuit with a signal_hash, which a proof without an action must carry the
+ * signal_hash of (./signalHash); and the
  * `signerVariant` the proof's result says made it.
  */
 export interface OnChainVerifyOptions extends ProofCheckOptions {
@@ -116,12 +119,26 @@ export interface OnChainVerifyOptions extends ProofCheckOptions {
   signerVariant?: string;
 }
 
-/** @internal The contract to call, or why there is none. */
+/**
+ * Which contract accepted a proof: one the dApp configured, the current pinned
+ * deployment, or a superseded one still accepted during a transition. Lets a
+ * dApp count how many proofs still come from apps on the old circuit build.
+ */
+export interface VerifiedBy {
+  address: string;
+  chainId: number;
+  label: 'configured' | 'current' | 'legacy';
+}
+
+/** @internal A contract to call, with the label reported when it accepts. */
+type Candidate = VerifierContract & { label: VerifiedBy['label'] };
+
+/** @internal The contracts to call, in order, or why there are none. */
 function resolveTarget(
   circuit: string,
   variant: SignerVariant,
   target: VerifierTarget | undefined,
-): { verifier: VerifierContract } | { error: string } {
+): { candidates: Candidate[] } | { error: string } {
   if (!target) {
     return {
       error:
@@ -140,11 +157,13 @@ function resolveTarget(
           `from the configured verifier's. Verify it against the pinned '${variant}' verifier by naming a chain.`,
       };
     }
-    return { verifier: target };
+    return { candidates: [{ ...target, label: 'configured' }] };
   }
   try {
-    const pinned = getPinnedVariantVerifier(circuit, variant, target.chainId);
-    return { verifier: { address: pinned.address, chainId: target.chainId, abi: VERIFIER_ABI } };
+    const accepted = getAcceptedVerifiers(circuit, variant, target.chainId);
+    return {
+      candidates: accepted.map(v => ({ address: v.address, chainId: v.chainId, abi: VERIFIER_ABI, label: v.label })),
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
@@ -162,11 +181,19 @@ function resolveTarget(
  *     package only), or `{ chainId }` for the pinned deployment of that
  *     package on that chain (see {@link PINNED_VERIFIERS} and
  *     {@link PINNED_VARIANT_VERIFIERS}). Nothing else -- in particular not the
- *     address a proof response carries.
+ *     address a proof response carries. During a transition the pinned set
+ *     also holds superseded deployments the circuits repository still vouches
+ *     for ({@link ACCEPTED_LEGACY_VERIFIERS}, each until its `acceptedUntil`):
+ *     the current one is tried first, then each of those, and the result's
+ *     `verifiedBy` says which accepted. A proof carries no marker of the
+ *     circuit build that made it, so trying the pinned set is the only way to
+ *     tell; every candidate is still one this package chose.
  *  4. If `claimed` (what a response said its verifier was) names a different
  *     address or chain, the proof is refused rather than checked somewhere the
  *     sender did not expect.
- *  5. The circuit's issuer check runs ({@link checkProofIssuer}): for
+ *  5. The circuit's issuer check runs ({@link checkProofIssuer}): when
+ *     `options.request` is given, a wallet proof without an action must carry
+ *     that request's signal_hash ({@link checkSignalHash}); for
  *     `oidc_domain_attestation`, the token's audience, nonce mode, nonce
  *     binding (against `options.request` when given) and `now` must pass
  *     {@link checkOidcPolicy}, and the RSA key must be one the provider
@@ -179,7 +206,7 @@ function resolveTarget(
  *   public RPC for the verifier's chain
  * @param target - The verifier: a configured contract, or `{ chainId }`
  * @param claimed - The verifier a proof response claims, compared and never used
- * @param options - JWKS fetch timeout, the request an OIDC proof answers, and
+ * @param options - JWKS fetch timeout, the request the proof answers, and
  *   the signer variant the proof's result names
  *
  * @example
@@ -195,7 +222,7 @@ export async function verifyProofOnChain(
   target?: VerifierTarget,
   claimed?: ClaimedVerifier,
   options: OnChainVerifyOptions = {},
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; error?: string; verifiedBy?: VerifiedBy }> {
   if (!isCircuitId(circuit)) {
     return { valid: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
   }
@@ -205,20 +232,21 @@ export async function verifyProofOnChain(
 
   const resolved = resolveTarget(circuit, signer.variant, target);
   if ('error' in resolved) return { valid: false, error: resolved.error };
-  const verifier = resolved.verifier;
+  const candidates = resolved.candidates;
+  const chainId = candidates[0].chainId;
 
-  if (claimed?.verifierAddress !== undefined && !sameAddress(claimed.verifierAddress, verifier.address)) {
+  if (claimed?.verifierAddress !== undefined && !candidates.some(c => sameAddress(claimed.verifierAddress as string, c.address))) {
     return {
       valid: false,
       error:
         `The response names verifier ${claimed.verifierAddress}, but ${circuit} verifies against ` +
-        `${verifier.address} on chain ${verifier.chainId}. Refusing rather than trusting the response.`,
+        `${candidates.map(c => c.address).join(' or ')} on chain ${chainId}. Refusing rather than trusting the response.`,
     };
   }
-  if (claimed?.chainId !== undefined && Number(claimed.chainId) !== verifier.chainId) {
+  if (claimed?.chainId !== undefined && Number(claimed.chainId) !== chainId) {
     return {
       valid: false,
-      error: `The response names chain ${claimed.chainId}, but ${circuit} verifies on chain ${verifier.chainId}.`,
+      error: `The response names chain ${claimed.chainId}, but ${circuit} verifies on chain ${chainId}.`,
     };
   }
 
@@ -228,20 +256,31 @@ export async function verifyProofOnChain(
   let provider = providerOrSigner;
   if (!provider) {
     try {
-      provider = getDefaultProvider(verifier.chainId);
+      provider = getDefaultProvider(chainId);
     } catch (error) {
       return { valid: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
-  try {
-    const contract = getVerifierContract(provider, verifier);
-    const isValid = await contract.verify(parsedProof.proofHex, parsedProof.publicInputsHex);
-    return { valid: isValid === true };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return { valid: false, error: errorMessage };
+  // The current deployment first; a legacy one only when it refuses. A call
+  // that fails (RPC error, revert) is remembered and the next candidate tried,
+  // so a flaky RPC on one address cannot hide a contract that would accept.
+  const failures: string[] = [];
+  for (const candidate of candidates) {
+    try {
+      const contract = getVerifierContract(provider, candidate);
+      const isValid = await contract.verify(parsedProof.proofHex, parsedProof.publicInputsHex);
+      if (isValid === true) {
+        return { valid: true, verifiedBy: { address: candidate.address, chainId: candidate.chainId, label: candidate.label } };
+      }
+    } catch (error) {
+      failures.push(`${candidate.label} ${candidate.address}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
+  // Not accepted. Name any contract that could not be asked: then "no" may
+  // only mean "not checked there".
+  if (failures.length > 0) return { valid: false, error: failures.join('; ') };
+  return { valid: false };
 }
 
 /** @internal Ensure a hex string has the 0x prefix */
@@ -347,46 +386,42 @@ export function getVerifierChainId(
  *
  * Keyed by `CircuitId`, which is the point: adding a circuit to the SDK makes
  * this object a compile error until somebody opens that circuit's `fn main`
- * and writes its offsets down. Nothing here can be inferred from the proof —
- * the public inputs are a flat array of bytes with no framing.
+ * and writes its offsets down. Nothing here can be inferred from the proof --
+ * the public inputs are a flat array with no framing.
  *
  * It replaced an `if / else if / else` chain whose final `else` handed every
- * unrecognised circuit — and every call that named no circuit at all —
- * Coinbase's offsets. For `giwa_attestation` that is not a near miss: its
- * public inputs are signal_hash, domain_separator, action_hash, merkle root,
- * scope, nullifier, so the nullifier slot under Coinbase's offsets holds the
- * MERKLE ROOT, a value identical for every user. Duplicate detection built on
- * it would report one person.
+ * unrecognised circuit -- and every call that named no circuit at all --
+ * Coinbase's offsets, so GIWA's nullifier was read from its Merkle root.
+ *
+ * Two shapes: the wallet credential circuits publish scope and nullifier as
+ * one Field each (the OPRF nullifier, ./oprfLayouts is the table); the OIDC
+ * circuit as 32 bytes, one per field.
  */
-const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, { scope: readonly [number, number]; nullifier: readonly [number, number] }>> = Object.freeze({
-  // Coinbase KYC v2: GIWA's order (signal_hash, domain_separator,
-  // action_hash, merkle root, scope, nullifier), then attested_at.
-  coinbase_attestation: { scope: [128, 159], nullifier: [160, 191] },
-  // No longer Coinbase's layout. The GIWA circuit gained the EIP-712 pair, so
-  // it reads: signal_hash, domain_separator, action_hash, merkle root, then
-  // scope and nullifier 64 bytes further along than Coinbase.
-  giwa_attestation: { scope: [128, 159], nullifier: [160, 191] },
-  // signal_hash, domain_separator, action_hash, scope, nullifier: GIWA's
-  // order without the merkle root, since there is no issuer list.
-  dojang_playground: { scope: [96, 127], nullifier: [128, 159] },
-  // Coinbase Country v2: Coinbase KYC v2's first four, then country_list,
-  // country_list_length and is_included before scope; attested_at last.
-  coinbase_country_attestation: { scope: [150, 181], nullifier: [182, 213] },
+type ScopeNullifierOffsets =
+  | { kind: 'field'; scope: number; nullifier: number }
+  | { kind: 'bytes'; scope: readonly [number, number]; nullifier: readonly [number, number] };
+
+const fieldOffsets = (circuit: OprfCircuitId): ScopeNullifierOffsets => {
+  const l = oprfLayoutOf(circuit);
+  return { kind: 'field', scope: l.scope, nullifier: l.nullifier };
+};
+
+const PUBLIC_INPUT_OFFSETS: Readonly<Record<CircuitId, ScopeNullifierOffsets>> = Object.freeze({
+  coinbase_attestation: fieldOffsets('coinbase_attestation'),
+  coinbase_country_attestation: fieldOffsets('coinbase_country_attestation'),
+  giwa_attestation: fieldOffsets('giwa_attestation'),
+  dojang_playground: fieldOffsets('dojang_playground'),
+  human_passport_score: fieldOffsets('human_passport_score'),
   // pubkey_modulus_limbs and the bounded domain sit before scope.
-  oidc_domain_attestation: { scope: [83, 114], nullifier: [115, 146] },
-  // GIWA's six first, then min_score, scorer_id and now.
-  human_passport_score: { scope: [128, 159], nullifier: [160, 191] },
+  oidc_domain_attestation: { kind: 'bytes', scope: [83, 114], nullifier: [115, 146] },
 });
 
 /**
- * The offsets for a circuit, or an error naming what was asked for.
- *
- * Throwing is the whole point. A caller that omits the circuit, or names one
- * this SDK has never heard of, is asking a question with no answer; returning
- * a guess produced a scope and a nullifier that belong to different bytes and
- * looked exactly like real ones.
+ * The offsets for a circuit, or an error naming what was asked for. Throwing
+ * is the whole point: a guess produced a scope and a nullifier that belonged
+ * to different bytes and looked exactly like real ones.
  */
-function offsetsFor(circuit: string | undefined): { scope: readonly [number, number]; nullifier: readonly [number, number] } {
+function offsetsFor(circuit: string | undefined): ScopeNullifierOffsets {
   if (circuit === undefined) {
     throw new Error(
       `A circuit id is required to read public inputs: the layout differs per circuit and cannot be inferred from the proof. Pass one of: ${ALL_CIRCUIT_IDS.join(', ')}`,
@@ -400,61 +435,76 @@ function offsetsFor(circuit: string | undefined): { scope: readonly [number, num
   return PUBLIC_INPUT_OFFSETS[circuit];
 }
 
+function readScopeOrNullifier(publicInputsHex: string[], offsets: ScopeNullifierOffsets, which: 'scope' | 'nullifier'): string | null {
+  if (offsets.kind === 'field') {
+    const at = offsets[which];
+    if (publicInputsHex.length <= at) return null;
+    return readFieldPublicInput(publicInputsHex, at, which);
+  }
+  const [start, end] = offsets[which];
+  if (publicInputsHex.length <= end) return null;
+  return reconstructBytes32FromFields(publicInputsHex.slice(start, end + 1));
+}
+
 /**
- * Extract scope value from public inputs array.
+ * Extract the scope from public inputs.
  *
- * The scope is a bytes32 value encoded across 32 consecutive field elements
- * in the public inputs. The exact position depends on the circuit type.
+ * For a wallet credential circuit this is the scope FIELD,
+ * keccak256(utf8(scope string)) mod p, as 0x + 64 hex; compare it with
+ * `reduceOprfName(scope string)`, never with a raw keccak256. For
+ * `oidc_domain_attestation` it is keccak256(scope string), 32 bytes.
  *
- * @param publicInputsHex - Array of public input hex strings (zero-padded to 32 bytes)
- * @param circuit - Optional circuit identifier to determine field positions
- * @returns Reconstructed scope as hex string with 0x prefix, or null if inputs are insufficient
- *
- * @example
- * ```typescript
- * const scope = extractScopeFromPublicInputs(publicInputsHex, 'coinbase_attestation');
- * console.log(scope); // '0x7a6b70726f6f66706f72742e636f6d...'
- * ```
+ * @param publicInputsHex - Array of public input hex strings
+ * @param circuit - Circuit id. REQUIRED; an unknown one throws.
+ * @returns The scope as 0x + 64 hex, or null if the inputs are too short
+ * @throws Error for a missing or unknown circuit, or a value that is not a field element
  */
 export function extractScopeFromPublicInputs(
   publicInputsHex: string[],
   circuit: string,
 ): string | null {
-  const [start, end] = offsetsFor(circuit).scope;
-  if (publicInputsHex.length <= end) return null;
-  const scopeFields = publicInputsHex.slice(start, end + 1);
-  return reconstructBytes32FromFields(scopeFields);
+  return readScopeOrNullifier(publicInputsHex, offsetsFor(circuit), 'scope');
 }
 
 /**
- * Extracts the nullifier (bytes32) from public inputs based on circuit type.
+ * Extracts the nullifier from public inputs.
  *
- * The nullifier is a unique, deterministic hash derived from the user's attestation
- * and scope. It serves as a privacy-preserving user identifier — the same user
- * with the same scope always produces the same nullifier, enabling duplicate
- * detection without revealing the wallet address.
+ * The same person with the same scope (and, for a wallet credential, the same
+ * OPRF domain and key) always produces the same nullifier, so a dApp can
+ * refuse a second use without learning who it is. A wallet credential's
+ * nullifier is TACEO's OPRF output, a field element; OIDC's is 32 bytes.
  *
  * @param publicInputsHex - Array of hex-encoded field elements
  * @param circuit - Circuit id. REQUIRED: the layout differs per circuit and
- *   cannot be inferred from the proof. It used to default to
- *   `coinbase_attestation`, which returned the right-shaped bytes read from
- *   the wrong place for every other circuit.
- * @returns Nullifier as hex string (bytes32), or null if publicInputs too short
- *
- * @example
- * ```typescript
- * const nullifier = extractNullifierFromPublicInputs(publicInputs, 'coinbase_attestation');
- * console.log(nullifier); // '0xabc123...'
- * ```
+ *   cannot be inferred from the proof.
+ * @returns Nullifier as 0x + 64 hex, or null if publicInputs too short
  */
 export function extractNullifierFromPublicInputs(
   publicInputsHex: string[],
   circuit: string,
 ): string | null {
-  const [start, end] = offsetsFor(circuit).nullifier;
-  if (publicInputsHex.length <= end) return null;
-  const nullifierFields = publicInputsHex.slice(start, end + 1);
-  return reconstructBytes32FromFields(nullifierFields);
+  return readScopeOrNullifier(publicInputsHex, offsetsFor(circuit), 'nullifier');
+}
+
+/**
+ * A wallet credential proof's OPRF domain field, keccak256(utf8(domain)) mod p,
+ * or null if the inputs are too short. Throws for a circuit without an OPRF
+ * nullifier (OIDC's "domain" is the email domain: {@link extractDomainFromPublicInputs}).
+ */
+export function extractOprfDomainFromPublicInputs(publicInputsHex: string[], circuit: string): string | null {
+  const l = oprfLayoutOf(circuit);
+  if (publicInputsHex.length <= l.domain) return null;
+  return readFieldPublicInput(publicInputsHex, l.domain, 'domain');
+}
+
+/**
+ * A wallet credential proof's OPRF key hash, or null if the inputs are too
+ * short. Verify paths compare it with getPinnedOprfKeyHash; reading it does not.
+ */
+export function extractOprfKeyHashFromPublicInputs(publicInputsHex: string[], circuit: string): string | null {
+  const l = oprfLayoutOf(circuit);
+  if (publicInputsHex.length <= l.keyHash) return null;
+  return readFieldPublicInput(publicInputsHex, l.keyHash, 'oprf_key_hash');
 }
 
 /**

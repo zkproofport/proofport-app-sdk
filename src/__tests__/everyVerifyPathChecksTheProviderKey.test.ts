@@ -17,7 +17,14 @@ import { makeRsaKey, oidcPublicInputs, serveJwks, GOOGLE_JWKS_URL, REQUEST_ID, S
 const REQUEST = { scope: SCOPE, requestId: REQUEST_ID };
 
 const bbLoaded = vi.fn();
-vi.mock('@aztec/bb.js', () => {
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
+vi.mock('@aztec-foundation/bb.js', () => {
   bbLoaded();
   return {
     Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },

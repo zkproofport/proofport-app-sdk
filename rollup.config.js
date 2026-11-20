@@ -2,14 +2,15 @@ import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 
-// @aztec/bb.js is EXTERNAL everywhere, deliberately.
+// @aztec-foundation/bb.js is EXTERNAL everywhere, deliberately.
 //
-// It is the off-chain verifier's WebAssembly Barretenberg — 16MB installed, and
-// an optional peer dependency, because most callers verify on-chain and should
-// not pay for it. Bundling it also does not work: rollup follows it into
-// thread-stream's package.json and stops with "Expected ';', '}' or <eof>",
-// which reads like a syntax error in this repo and is not one.
-const BB = '@aztec/bb.js';
+// It is the off-chain verifier's Barretenberg (WebAssembly plus native bb
+// binaries; 177 MB unpacked for 6.0.0), a dependency loaded lazily so a caller
+// who verifies on-chain never loads it. Bundling it also does not work: with
+// bb.js 4.x rollup followed it into thread-stream's package.json and stopped
+// with "Expected ';', '}' or <eof>", which reads like a syntax error in this
+// repo and is not one.
+const BB = '@aztec-foundation/bb.js';
 
 // The browser Buffer polyfill, external for the same reason: it is a declared
 // dependency the consumer resolves, and bundling a dynamic import of it forces

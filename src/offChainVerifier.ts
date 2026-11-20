@@ -16,13 +16,17 @@
  * `UltraHonkVerifierBackend.verifyProof(..., { verifierTarget: 'evm' })`. Two
  * things have to line up:
  *
- *   The version. `@aztec/bb.js` must be the WASM build of the same bb the
- *   circuits are compiled with -- `BB_VERSION` in circuits/toolchain.env,
- *   4.2.0-aztecnr-rc.2 since the beta.19 toolchain. Versions are not
- *   interchangeable: on one of our circuits the 2025 nightly wrote
- *   a 16256-byte proof where bb 1.2.0 wrote 16224 for the identical circuit and
+ *   The version. bb.js must be the build of the same bb the circuits are
+ *   compiled with -- `BB_VERSION` in circuits/toolchain.env, which the
+ *   generator records as core's VERIFICATION_KEY_BB_VERSION. Since the Noir
+ *   1.0.0 toolchain that is bb 6.0.0, published as `@aztec-foundation/bb.js`
+ *   (bb 4.x was `@aztec/bb.js`). Versions are not interchangeable: bb.js 6.0.0
+ *   answers false for a bb 4.2 proof checked against its own bb 4.2 key
+ *   (measured 2026-11-17), and on one of our circuits the 2025 nightly wrote a
+ *   16256-byte proof where bb 1.2.0 wrote 16224 for the identical circuit and
  *   witness, with the SAME verification key, so the key cannot warn you. A
- *   mismatch shows up only as verification failing.
+ *   mismatch shows up only as verification failing -- so the SDK compares the
+ *   versions itself and says so (BB_JS_VERSION below).
  *
  *   The target. Verifying an EVM proof as any other target is not a polite
  *   false. With the 2025 nightly, keccak-without-ZK trapped the WebAssembly
@@ -31,11 +35,27 @@
  *
  * THE PROOF ARRIVES IN TWO PIECES. The mobile app splits what Barretenberg
  * produced into `proof` and `publicInputs` before sending it, because the
- * Solidity verifier takes them separately. bb.js 4.x's verifier takes the same
+ * Solidity verifier takes them separately. bb.js 6's verifier takes the same
  * two pieces, so nothing is joined back here.
  */
 import { ALL_CIRCUIT_IDS, getCircuitPackage, isCircuitId, resolveSignerVariant, type CircuitId, type SignerVariant } from './circuits';
-import { checkProofIssuer, type CountryCondition, type OidcRequestContext } from '@zkproofport-app/core';
+import {
+  checkProofIssuer,
+  getAcceptedLegacyVerifiers,
+  getVerificationKeyRecord,
+  VERIFICATION_KEYS_REF,
+  VERIFICATION_KEY_BB_VERSION,
+  type CountryCondition,
+  type ProofRequestContext,
+} from '@zkproofport-app/core';
+
+/**
+ * The bb this SDK's off-chain verifier is: the exact `@aztec-foundation/bb.js`
+ * version in package.json (a test holds the two equal, and this equal to
+ * core's VERIFICATION_KEY_BB_VERSION). A key written by another bb is refused
+ * by name rather than handed to a verifier that would answer false.
+ */
+export const BB_JS_VERSION = '6.0.0';
 
 /**
  * Where verification keys are published.
@@ -45,8 +65,18 @@ import { checkProofIssuer, type CountryCondition, type OidcRequestContext } from
  * then mean nothing. Same repository the mobile app downloads circuit data
  * from.
  */
-const CIRCUITS_VK_BASE =
-  'https://raw.githubusercontent.com/zkproofport/circuits/main';
+const CIRCUITS_VK_BASE = 'https://raw.githubusercontent.com/zkproofport/circuits';
+
+/*
+ * The CURRENT verification key is read at the circuits commit core's generated
+ * table names (VERIFICATION_KEYS_REF) and must match the sha256 recorded there.
+ * Until 2026-11-17 it was read at `main`: every installed SDK then verified
+ * against whatever main held, so the day main moved to keys from a new bb,
+ * every SDK already installed would have started refusing every proof -- and
+ * an SDK released before the circuits merged would refuse every proof until
+ * they did. A superseded key still accepted during a transition is read at its
+ * own pinned commit (`vkRef` in core's ACCEPTED_LEGACY_VERIFIERS).
+ */
 
 /** How long a fetched verification key is reused. Keys change only on a recompile. */
 const VK_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -56,6 +86,12 @@ const vkCache = new Map<string, { vk: Uint8Array; at: number }>();
 export interface OffChainVerifyResult {
   valid: boolean;
   error?: string;
+  /**
+   * Which key accepted: the circuit's current one, a superseded one still
+   * accepted during a transition (with the circuits commit it was read at), or
+   * the one the caller passed.
+   */
+  verifiedBy?: { label: 'current' | 'legacy' | 'provided'; vkRef?: string };
 }
 
 export interface OffChainVerifyOptions {
@@ -68,11 +104,19 @@ export interface OffChainVerifyOptions {
   /** Milliseconds before the fetch is abandoned. Default 30000. */
   timeoutMs?: number;
   /**
-   * For `oidc_domain_attestation`: the request the proof answers. A proof made
+   * The request the proof answers. For `oidc_domain_attestation`, a proof made
    * with a request-bound nonce (the app path) must be bound to exactly this
-   * scope and requestId. See core's `checkOidcPolicy`.
+   * scope and requestId (core's `checkOidcPolicy`); for every circuit with a
+   * signal_hash, a proof without an action must carry the signal_hash of
+   * exactly this request (core's `checkSignalHash`).
    */
-  request?: OidcRequestContext;
+  request?: ProofRequestContext;
+  /**
+   * Which environment's OPRF key a wallet credential proof must carry the
+   * hash of ('production', 'staging', 'local'; core's OPRF_KEY_HASHES).
+   * Required for every circuit with an OPRF nullifier.
+   */
+  oprfEnvironment?: string;
   /**
    * Which of the circuit's packages made the proof, as its result says. Omitted
    * means `standard`; a proof with another package's length is then refused.
@@ -173,18 +217,29 @@ function normalisePublicInputs(publicInputs: string[]): string[] {
  *
  * @internal
  */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const subtle = (globalThis as { crypto?: { subtle?: { digest(a: string, d: Uint8Array): Promise<ArrayBuffer> } } }).crypto?.subtle;
+  if (!subtle) {
+    throw new Error('This runtime has no Web Crypto (globalThis.crypto.subtle), which checking the verification key needs.');
+  }
+  const digest = new Uint8Array(await subtle.digest('SHA-256', bytes));
+  return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function fetchVerificationKey(
   circuit: CircuitId,
   variant: SignerVariant,
-  timeoutMs: number
+  ref: string,
+  timeoutMs: number,
+  expectedSha256?: string
 ): Promise<Uint8Array> {
-  const cacheKey = `${circuit}/${variant}`;
+  const cacheKey = `${circuit}/${variant}@${ref}`;
   const cached = vkCache.get(cacheKey);
   if (cached && Date.now() - cached.at < VK_CACHE_TTL_MS) return cached.vk;
 
   const vkPath = getCircuitPackage(circuit, variant).vkPath;
 
-  const url = `${CIRCUITS_VK_BASE}/${vkPath}`;
+  const url = `${CIRCUITS_VK_BASE}/${ref}/${vkPath}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -201,6 +256,15 @@ async function fetchVerificationKey(
         `The verification key at ${url} is ${vk.length} bytes, far too small to be one. ` +
           `The path is probably wrong and something else was served.`
       );
+    }
+    if (expectedSha256) {
+      const actual = await sha256Hex(vk);
+      if (actual !== expectedSha256) {
+        throw new Error(
+          `The verification key at ${url} has sha256 ${actual}; this SDK pins ${expectedSha256} for ${circuit} '${variant}'. ` +
+            `It is not the key this SDK verifies against.`
+        );
+      }
     }
     vkCache.set(cacheKey, { vk, at: Date.now() });
     return vk;
@@ -259,9 +323,82 @@ export async function verifyProofOffChain(
   // their trust anchor as a public input the prover chooses. For OIDC that is
   // the RSA key -- see core's oidcProviderKeys. Checked here so a dApp that
   // verifies off-chain gets the same answer as one that verifies on-chain.
-  const issuer = await checkProofIssuer(circuit, publicInputs, { request: options.request, countryCondition: options.countryCondition, minScore: options.minScore });
+  const issuer = await checkProofIssuer(circuit, publicInputs, {
+    request: options.request,
+    countryCondition: options.countryCondition,
+    minScore: options.minScore,
+    oprfEnvironment: options.oprfEnvironment,
+  });
   if (!issuer.ok) {
     return { valid: false, error: issuer.error };
+  }
+
+  // The proof itself first: an empty or malformed one is reported as such,
+  // whatever the keys.
+  let proofBytes: Uint8Array;
+  let fields: string[];
+  try {
+    proofBytes = hexToBytes(proof);
+    if (proofBytes.length === 0) {
+      return { valid: false, error: 'Proof is empty' };
+    }
+    // Normalised to 32-byte big-endian fields before handing them over: the
+    // relay can deliver a short value (`0x01`), and the check below must see
+    // exactly what the circuit committed to.
+    fields = normalisePublicInputs(publicInputs);
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  // Which keys to try: the caller's, alone; otherwise the current key, then
+  // each superseded key still within its transition window. A proof carries
+  // no marker of the circuit build that made it, so the pinned keys are tried
+  // in order; every one is a key this SDK names, never one the sender chose.
+  //
+  // A key this bb.js cannot check is not tried: it is reported, by name,
+  // among the failures. That is the current key when core's table was
+  // generated from keys of another bb (a release mistake a test catches),
+  // the current key when it was generated from an uncommitted working tree
+  // (no commit to fetch it at), and a legacy key written by an older bb --
+  // the off-chain half of a transition across a toolchain upgrade, which this
+  // SDK does not carry a second bb.js for. Such a proof can still be checked
+  // on-chain, against its legacy verifier.
+  // Decided before Barretenberg is loaded, so a refusal costs nothing.
+  const failures: string[] = [];
+  type Key = { label: 'current' | 'legacy' | 'provided'; ref?: string; sha256?: string };
+  const keys: Key[] = [];
+  try {
+    if (options.verificationKey) {
+      keys.push({ label: 'provided' });
+    } else {
+      const current = getVerificationKeyRecord(circuit, signer.variant);
+      if (VERIFICATION_KEY_BB_VERSION !== BB_JS_VERSION) {
+        failures.push(`current: the ${circuit} key was written by bb ${VERIFICATION_KEY_BB_VERSION}; this SDK verifies with bb.js ${BB_JS_VERSION}`);
+      } else if (VERIFICATION_KEYS_REF === null) {
+        failures.push(
+          `current: the ${circuit} '${signer.variant}' key (sha256 ${current.sha256}) is not published at any circuits commit yet; ` +
+            `pass it as options.verificationKey`
+        );
+      } else {
+        keys.push({ label: 'current', ref: VERIFICATION_KEYS_REF, sha256: current.sha256 });
+      }
+      const seen = new Set<string>();
+      for (const legacy of getAcceptedLegacyVerifiers(circuit, signer.variant, new Date(), 'any')) {
+        if (seen.has(legacy.vkRef)) continue;
+        seen.add(legacy.vkRef);
+        if (legacy.bbVersion !== BB_JS_VERSION) {
+          failures.push(
+            `legacy @${legacy.vkRef}: its key was written by bb ${legacy.bbVersion}; this SDK verifies off-chain with bb.js ${BB_JS_VERSION} only. ` +
+              `Verify this proof on-chain`
+          );
+          continue;
+        }
+        keys.push({ label: 'legacy', ref: legacy.vkRef });
+      }
+    }
+    if (keys.length === 0) return { valid: false, error: failures.join('; ') };
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : String(error) };
   }
 
   // A REQUIRED dependency, loaded lazily.
@@ -277,9 +414,9 @@ export async function verifyProofOffChain(
   // Before bb.js, not after: its module-level code already reaches for Buffer.
   await ensureBufferForBarretenberg();
 
-  let bb: typeof import('@aztec/bb.js');
+  let bb: typeof import('@aztec-foundation/bb.js');
   try {
-    bb = await import('@aztec/bb.js');
+    bb = await import('@aztec-foundation/bb.js');
   } catch (error) {
     // Reaching here means the install is broken, not that something is missing
     // by design. Say so, rather than sending the caller off to install a
@@ -287,7 +424,7 @@ export async function verifyProofOffChain(
     return {
       valid: false,
       error:
-        'Could not load the proof verifier (@aztec/bb.js), which ships with this ' +
+        'Could not load the proof verifier (@aztec-foundation/bb.js), which ships with this ' +
         'SDK. This usually means a broken or partial install — try reinstalling ' +
         `@zkproofport-app/sdk. Underlying error: ${error instanceof Error ? error.message : String(error)}`,
     };
@@ -295,26 +432,29 @@ export async function verifyProofOffChain(
 
   let api: { destroy(): Promise<void> } | undefined;
   try {
-    const proofBytes = hexToBytes(proof);
-    if (proofBytes.length === 0) {
-      return { valid: false, error: 'Proof is empty' };
-    }
-    // Normalised to 32-byte big-endian fields before handing them over: the
-    // relay can deliver a short value (`0x01`), and the check below must see
-    // exactly what the circuit committed to.
-    const fields = normalisePublicInputs(publicInputs);
-
-    const vk =
-      options.verificationKey ?? (await fetchVerificationKey(circuit, signer.variant, timeoutMs));
 
     const barretenberg = await bb.Barretenberg.new({ threads: 1 });
     api = barretenberg;
     const verifier = new bb.UltraHonkVerifierBackend(barretenberg);
-    const valid = await verifier.verifyProof(
-      { proof: proofBytes, publicInputs: fields, verificationKey: vk },
-      { verifierTarget: 'evm' }
-    );
-    return { valid };
+    for (const key of keys) {
+      try {
+        const vk =
+          key.label === 'provided'
+            ? (options.verificationKey as Uint8Array)
+            : await fetchVerificationKey(circuit, signer.variant, key.ref as string, timeoutMs, key.sha256);
+        const valid = await verifier.verifyProof(
+          { proof: proofBytes, publicInputs: fields, verificationKey: vk },
+          { verifierTarget: 'evm' }
+        );
+        if (valid) {
+          return { valid: true, verifiedBy: key.label === 'legacy' ? { label: 'legacy', vkRef: key.ref } : { label: key.label } };
+        }
+      } catch (error) {
+        failures.push(`${key.label}${key.ref ? ` @${key.ref}` : ''}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (failures.length > 0) return { valid: false, error: failures.join('; ') };
+    return { valid: false };
   } catch (error) {
     return { valid: false, error: error instanceof Error ? error.message : String(error) };
   } finally {

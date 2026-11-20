@@ -50,10 +50,29 @@ import { parseProofResponseUrl } from '../deeplink';
 import type { ProofResponse } from '../types';
 // @ts-ignore -- a plain .mjs module shared with the generator script
 import { VERIFIER_BY_SCRIPT, NOT_PINNED_HERE } from '../../scripts/pinned-verifier-scripts.mjs';
-import { attestationInputs } from './helpers/signerFixtures';
+import { attestationInputs, TEST_REQUEST, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
 
 const bbLoaded = vi.fn();
-vi.mock('@aztec/bb.js', () => {
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+// The keys are published at KEYS_REF and every key is the 1888 zero bytes the
+// fetch mock below serves, so the off-chain path reaches the (mocked) verifier.
+const { KEYS_REF } = vi.hoisted(() => ({ KEYS_REF: 'f'.repeat(40) }));
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  const { createHash } = await import('node:crypto');
+  const real = withRedeployedVerifiers(await importOriginal());
+  const served = createHash('sha256').update(new Uint8Array(1888)).digest('hex');
+  const keys = Object.fromEntries(
+    Object.entries(real.VERIFICATION_KEYS).map(([circuit, byVariant]) => [
+      circuit,
+      Object.fromEntries(Object.entries(byVariant).map(([variant, k]) => [variant, { ...k, sha256: served }])),
+    ]),
+  );
+  return { ...real, VERIFICATION_KEYS_REF: KEYS_REF, VERIFICATION_KEYS: keys };
+});
+
+vi.mock('@aztec-foundation/bb.js', () => {
   bbLoaded();
   return {
     Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },
@@ -178,18 +197,25 @@ describe('the package table', () => {
     }
   });
 
-  it('Coinbase KYC v2 pins all three packages; v1 (CoinbaseAttestation) is not pinned', () => {
+  it('Coinbase KYC v2 maps all three packages; v1 (CoinbaseAttestation) is not pinned', async () => {
     expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestation')).toBe(true);
     expect((NOT_PINNED_HERE as Set<string>).has('CoinbaseAttestationV2')).toBe(false);
-    // The mainnet contracts the circuits deployment records name (circuits
-    // 1d41d85 for the standard package, da21683 for the Android ones).
-    expect(getPinnedVerifier('coinbase_attestation', 8453).address).toBe('0x6fc22d3576fb70457d1529b3f70f711a3cba7a7f');
-    expect(getPinnedVerifier('coinbase_attestation', 1).address).toBe('0x0e458610bd79893a0855c8f90ceded70cf7553b6');
-    expect(getPinnedVerifier('coinbase_attestation', 84532).address).toBe('0x1885aa2283db21ad0fc63a2df98efe92f31908e6');
-    expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation?.[8453].address).toBe('0x836d8b0fd01bed4e34220ebcee6d63265951fbf9');
-    expect(PINNED_VARIANT_VERIFIERS.android.coinbase_attestation?.[1].address).toBe('0x099bacd621d896d9b7618d8e7ec330ae7867c117');
-    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation?.[8453].address).toBe('0x87d9a66cacac95b2bc43bac8e610c59acb67c5e0');
-    expect(PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation?.[1].address).toBe('0x5798eee099da12eeb995ad6a09a8ab87c240b72b');
+    // The contracts the circuits deployment records name (circuits 1d41d85 for
+    // the standard package, da21683 for the Android ones) were built from bb
+    // 4.2 keys; since the Noir 1.0.0 / bb 6.0.0 rebuild they await a redeploy
+    // and are pinned nowhere. The real generated table, not this file's mock.
+    // After the redeploy, regenerate and write the new addresses here.
+    const real = await vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
+    const awaiting = (variant: string, chainId: number) =>
+      real.AWAITING_REDEPLOY.find(v => v.circuit === 'coinbase_attestation' && v.variant === variant && v.chainId === chainId)?.previousAddress;
+    expect(awaiting('standard', 8453)).toBe('0x6fc22d3576fb70457d1529b3f70f711a3cba7a7f');
+    expect(awaiting('standard', 1)).toBe('0x0e458610bd79893a0855c8f90ceded70cf7553b6');
+    expect(awaiting('standard', 84532)).toBe('0x1885aa2283db21ad0fc63a2df98efe92f31908e6');
+    expect(awaiting('android', 8453)).toBe('0x836d8b0fd01bed4e34220ebcee6d63265951fbf9');
+    expect(awaiting('android', 1)).toBe('0x099bacd621d896d9b7618d8e7ec330ae7867c117');
+    expect(awaiting('android_factory', 8453)).toBe('0x87d9a66cacac95b2bc43bac8e610c59acb67c5e0');
+    expect(awaiting('android_factory', 1)).toBe('0x5798eee099da12eeb995ad6a09a8ab87c240b72b');
+    expect(Object.keys(real.PINNED_VERIFIERS.coinbase_attestation)).toEqual([]);
     // v1's contracts appear nowhere in the table.
     const all = JSON.stringify([PINNED_VERIFIERS, PINNED_VARIANT_VERIFIERS]);
     for (const v1 of ['0xf7ded73e7a7fc8fb030c35c5a88d40abe6865382', '0x42d165a48256ae184e1de4e7e6372e870e2bc883', '0xf3d5a09d2c85b28c52ef2905c1be3a852b609d0c']) {
@@ -345,8 +371,11 @@ describe('resolveSignerVariant', () => {
 });
 
 describe('every verify path applies it before anything else runs', () => {
+  const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
+  const verifyOn = (circuit: string, p: unknown, pr: unknown, target: unknown, claimed?: unknown, options: Record<string, unknown> = {}) =>
+    verifyProofOnChain(circuit as never, p as never, pr, target as never, claimed as never, { ...ENV, ...options });
   const kyc = attestationInputs('coinbase_attestation');
-  const parsed = (bytes: number) => ({ proofHex: proofOf(bytes), publicInputsHex: kyc, numPublicInputs: 193 });
+  const parsed = (bytes: number) => ({ proofHex: proofOf(bytes), publicInputsHex: kyc, numPublicInputs: 133 });
   const response = (over: Partial<ProofResponse> = {}): ProofResponse => ({
     requestId: 'r1',
     circuit: 'coinbase_attestation',
@@ -357,31 +386,31 @@ describe('every verify path applies it before anything else runs', () => {
   });
 
   it('core on-chain: a standard proof without the field verifies on the standard pinned contract', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 });
-    expect(r).toEqual({ valid: true });
+    const r = await verifyOn('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 });
+    expect(r).toMatchObject({ valid: true });
     expect(String(Contract.mock.calls[0][0]).toLowerCase()).toBe(getPinnedVerifier('coinbase_attestation', 84532).address);
   });
 
   it('core on-chain: the android length without the field is refused, no contract called', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 });
+    const r = await verifyOn('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/does not say which signer made it/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it('core on-chain: an android claim with the standard length is refused', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
+    const r = await verifyOn('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/the length of a 'standard' proof/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it.each([['android'], ['android_factory']])('core on-chain: a %s proof verifies on its own pinned contract', async variant => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 }, undefined, { signerVariant: variant });
-    expect(r).toEqual({ valid: true });
+    const r = await verifyOn('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 }, undefined, { signerVariant: variant });
+    expect(r).toMatchObject({ valid: true });
     expect(String(Contract.mock.calls[0][0]).toLowerCase()).toBe(getPinnedVariantVerifier('coinbase_attestation', variant, 84532).address);
   });
 
   it('core on-chain: a response naming the standard contract for an android proof is refused', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 },
+    const r = await verifyOn('coinbase_attestation', parsed(ANDROID), {}, { chainId: 84532 },
       { verifierAddress: getPinnedVerifier('coinbase_attestation', 84532).address }, { signerVariant: 'android' });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/Refusing rather than trusting the response/) });
     expect(Contract).not.toHaveBeenCalled();
@@ -389,23 +418,23 @@ describe('every verify path applies it before anything else runs', () => {
 
   it('core on-chain: a configured verifier is never asked about an android proof', async () => {
     const configured = { address: '0x1111111111111111111111111111111111111111', chainId: 84532, abi: VERIFIER_ABI };
-    const r = await verifyProofOnChain('oidc_domain_attestation', parsed(ANDROID), {}, configured, undefined, { signerVariant: 'android' });
+    const r = await verifyOn('oidc_domain_attestation', parsed(ANDROID), {}, configured, undefined, { signerVariant: 'android' });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/made by the 'android' signer's package, whose verification key differs from the configured verifier's/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it('core on-chain: an unknown variant is refused by name', async () => {
-    const r = await verifyProofOnChain('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 }, undefined, { signerVariant: 'ios' });
+    const r = await verifyOn('coinbase_attestation', parsed(STANDARD_KYC), {}, { chainId: 84532 }, undefined, { signerVariant: 'ios' });
     expect(r).toEqual({ valid: false, error: expect.stringContaining(`has no "ios" signer variant`) });
   });
 
   it('SDK verifyResponseOnChain passes the response field through', async () => {
     const sdk = ProofportSDK.create('staging');
-    expect(await sdk.verifyResponseOnChain(response(), {})).toEqual({ valid: true });
-    const missing = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID) }), {});
+    expect(await sdk.verifyResponseOnChain(response(), {}, { request: TEST_REQUEST })).toMatchObject({ valid: true });
+    const missing = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID) }), {}, { request: TEST_REQUEST });
     expect(missing).toEqual({ valid: false, error: expect.stringMatching(/does not say which signer made it/) });
-    const claimed = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID), signerVariant: 'android' }), {});
-    expect(claimed).toEqual({ valid: true });
+    const claimed = await sdk.verifyResponseOnChain(response({ proof: proofOf(ANDROID), signerVariant: 'android' }), {}, { request: TEST_REQUEST });
+    expect(claimed).toMatchObject({ valid: true });
     expect(Contract).toHaveBeenCalledTimes(2);
     expect(String(Contract.mock.calls[1][0]).toLowerCase()).toBe(getPinnedVariantVerifier('coinbase_attestation', 'android', 84532).address);
   });
@@ -417,7 +446,7 @@ describe('every verify path applies it before anything else runs', () => {
   });
 
   it('off-chain: refused before the key fetch and before Barretenberg loads', async () => {
-    const r = await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc);
+    const r = await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, ENV);
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/does not say which signer made it/) });
     expect(global.fetch).not.toHaveBeenCalled();
     expect(bbLoaded).not.toHaveBeenCalled();
@@ -429,21 +458,21 @@ describe('every verify path applies it before anything else runs', () => {
       urls.push(url);
       return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array(1888).buffer };
     }) as unknown as typeof fetch;
-    const r = await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { signerVariant: 'android' });
-    expect(r).toEqual({ valid: true });
-    expect(urls).toEqual(['https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2-android/target/vk/vk']);
-    await verifyProofOffChain('coinbase_attestation', proofOf(STANDARD_KYC), kyc);
-    expect(urls[1]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2/target/vk/vk');
+    const r = await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { ...ENV, signerVariant: 'android' });
+    expect(r).toMatchObject({ valid: true });
+    expect(urls).toEqual([`https://raw.githubusercontent.com/zkproofport/circuits/${KEYS_REF}/coinbase-attestation-v2-android/target/vk/vk`]);
+    await verifyProofOffChain('coinbase_attestation', proofOf(STANDARD_KYC), kyc, ENV);
+    expect(urls[1]).toBe(`https://raw.githubusercontent.com/zkproofport/circuits/${KEYS_REF}/coinbase-attestation-v2/target/vk/vk`);
     // Same length as android; the field alone picks the factory package's key,
     // cached apart from the android one.
-    await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { signerVariant: 'android_factory' });
-    expect(urls[2]).toBe('https://raw.githubusercontent.com/zkproofport/circuits/main/coinbase-attestation-v2-android-factory/target/vk/vk');
+    await verifyProofOffChain('coinbase_attestation', proofOf(ANDROID), kyc, { ...ENV, signerVariant: 'android_factory' });
+    expect(urls[2]).toBe(`https://raw.githubusercontent.com/zkproofport/circuits/${KEYS_REF}/coinbase-attestation-v2-android-factory/target/vk/vk`);
     expect(urls).toHaveLength(3);
   });
 
   it('SDK verifyResponseOffChain passes the response field through', async () => {
     const sdk = ProofportSDK.create('staging');
-    const r = await sdk.verifyResponseOffChain(response({ signerVariant: 'android' }));
+    const r = await sdk.verifyResponseOffChain(response({ signerVariant: 'android' }), { request: TEST_REQUEST });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/the length of a 'standard' proof/) });
     expect(global.fetch).not.toHaveBeenCalled();
   });

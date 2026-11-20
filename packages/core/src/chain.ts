@@ -49,28 +49,31 @@ export const RPC_ENDPOINTS: Record<number, string> = {
   91342: 'https://sepolia-rpc.giwa.io', // GIWA Sepolia
 };
 
+/*
+ * The wallet credential circuits publish TACEO's OPRF nullifier as four
+ * Fields, in this order, where they used to publish `scope` and `nullifier`
+ * as 32 bytes each (circuits-dev.md, "OPRF nullifier in every wallet
+ * credential circuit"):
+ *   oprf_key_hash  Poseidon2(DS_key, D.x, D.y) of the OPRF key that answered
+ *   domain         keccak256(utf8(domain string)) mod p
+ *   scope          keccak256(utf8(scope string)) mod p
+ *   nullifier      the OPRF output
+ * Everything before them keeps its offset; everything after moved by -60.
+ * ./oprfPolicy reads and judges the four; these layouts are its source.
+ */
+
 /**
- * Coinbase KYC (v2) circuit public input layout (field offsets), 193 fields.
+ * Coinbase KYC (v2) circuit public input layout (field offsets), 133 fields.
  * One field per byte of each `[u8; 32]`, in `fn main`'s order
- * (coinbase-attestation-v2/src/main.nr; giwa_attestation's six, then
- * `attested_at`):
+ * (coinbase-attestation-v2/src/main.nr):
  * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
  * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
  * - signer_list_merkle_root: 96-127
- * - scope: 128-159
- * - nullifier: 160-191, keccak(keccak(wallet ++ keccak("coinbase_attestation")) ++ scope)
- * - attested_at: 192, unix seconds the signed statement names
+ * - oprf_key_hash 128, domain 129, scope 130, nullifier 131 (one Field each)
+ * - attested_at: 132, unix seconds the signed statement names
  *
- * v1's layout (128 fields: signal_hash, root, scope, nullifier) is gone; a v1
- * proof is refused by its count on every verify path.
- *
- * @example
- * ```typescript
- * const scope = publicInputs.slice(
- *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START,
- *   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_END + 1
- * );
- * ```
+ * Refused by count on every verify path: v1 (68 fields; 128 before the OPRF
+ * nullifier) and v2 from before the OPRF nullifier (193).
  */
 export const COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -81,42 +84,31 @@ export const COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   ACTION_HASH_END: 95,
   MERKLE_ROOT_START: 96,
   MERKLE_ROOT_END: 127,
-  SCOPE_START: 128,
-  SCOPE_END: 159,
-  NULLIFIER_START: 160,
-  NULLIFIER_END: 191,
-  ATTESTED_AT: 192,
+  OPRF_KEY_HASH: 128,
+  OPRF_DOMAIN: 129,
+  SCOPE: 130,
+  NULLIFIER: 131,
+  ATTESTED_AT: 132,
 } as const;
 
-/** Coinbase KYC (v2) public input count. A 128-input proof is v1 and refused. */
-export const COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT = 193;
+/** Coinbase KYC (v2) public input count. */
+export const COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT = 133;
 
 /**
- * Coinbase Country (v2) circuit public input layout (field offsets), 215 fields.
- * One field per byte of each `[u8; 32]` and of each country code, in `fn main`'s
- * order (coinbase-country-attestation-v2/src/main.nr: Coinbase KYC v2's order
- * with v1's country fields after the signer root, then `attested_at`):
+ * Coinbase Country (v2) circuit public input layout (field offsets), 155 fields
+ * (coinbase-country-attestation-v2/src/main.nr: Coinbase KYC v2's order with
+ * v1's country fields after the signer root, then `attested_at`):
  * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
  * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
  * - signer_list_merkle_root: 96-127
  * - country_list: 128-147, ten ISO 3166-1 alpha-2 codes, two ASCII bytes each
  * - country_list_length: 148 (1 to 10; entries at or past it are ignored)
  * - is_included: 149 (1 inclusion, 0 exclusion)
- * - scope: 150-181
- * - nullifier: 182-213, keccak(keccak(wallet ++ keccak("coinbase_country_attestation")) ++ scope)
- * - attested_at: 214, unix seconds the signed statement names
+ * - oprf_key_hash 150, domain 151, scope 152, nullifier 153
+ * - attested_at: 154, unix seconds the signed statement names
  *
- * v1's layout (150 fields: signal_hash, root, country list, length, inclusion,
- * scope, nullifier) is gone; a v1 proof is refused by its count on every
- * verify path.
- *
- * @example
- * ```typescript
- * const countryList = publicInputs.slice(
- *   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.COUNTRY_LIST_START,
- *   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.COUNTRY_LIST_END + 1
- * );
- * ```
+ * Refused by count on every verify path: v1 (90; 150 before the OPRF
+ * nullifier) and v2 from before the OPRF nullifier (215).
  */
 export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -131,29 +123,73 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
   COUNTRY_LIST_END: 147,
   COUNTRY_LIST_LENGTH: 148,
   IS_INCLUDED: 149,
-  SCOPE_START: 150,
-  SCOPE_END: 181,
-  NULLIFIER_START: 182,
-  NULLIFIER_END: 213,
-  ATTESTED_AT: 214,
+  OPRF_KEY_HASH: 150,
+  OPRF_DOMAIN: 151,
+  SCOPE: 152,
+  NULLIFIER: 153,
+  ATTESTED_AT: 154,
 } as const;
 
-/** Coinbase Country (v2) public input count. A 150-input proof is v1 and refused. */
-export const COINBASE_COUNTRY_PUBLIC_INPUT_COUNT = 215;
+/** Coinbase Country (v2) public input count. */
+export const COINBASE_COUNTRY_PUBLIC_INPUT_COUNT = 155;
 
 /**
- * Human Passport score circuit public input layout (field offsets), 195 fields.
- * One field per byte of each `[u8; 32]`, in `fn main`'s order
- * (human-passport-score/src/main.nr; giwa_attestation's six, then three scalars):
+ * GIWA attestation public input layout, 132 fields (giwa-attestation/src/main.nr):
+ * signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
+ * signer_list_merkle_root 96-127, then the OPRF four at 128-131.
+ * 192 before the OPRF nullifier.
+ */
+export const GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
+  SIGNAL_HASH_START: 0,
+  SIGNAL_HASH_END: 31,
+  DOMAIN_SEPARATOR_START: 32,
+  DOMAIN_SEPARATOR_END: 63,
+  ACTION_HASH_START: 64,
+  ACTION_HASH_END: 95,
+  MERKLE_ROOT_START: 96,
+  MERKLE_ROOT_END: 127,
+  OPRF_KEY_HASH: 128,
+  OPRF_DOMAIN: 129,
+  SCOPE: 130,
+  NULLIFIER: 131,
+} as const;
+
+/** GIWA attestation public input count. */
+export const GIWA_ATTESTATION_PUBLIC_INPUT_COUNT = 132;
+
+/**
+ * Dojang Playground public input layout, 100 fields (dojang-playground/src/main.nr):
+ * signal_hash 0-31, domain_separator 32-63, action_hash 64-95 (no issuer
+ * list, so no root), then the OPRF four at 96-99. 160 before the OPRF nullifier.
+ */
+export const DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT = {
+  SIGNAL_HASH_START: 0,
+  SIGNAL_HASH_END: 31,
+  DOMAIN_SEPARATOR_START: 32,
+  DOMAIN_SEPARATOR_END: 63,
+  ACTION_HASH_START: 64,
+  ACTION_HASH_END: 95,
+  OPRF_KEY_HASH: 96,
+  OPRF_DOMAIN: 97,
+  SCOPE: 98,
+  NULLIFIER: 99,
+} as const;
+
+/** Dojang Playground public input count. */
+export const DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT = 100;
+
+/**
+ * Human Passport score circuit public input layout (field offsets), 135 fields
+ * (human-passport-score/src/main.nr):
  * - signal_hash: 0-31 (zero when an EIP-712 action is signed)
  * - domain_separator: 32-63 and action_hash: 64-95 (zero without an action)
  * - signer_list_merkle_root: 96-127, root over (issuer, GitcoinVerifier domain,
  *   scoreV2 schema) leaves; must be HUMAN_PASSPORT_ISSUER_ROOT
- * - scope: 128-159
- * - nullifier: 160-191, keccak(keccak(wallet ++ keccak("human_passport_score")) ++ scope)
- * - min_score: 192, threshold in score units (score x 10^4)
- * - scorer_id: 193, the Passport scorer the score belongs to
- * - now: 194, unix seconds the attestation was unexpired at
+ * - oprf_key_hash 128, domain 129, scope 130, nullifier 131
+ * - min_score: 132, threshold in score units (score x 10^4)
+ * - scorer_id: 133, the Passport scorer the score belongs to
+ * - now: 134, unix seconds the attestation was unexpired at
+ * 195 before the OPRF nullifier.
  */
 export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -164,17 +200,17 @@ export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT = {
   ACTION_HASH_END: 95,
   MERKLE_ROOT_START: 96,
   MERKLE_ROOT_END: 127,
-  SCOPE_START: 128,
-  SCOPE_END: 159,
-  NULLIFIER_START: 160,
-  NULLIFIER_END: 191,
-  MIN_SCORE: 192,
-  SCORER_ID: 193,
-  NOW: 194,
+  OPRF_KEY_HASH: 128,
+  OPRF_DOMAIN: 129,
+  SCOPE: 130,
+  NULLIFIER: 131,
+  MIN_SCORE: 132,
+  SCORER_ID: 133,
+  NOW: 134,
 } as const;
 
 /** Human Passport score public input count. */
-export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT = 195;
+export const HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT = 135;
 
 /**
  * OIDC Domain Attestation circuit public input layout (field offsets), v2.

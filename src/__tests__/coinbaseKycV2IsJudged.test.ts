@@ -1,11 +1,12 @@
 /**
- * Coinbase KYC is judged by the v2 layout on every verify path: 193 public
- * inputs, the signer root at 96-127, and `attested_at` (192) held to the
+ * Coinbase KYC is judged by the v2 layout on every verify path: 133 public
+ * inputs, the signer root at 96-127, and `attested_at` (132) held to the
  * verifier's clock. The circuit has no clock of its own, so without the last
  * check a proof whose attestation was unrevoked once would verify forever.
  *
  * Matrix:
- *   count       128 (v1) refused by name; 0, 192, 194 refused; not an array
+ *   count       68 (v1), 128 (v1 before the OPRF nullifier) and 193 (v2 before
+ *               it) refused by name; 0, 132, 134 refused; not an array
  *   root        published root accepted; any other refused
  *   attested_at boundaries: 15 min behind accepted, +1 s refused; 5 min ahead
  *               accepted, +1 s refused; not a number, negative, above u64
@@ -25,9 +26,16 @@ import {
   verifyProofOnChain,
 } from '../verifier';
 import { verifyProofOffChain } from '../offChainVerifier';
-import { attestationInputs } from './helpers/signerFixtures';
+import { attestationInputs, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
 
-vi.mock('@aztec/bb.js', () => ({
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
+vi.mock('@aztec-foundation/bb.js', () => ({
   Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },
   UltraHonkVerifierBackend: vi.fn(function (this: any) {
     this.verifyProof = vi.fn(async () => true);
@@ -56,27 +64,33 @@ afterEach(() => {
 });
 
 describe('count', () => {
-  it('the layout is 193 fields, attested_at last', () => {
-    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT).toBe(193);
-    expect(AT).toBe(192);
+  it('the layout is 133 fields, the OPRF four after the root, attested_at last', () => {
+    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT).toBe(133);
+    expect(AT).toBe(132);
     expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.MERKLE_ROOT_START).toBe(96);
-    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE_START).toBe(128);
-    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER_START).toBe(160);
+    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.OPRF_KEY_HASH).toBe(128);
+    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.OPRF_DOMAIN).toBe(129);
+    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.SCOPE).toBe(130);
+    expect(COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.NULLIFIER).toBe(131);
   });
 
-  it('refuses a v1 proof (128 inputs) naming what it is', async () => {
-    const r = await checkCoinbaseAttestationProof(Array.from({ length: 128 }, () => field(0)));
-    expect(r).toEqual({ ok: false, error: expect.stringMatching(/^This is a Coinbase KYC v1 proof \(128 public inputs\)\. Only Coinbase KYC v2 proofs \(193/) });
-  });
-
-  it.each([[0], [192], [194]])('refuses %i inputs by count', async n => {
+  it.each([
+    [68, 'Coinbase KYC v1 proof'],
+    [128, 'Coinbase KYC v1 proof made before the OPRF nullifier'],
+    [193, 'Coinbase KYC v2 proof made before the OPRF nullifier (its nullifier is derived from the wallet address)'],
+  ])('refuses an earlier shape (%i inputs) naming what it is', async (n, what) => {
     const r = await checkCoinbaseAttestationProof(Array.from({ length: n }, () => field(0)));
-    expect(r).toEqual({ ok: false, error: `Expected 193 public inputs; got ${n}.` });
+    expect(r).toEqual({ ok: false, error: expect.stringContaining(`This is a ${what} (${n} public inputs). Only Coinbase KYC v2 proofs with the OPRF nullifier (133`) });
+  });
+
+  it.each([[0], [132], [134]])('refuses %i inputs by count', async n => {
+    const r = await checkCoinbaseAttestationProof(Array.from({ length: n }, () => field(0)));
+    expect(r).toEqual({ ok: false, error: `Expected 133 public inputs; got ${n}.` });
   });
 
   it('refuses something that is not an array', async () => {
     const r = await checkCoinbaseAttestationProof('0x01' as unknown as string[]);
-    expect(r).toEqual({ ok: false, error: 'Expected 193 public inputs; got string.' });
+    expect(r).toEqual({ ok: false, error: 'Expected 133 public inputs; got string.' });
   });
 });
 
@@ -112,9 +126,9 @@ describe('attested_at', () => {
   });
 
   it.each([
-    ['not a number', '0xzz', /Public input 192 \(attested_at\) is not a number\./],
-    ['negative', '-1', /Public input 192 \(attested_at\) is out of range: -1\./],
-    ['above u64', field(1n << 64n), /Public input 192 \(attested_at\) is out of range/],
+    ['not a number', '0xzz', /Public input 132 \(attested_at\) is not a number\./],
+    ['negative', '-1', /Public input 132 \(attested_at\) is out of range: -1\./],
+    ['above u64', field(1n << 64n), /Public input 132 \(attested_at\) is out of range/],
   ])('refuses a value that is %s', async (_label, value, message) => {
     const r = await checkCoinbaseAttestationProof(withAttestedAt(value));
     expect(r).toEqual({ ok: false, error: expect.stringMatching(message) });
@@ -124,28 +138,29 @@ describe('attested_at', () => {
 describe('wiring', () => {
   it('the issuer table runs this check for coinbase_attestation', async () => {
     expect(CIRCUIT_ISSUER_CHECKS.coinbase_attestation).toBe(checkCoinbaseAttestationProof);
-    const r = await checkProofIssuer('coinbase_attestation', withAttestedAt(field(NOW - 3600)));
+    const r = await checkProofIssuer('coinbase_attestation', withAttestedAt(field(NOW - 3600)), { oprfEnvironment: OPRF_TEST_ENVIRONMENT });
+    expect(r).toEqual({ ok: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(r.ok).toBe(false);
   });
 
   it('on-chain verify refuses a stale proof before calling any contract', async () => {
     const stale = withAttestedAt(field(NOW - 3600));
-    const r = await verifyProofOnChain('coinbase_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: stale, numPublicInputs: 193 }, {}, { chainId: 84532 });
+    const r = await verifyProofOnChain('coinbase_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: stale, numPublicInputs: 133 }, {}, { chainId: 84532 }, undefined, { oprfEnvironment: OPRF_TEST_ENVIRONMENT });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it('on-chain verify reaches the pinned contract with a fresh proof', async () => {
     const fresh = withAttestedAt(field(NOW));
-    const r = await verifyProofOnChain('coinbase_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: fresh, numPublicInputs: 193 }, {}, { chainId: 84532 });
-    expect(r).toEqual({ valid: true });
+    const r = await verifyProofOnChain('coinbase_attestation', { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: fresh, numPublicInputs: 133 }, {}, { chainId: 84532 }, undefined, { oprfEnvironment: OPRF_TEST_ENVIRONMENT });
+    expect(r).toMatchObject({ valid: true });
     expect(Contract).toHaveBeenCalledTimes(1);
   });
 
   it('off-chain verify refuses a stale proof before fetching a key', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const r = await verifyProofOffChain('coinbase_attestation', '0x' + 'ab'.repeat(64), withAttestedAt(field(NOW - 3600)));
+    const r = await verifyProofOffChain('coinbase_attestation', '0x' + 'ab'.repeat(64), withAttestedAt(field(NOW - 3600)), { oprfEnvironment: OPRF_TEST_ENVIRONMENT });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/behind this verifier's clock/) });
     expect(fetchMock).not.toHaveBeenCalled();
   });

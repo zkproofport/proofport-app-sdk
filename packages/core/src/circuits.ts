@@ -153,14 +153,14 @@ export interface CircuitPackage {
  * {@link CircuitId}: every circuit id has a `standard` package.
  *
  * `coinbase_attestation` is Coinbase KYC v2 in all three packages
- * (`coinbase-attestation-v2`, `-android`, `-android-factory`): 193 public
+ * (`coinbase-attestation-v2`, `-android`, `-android-factory`): 133 public
  * inputs, read by the layout in ./chain. The v1 package (`coinbase-attestation`,
- * 128 public inputs) is not served here: its proofs are refused by count, and
+ * 68 public inputs) is not served here: its proofs are refused by count, and
  * its verifiers are not pinned (scripts/pinned-verifier-scripts.mjs says why).
  *
  * `coinbase_country_attestation` is Coinbase Country v2 in the same three
  * shapes (`coinbase-country-attestation-v2`, `-android`, `-android-factory`):
- * 215 public inputs. Its v1 package (`coinbase-country-attestation`, 150) is
+ * 155 public inputs. Its v1 package (`coinbase-country-attestation`, 90) is
  * refused by count and not pinned, as for KYC.
  */
 const CIRCUIT_PACKAGE_ROWS = {

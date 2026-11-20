@@ -16,6 +16,7 @@
  */
 import { COINBASE_SIGNER_SET, GIWA_SIGNER_SET, type SignerSet } from './signerRoots.generated';
 import type { IssuerCheckResult } from './oidcProviderKeys';
+import { COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT, COINBASE_COUNTRY_PUBLIC_INPUT_COUNT, GIWA_ATTESTATION_PUBLIC_INPUT_COUNT } from './chain';
 
 export { COINBASE_SIGNER_SET, GIWA_SIGNER_SET } from './signerRoots.generated';
 export type { SignerSet } from './signerRoots.generated';
@@ -37,9 +38,9 @@ export interface SignerRootLayout {
  * action_hash first, so their root is at 96-127.
  */
 export const SIGNER_ROOT_LAYOUTS = Object.freeze({
-  coinbase_attestation: { rootStart: 96, publicInputCount: 193, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
-  coinbase_country_attestation: { rootStart: 96, publicInputCount: 215, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
-  giwa_attestation: { rootStart: 96, publicInputCount: 192, set: GIWA_SIGNER_SET, issuer: 'the GIWA attester' },
+  coinbase_attestation: { rootStart: 96, publicInputCount: COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
+  coinbase_country_attestation: { rootStart: 96, publicInputCount: COINBASE_COUNTRY_PUBLIC_INPUT_COUNT, set: COINBASE_SIGNER_SET, issuer: 'Coinbase' },
+  giwa_attestation: { rootStart: 96, publicInputCount: GIWA_ATTESTATION_PUBLIC_INPUT_COUNT, set: GIWA_SIGNER_SET, issuer: 'the GIWA attester' },
 } as const satisfies Record<string, SignerRootLayout>);
 
 /** The check for one circuit's layout. */

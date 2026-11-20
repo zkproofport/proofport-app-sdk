@@ -46,7 +46,14 @@ import {
 } from './helpers/oidcFixtures';
 
 const bbLoaded = vi.fn();
-vi.mock('@aztec/bb.js', () => {
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
+vi.mock('@aztec-foundation/bb.js', () => {
   bbLoaded();
   return {
     Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },
@@ -313,7 +320,7 @@ describe('every verify path runs the policy before anything else', () => {
 
   it.each(paths)('%s accepts a bound app proof with a published key', async (_n, verify) => {
     serveJwks({ [GOOGLE_JWKS_URL]: [google.jwk] });
-    expect(await verify(appGoogle())).toEqual({ valid: true });
+    expect(await verify(appGoogle())).toMatchObject({ valid: true });
   });
 
   it('checkProofIssuer passes the request through to the policy', async () => {
@@ -354,7 +361,7 @@ describe('the SDK remembers the relay requests it created', () => {
 
   it('checks the binding against the request it created, with nothing passed back in', async () => {
     const sdk = await sdkWithRelayRequest();
-    expect(await sdk.verifyResponseOnChain(resp(appGoogle()), {})).toEqual({ valid: true });
+    expect(await sdk.verifyResponseOnChain(resp(appGoogle()), {})).toMatchObject({ valid: true });
   });
 
   it('refuses a response bound to another request even though the response names this requestId', async () => {
@@ -375,10 +382,12 @@ describe('the SDK remembers the relay requests it created', () => {
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/is not the one this response answers/) });
   });
 
-  it('does not ask non-OIDC responses for a request', async () => {
+  it('asks a wallet (non-OIDC) response for its request too, for its signal_hash', async () => {
+    // Until 2026-11-17 a non-OIDC response needed no request; its signal_hash
+    // is now bound to one (signalHashIsBoundToTheRequest.test.ts).
     const sdk = ProofportSDK.create('staging');
     const r = await sdk.verifyResponseOnChain({ ...resp([]), circuit: 'dojang_playground', publicInputs: Array(160).fill(field(0)) }, {});
-    expect(r.error ?? '').not.toMatch(/request/);
+    expect(r).toEqual({ valid: false, error: expect.stringMatching(/signal_hash cannot be checked/) });
   });
 
   it(`forgets the oldest past ${ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS} remembered requests`, async () => {

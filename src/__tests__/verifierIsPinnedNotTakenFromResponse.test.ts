@@ -16,16 +16,40 @@ import {
   VERIFIER_ABI,
 } from '../verifier';
 import type { ProofResponse } from '../types';
-import { attestationInputs } from './helpers/signerFixtures';
+import { attestationInputs, TEST_REQUEST, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
+
+// Production has no OPRF key (core's OPRF_KEY_HASHES), so it refuses every
+// wallet credential proof. The routing test below lends production the staging
+// row for one case, to see which contract it calls; the others read the table
+// as it is.
+const { lend } = vi.hoisted(() => ({ lend: { production: false } }));
+vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
+  const real = await importOriginal<typeof import('../../packages/core/src/oprfKeyHashes')>();
+  return {
+    ...real,
+    get OPRF_KEY_HASHES() {
+      return lend.production ? { ...real.OPRF_KEY_HASHES, production: real.OPRF_KEY_HASHES.staging } : real.OPRF_KEY_HASHES;
+    },
+  };
+});
+
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
 
 const Contract = ethers.Contract as unknown as ReturnType<typeof vi.fn>;
 const ATTACKER = '0x000000000000000000000000000000000000dEaD';
 const PINNED_BASE_SEPOLIA_KYC = PINNED_VERIFIERS.coinbase_attestation[84532].address;
 const provider = {};
-const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: attestationInputs('coinbase_attestation'), numPublicInputs: 193 };
+const parsed = { proofHex: '0x' + 'ab'.repeat(64), publicInputsHex: attestationInputs('coinbase_attestation'), numPublicInputs: 133 };
 
+const request = { request: TEST_REQUEST };
 const response = (over: Partial<ProofResponse> = {}): ProofResponse => ({
-  requestId: 'r1',
+  requestId: TEST_REQUEST.requestId,
   circuit: 'coinbase_attestation',
   status: 'completed',
   proof: parsed.proofHex,
@@ -39,9 +63,13 @@ beforeEach(() => {
   Contract.mockClear();
 });
 
+const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
+const verifyOn = (circuit: never | string, p: typeof parsed, pr: unknown, target?: unknown, claimed?: unknown) =>
+  verifyProofOnChain(circuit as never, p, pr, target as never, claimed as never, ENV);
+
 describe('core verifyProofOnChain', () => {
   it('refuses a response-only verifier: the old fallback is gone', async () => {
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, undefined, {
+    const result = await verifyOn('coinbase_attestation', parsed, provider, undefined, {
       verifierAddress: ATTACKER,
       chainId: 84532,
     });
@@ -51,13 +79,13 @@ describe('core verifyProofOnChain', () => {
   });
 
   it('uses the pinned deployment when given a chain', async () => {
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 });
+    const result = await verifyOn('coinbase_attestation', parsed, provider, { chainId: 84532 });
     expect(result.valid).toBe(true);
     expect(calledAddresses()).toEqual([PINNED_BASE_SEPOLIA_KYC]);
   });
 
   it('refuses when the response names a different address than the pinned one', async () => {
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
+    const result = await verifyOn('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
       verifierAddress: ATTACKER,
     });
     expect(result.valid).toBe(false);
@@ -66,9 +94,12 @@ describe('core verifyProofOnChain', () => {
   });
 
   it('accepts the pinned address in checksum case', async () => {
-    const checksummed = '0x1885aA2283DB21ad0fc63A2Df98efe92F31908E6';
+    // Mixed case, as an EIP-55 checksum writes it: every other letter upper.
+    let flip = false;
+    const checksummed = '0x' + PINNED_BASE_SEPOLIA_KYC.slice(2).replace(/[a-f]/g, c => ((flip = !flip) ? c.toUpperCase() : c));
+    expect(checksummed).not.toBe(PINNED_BASE_SEPOLIA_KYC);
     expect(checksummed.toLowerCase()).toBe(PINNED_BASE_SEPOLIA_KYC);
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
+    const result = await verifyOn('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
       verifierAddress: checksummed,
       chainId: 84532,
     });
@@ -76,7 +107,7 @@ describe('core verifyProofOnChain', () => {
   });
 
   it.each([[''], ['not-an-address'], ['0x1234'], ['<script>']])('refuses a claimed address %j', async claimed => {
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
+    const result = await verifyOn('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
       verifierAddress: claimed,
     });
     expect(result.valid).toBe(false);
@@ -84,7 +115,7 @@ describe('core verifyProofOnChain', () => {
   });
 
   it('refuses when the response names a different chain', async () => {
-    const result = await verifyProofOnChain('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
+    const result = await verifyOn('coinbase_attestation', parsed, provider, { chainId: 84532 }, {
       chainId: 8453,
     });
     expect(result.valid).toBe(false);
@@ -93,22 +124,22 @@ describe('core verifyProofOnChain', () => {
 
   it('a dApp-configured verifier is used, and a differing response address is still refused', async () => {
     const configured = { address: '0x1111111111111111111111111111111111111111', chainId: 84532, abi: VERIFIER_ABI };
-    expect((await verifyProofOnChain('coinbase_attestation', parsed, provider, configured)).valid).toBe(true);
+    expect((await verifyOn('coinbase_attestation', parsed, provider, configured)).valid).toBe(true);
     expect(calledAddresses()).toEqual([configured.address]);
-    const refused = await verifyProofOnChain('coinbase_attestation', parsed, provider, configured, {
+    const refused = await verifyOn('coinbase_attestation', parsed, provider, configured, {
       verifierAddress: ATTACKER,
     });
     expect(refused.valid).toBe(false);
   });
 
   it('names the chain and the chains that have one when a circuit has no deployment there', async () => {
-    const result = await verifyProofOnChain('giwa_attestation', parsed, provider, { chainId: 8453 });
+    const result = await verifyOn('giwa_attestation', parsed, provider, { chainId: 8453 });
     expect(result.valid).toBe(false);
     expect(result.error).toBe('No giwa_attestation verifier is deployed on chain 8453. Chains with one: 91342.');
   });
 
   it.each([['arc_eligibility'], ['coinbase-kyc'], [''], ['__proto__']])('names unknown circuit %j', async circuit => {
-    const result = await verifyProofOnChain(circuit as never, parsed, provider, { chainId: 84532 });
+    const result = await verifyOn(circuit as never, parsed, provider, { chainId: 84532 });
     expect(result.valid).toBe(false);
     expect(result.error).toContain(`Unknown circuit '${circuit}'`);
     expect(Contract).not.toHaveBeenCalled();
@@ -146,37 +177,52 @@ describe('getPinnedVerifier', () => {
 describe('ProofportSDK.verifyResponseOnChain', () => {
   it('staging verifies on the pinned Base Sepolia contract, ignoring nothing but trusting nothing', async () => {
     const sdk = ProofportSDK.create('staging');
-    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: PINNED_BASE_SEPOLIA_KYC, chainId: 84532 }), provider);
+    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: PINNED_BASE_SEPOLIA_KYC, chainId: 84532 }), provider, request);
     expect(result.valid).toBe(true);
     expect(calledAddresses()).toEqual([PINNED_BASE_SEPOLIA_KYC]);
   });
 
   it('refuses a response pointing at another contract', async () => {
     const sdk = ProofportSDK.create('staging');
-    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: ATTACKER, chainId: 84532 }), provider);
+    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: ATTACKER, chainId: 84532 }), provider, request);
     expect(result.valid).toBe(false);
     expect(Contract).not.toHaveBeenCalled();
   });
 
   it('a response with no verifier fields is verified on the pinned contract', async () => {
     const sdk = ProofportSDK.create('staging');
-    expect((await sdk.verifyResponseOnChain(response(), provider)).valid).toBe(true);
+    expect((await sdk.verifyResponseOnChain(response(), provider, request)).valid).toBe(true);
     expect(calledAddresses()).toEqual([PINNED_BASE_SEPOLIA_KYC]);
   });
 
-  it('production verifies Coinbase KYC on Base and GIWA on GIWA Sepolia', async () => {
+  it('production refuses a wallet credential proof by name while it has no OPRF key, before any contract', async () => {
     const sdk = ProofportSDK.create();
-    await sdk.verifyResponseOnChain(response(), provider);
-    await sdk.verifyResponseOnChain(response({ circuit: 'giwa_attestation', publicInputs: attestationInputs('giwa_attestation') }), provider);
-    expect(calledAddresses()).toEqual([
-      PINNED_VERIFIERS.coinbase_attestation[8453].address,
-      PINNED_VERIFIERS.giwa_attestation[91342].address,
-    ]);
+    const result = await sdk.verifyResponseOnChain(response(), provider, request);
+    expect(result).toEqual({
+      valid: false,
+      error: "No OPRF key is registered for the 'production' environment, so no wallet credential proof can be verified there yet.",
+    });
+    expect(Contract).not.toHaveBeenCalled();
+  });
+
+  it('production verifies Coinbase KYC on Base and GIWA on GIWA Sepolia (OPRF key lent from staging)', async () => {
+    lend.production = true;
+    try {
+      const sdk = ProofportSDK.create();
+      await sdk.verifyResponseOnChain(response(), provider, request);
+      await sdk.verifyResponseOnChain(response({ circuit: 'giwa_attestation', publicInputs: attestationInputs('giwa_attestation') }), provider, request);
+      expect(calledAddresses()).toEqual([
+        PINNED_VERIFIERS.coinbase_attestation[8453].address,
+        PINNED_VERIFIERS.giwa_attestation[91342].address,
+      ]);
+    } finally {
+      lend.production = false;
+    }
   });
 
   it('a custom-config SDK with no verifiers refuses rather than reading the response', async () => {
     const sdk = new ProofportSDK({ relayUrl: 'https://relay.example' });
-    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: ATTACKER, chainId: 84532 }), provider);
+    const result = await sdk.verifyResponseOnChain(response({ verifierAddress: ATTACKER, chainId: 84532 }), provider, request);
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/No verifier chosen/);
     expect(Contract).not.toHaveBeenCalled();
@@ -184,7 +230,7 @@ describe('ProofportSDK.verifyResponseOnChain', () => {
 
   it('an unknown circuit in the response is a named error, not a throw', async () => {
     const sdk = ProofportSDK.create('staging');
-    const result = await sdk.verifyResponseOnChain(response({ circuit: 'arc_eligibility' as never }), provider);
+    const result = await sdk.verifyResponseOnChain(response({ circuit: 'arc_eligibility' as never }), provider, request);
     expect(result.valid).toBe(false);
     expect(result.error).toContain("Unknown circuit 'arc_eligibility'");
   });
@@ -200,7 +246,7 @@ describe('ProofportSDK.verifyResponseOnChain', () => {
 describe('an explicit environment with a custom relay', () => {
   it('verifies on that environment\'s pinned chain', async () => {
     const sdk = new ProofportSDK({ relayUrl: 'http://192.168.0.10:4001', environment: 'local' });
-    expect((await sdk.verifyResponseOnChain(response(), provider)).valid).toBe(true);
+    expect((await sdk.verifyResponseOnChain(response(), provider, request)).valid).toBe(true);
     expect(calledAddresses()).toEqual([PINNED_BASE_SEPOLIA_KYC]);
   });
 

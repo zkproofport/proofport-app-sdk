@@ -34,7 +34,28 @@ export {
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
   extractDomainFromPublicInputs,
+  extractOprfDomainFromPublicInputs,
+  extractOprfKeyHashFromPublicInputs,
 } from './verifier';
+
+// The OPRF nullifier every wallet credential proof carries: its four public
+// inputs, the key hash each environment pins, and the check every verify path
+// runs. reduceOprfName turns a scope or domain string into the field a proof
+// carries. The client side (blinding, the nodes' proof, the nullifier) is in
+// '@zkproofport-app/core/oprf'.
+export {
+  OPRF_PUBLIC_INPUT_LAYOUTS,
+  OPRF_CIRCUIT_IDS,
+  readOprfPublicInputs,
+  OPRF_KEY_HASHES,
+  OPRF_ENVIRONMENTS,
+  TACEO_TESTNET_OPRF_KEY_HASH,
+  getPinnedOprfKeyHash,
+  checkOprfProof,
+  reduceOprfName,
+  oprfNameError,
+} from './verifier';
+export type { OprfCircuitId, OprfEnvironment, OprfPublicInputs, OprfPublicInputLayout, ProofRequestContext } from './verifier';
 
 // Canonical circuit identifiers — the single source of truth.
 // Also available on its own, with no runtime dependencies, via
@@ -96,6 +117,21 @@ export {
 } from './verifier';
 export type { OidcRequestContext, OidcAudience, OidcNonceMode } from './verifier';
 
+// The signal_hash a proof without an action carries for a request, and the
+// check every verify path runs when it is given the request. Exported so a
+// dApp can recompute it for a request it issued.
+export {
+  computeSignalHash,
+  checkSignalHash,
+  signalHashScopeError,
+  signalHashRequestIdError,
+  SIGNAL_HASH_CIRCUIT_IDS,
+  SIGNAL_HASH_LAYOUTS,
+  SIGNAL_HASH_MAX_SCOPE_BYTES,
+  SIGNAL_HASH_MAX_REQUEST_ID_LENGTH,
+} from './verifier';
+export type { SignalHashRequest, SignalHashLayout } from './verifier';
+
 // Public input layout constants
 export {
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
@@ -105,6 +141,13 @@ export {
   HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT,
   HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT,
 } from './constants';
+export {
+  COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_COUNT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT,
+} from './verifier';
 
 export type { CircuitId, CircuitSupportStatus, SignerVariant, CircuitPackage, HumanPassportChain } from './circuits';
 // Whether a circuit binds an EIP-712 action, and whether it must. One table,

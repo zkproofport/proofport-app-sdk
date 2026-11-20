@@ -9,7 +9,7 @@
  * two circuits apart: only the pinned address does.
  */
 import { describe, it, expect } from 'vitest';
-import { PINNED_VERIFIERS, PINNED_VERIFIERS_SOURCE_COMMIT } from '@zkproofport-app/core';
+import { AWAITING_REDEPLOY, PINNED_VERIFIERS, PINNED_VERIFIERS_SOURCE_COMMIT } from '@zkproofport-app/core';
 
 const PROVIDER_KEY_VERIFIERS: Record<number, string> = {
   84532: '0xea5933abc598401c89f63b3f13ae56a7e78984e8',
@@ -25,18 +25,26 @@ const WITHOUT_PROVIDER_KEY_CHECK = [
 ];
 
 describe('OIDC testnet verifiers check the provider-key statement', () => {
+  // Built from 5081cfd's bb 4.2 key (and without the RSA limb fix), so since
+  // the Noir 1.0.0 / bb 6.0.0 rebuild each awaits a redeploy: recorded as the
+  // previous contract, pinned nowhere. After the redeploy, regenerate and
+  // write the new addresses here.
   for (const [chain, address] of Object.entries(PROVIDER_KEY_VERIFIERS)) {
-    it(`chain ${chain} pins ${address}`, () => {
-      const row = PINNED_VERIFIERS.oidc_domain_attestation[Number(chain)];
-      expect(row).toBeDefined();
-      expect(row.address).toBe(address);
-      expect(row.circuitsCommit).toBe('5081cfd');
+    it(`chain ${chain}: ${address} awaits a redeploy and is pinned nowhere`, () => {
+      const row = AWAITING_REDEPLOY.find(v => v.circuit === 'oidc_domain_attestation' && v.variant === 'standard' && v.chainId === Number(chain));
+      expect(row?.previousAddress).toBe(address);
+      expect(PINNED_VERIFIERS.oidc_domain_attestation[Number(chain)]).toBeUndefined();
     });
   }
 
   it('no OIDC row is a verifier without the provider-key check', () => {
     const pinned = Object.values(PINNED_VERIFIERS.oidc_domain_attestation).map((r) => r.address.toLowerCase());
     for (const old of WITHOUT_PROVIDER_KEY_CHECK) expect(pinned).not.toContain(old);
+  });
+
+  it('no OIDC row is one of the contracts awaiting a redeploy', () => {
+    const pinned = Object.values(PINNED_VERIFIERS.oidc_domain_attestation).map((r) => r.address.toLowerCase());
+    for (const row of AWAITING_REDEPLOY) expect(pinned).not.toContain(row.previousAddress);
   });
 
   it('the table names the circuits commit it was generated from', () => {

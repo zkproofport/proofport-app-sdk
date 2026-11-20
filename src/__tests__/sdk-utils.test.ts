@@ -51,8 +51,8 @@ describe('ProofportSDK - Utility Methods', () => {
     expect(metadata).toEqual({
       name: 'Coinbase KYC',
       description: 'Prove Coinbase identity verification, optionally authorizing one EIP-712 action',
-      publicInputsCount: 193,
-      publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'attested_at'],
+      publicInputsCount: 133,
+      publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'attested_at'],
     });
   });
 
@@ -63,7 +63,7 @@ describe('ProofportSDK - Utility Methods', () => {
     expect(metadata).toEqual({
       name: 'Coinbase Country',
       description: 'Prove Coinbase country verification, optionally authorizing one EIP-712 action',
-      publicInputsCount: 215,
+      publicInputsCount: 155,
       publicInputNames: [
         'signal_hash',
         'domain_separator',
@@ -72,6 +72,8 @@ describe('ProofportSDK - Utility Methods', () => {
         'country_list',
         'country_list_length',
         'is_included',
+        'oprf_key_hash',
+        'domain',
         'scope',
         'nullifier',
         'attested_at',

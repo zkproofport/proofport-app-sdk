@@ -96,7 +96,7 @@ export const DEEP_LINK_HOSTS = {
  * ```typescript
  * const metadata = CIRCUIT_METADATA['coinbase_attestation'];
  * console.log(metadata.name); // "Coinbase KYC"
- * console.log(metadata.publicInputsCount); // 193
+ * console.log(metadata.publicInputsCount); // 133
  * ```
  */
 export const CIRCUIT_METADATA: Record<CircuitType, {
@@ -108,13 +108,12 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   coinbase_attestation: {
     name: 'Coinbase KYC',
     description: 'Prove Coinbase identity verification, optionally authorizing one EIP-712 action',
-    // Coinbase KYC v2 (coinbase-attestation-v2/src/main.nr): GIWA's six
-    // `pub [u8; 32]` in its order, then `attested_at: pub u64` = 193 fields.
-    // signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
-    // signer_list_merkle_root 96-127, scope 128-159, nullifier 160-191,
-    // attested_at 192. v1's 128 fields are refused on every verify path.
-    publicInputsCount: 193,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'attested_at'],
+    // Coinbase KYC v2 (coinbase-attestation-v2/src/main.nr): signal_hash
+    // 0-31, domain_separator 32-63, action_hash 64-95, signer_list_merkle_root
+    // 96-127, oprf_key_hash 128, domain 129, scope 130, nullifier 131 (one
+    // Field each: the OPRF nullifier), attested_at 132 = 133 fields.
+    publicInputsCount: 133,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'attested_at'],
   },
   coinbase_country_attestation: {
     name: 'Coinbase Country',
@@ -122,11 +121,10 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
     // Coinbase Country v2 (coinbase-country-attestation-v2/src/main.nr):
     // signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
     // signer_list_merkle_root 96-127, country_list 128-147 (10 x 2 bytes),
-    // country_list_length 148, is_included 149, scope 150-181,
-    // nullifier 182-213, attested_at 214 = 215 fields. v1's 150 fields are
-    // refused on every verify path.
-    publicInputsCount: 215,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included', 'scope', 'nullifier', 'attested_at'],
+    // country_list_length 148, is_included 149, oprf_key_hash 150, domain
+    // 151, scope 152, nullifier 153, attested_at 154 = 155 fields.
+    publicInputsCount: 155,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'country_list', 'country_list_length', 'is_included', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'attested_at'],
   },
   oidc_domain_attestation: {
     name: 'OIDC Domain',
@@ -141,39 +139,35 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   // Forked from coinbase_attestation, then given the EIP-712 pair and a
   // branch: with an action the wallet signs the typed data and signal_hash is
   // zero; without one it signs signal_hash and the pair is zero. Read off the
-  // compiled ABI (6 x [u8; 32] = 192): signal_hash 0-31, domain_separator
-  // 32-63, action_hash 64-95, signer_list_merkle_root 96-127, scope 128-159,
-  // nullifier 160-191.
-  //
-  // signal_hash is NOT part of this circuit's nullifier: a nullifier derived
-  // from a public input nobody signs and nothing constrains would let one
-  // wallet mint as many nullifiers as it likes; here the secret is the address
-  // plus a constant compiled into the circuit.
+  // compiled ABI: signal_hash 0-31, domain_separator 32-63, action_hash
+  // 64-95, signer_list_merkle_root 96-127, then the OPRF nullifier's
+  // oprf_key_hash 128, domain 129, scope 130, nullifier 131 = 132 fields.
   giwa_attestation: {
     name: 'GIWA Attestation',
     description: 'Prove GIWA identity verification, optionally authorizing one EIP-712 action (planned — not officially supported yet)',
-    publicInputsCount: 192,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier'],
+    publicInputsCount: 132,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier'],
   },
   // Experimental, GIWA Sepolia only. The wallet signs the request (an EIP-712
   // action, or signal_hash when none is given -- the same branch as GIWA), and
   // the same key must have signed a payAndIssueEAS() call to the Playground
-  // faucet. No issuer list, so no merkle root: 5 x [u8; 32] = 160, read off the
-  // compiled ABI -- signal_hash 0-31, domain_separator 32-63, action_hash
-  // 64-95, scope 96-127, nullifier 128-159.
+  // faucet. No issuer list, so no merkle root: signal_hash 0-31,
+  // domain_separator 32-63, action_hash 64-95, then oprf_key_hash 96, domain
+  // 97, scope 98, nullifier 99 = 100 fields.
   dojang_playground: {
     name: 'Dojang Playground',
     description: 'Prove this wallet issued itself a Dojang through the GIWA Playground, optionally authorizing one EIP-712 action',
-    publicInputsCount: 160,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'scope', 'nullifier'],
+    publicInputsCount: 100,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'oprf_key_hash', 'domain', 'scope', 'nullifier'],
   },
-  // human-passport-score/src/main.nr: GIWA's six `pub [u8; 32]`, then
-  // min_score (u32, score x 10^4), scorer_id and now (u64) = 195 fields.
+  // human-passport-score/src/main.nr: GIWA's four `pub [u8; 32]` and the OPRF
+  // four (128-131), then min_score (u32, score x 10^4), scorer_id and now
+  // (u64) = 135 fields.
   human_passport_score: {
     name: 'Human Passport',
     description: 'Prove a Human Passport score at or above a threshold, optionally authorizing one EIP-712 action',
-    publicInputsCount: 195,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'scope', 'nullifier', 'min_score', 'scorer_id', 'now'],
+    publicInputsCount: 135,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'min_score', 'scorer_id', 'now'],
   },
 };
 

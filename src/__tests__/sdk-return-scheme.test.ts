@@ -171,7 +171,7 @@ describe('createRelayRequest — returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, {
       dappName: 'My DApp',
       returnScheme: 'mydapp://',
     });
@@ -184,7 +184,7 @@ describe('createRelayRequest — returnScheme', () => {
     const sdk = createSDKWithSigner();
 
     await expect(
-      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, {
         returnScheme: 'https://myapp.com',
       }),
     ).rejects.toThrow(/returnScheme/);
@@ -196,7 +196,7 @@ describe('createRelayRequest — returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, {
       returnScheme: 'googlechrome://',
     });
 
@@ -208,7 +208,7 @@ describe('createRelayRequest — returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' });
+    const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' });
 
     expect('returnScheme' in requestBody(fetchMock)).toBe(false);
     expect(relay.requestId).toBe('relay-req-123');
@@ -220,7 +220,7 @@ describe('createRelayRequest — returnScheme', () => {
     const sdk = createSDKWithSigner();
 
     await expect(
-      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, { returnScheme: value })
+      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, { returnScheme: value })
     ).rejects.toThrow(/returnScheme/);
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -238,7 +238,7 @@ describe('createRelayRequest — returnScheme', () => {
     const sdk = createSDKWithSigner();
 
     await expect(
-      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, { returnScheme: value })
+      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, { returnScheme: value })
     ).rejects.toThrow(/returnScheme/);
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -249,7 +249,7 @@ describe('createRelayRequest — returnScheme', () => {
     const sdk = createSDKWithSigner();
 
     await expect(
-      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, { returnScheme: 'file://' })
+      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, { returnScheme: 'file://' })
     ).rejects.toThrow();
 
     expect(mockSigner.signMessage).not.toHaveBeenCalled();
@@ -437,7 +437,7 @@ describe('createRelayRequest — automatic returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' });
+    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' });
 
     expect(requestBody(fetchMock).returnScheme).toBe('googlechrome://');
   });
@@ -452,7 +452,7 @@ describe('createRelayRequest — automatic returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' });
+    const relay = await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' });
 
     expect('returnScheme' in requestBody(fetchMock)).toBe(false);
     expect(relay.requestId).toBe('relay-req-123');
@@ -464,7 +464,7 @@ describe('createRelayRequest — automatic returnScheme', () => {
     const fetchMock = mockRelayOk();
     const sdk = createSDKWithSigner();
 
-    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+    await sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, {
       returnScheme: 'mydapp://',
     });
 
@@ -478,7 +478,7 @@ describe('createRelayRequest — automatic returnScheme', () => {
     const sdk = createSDKWithSigner();
 
     await expect(
-      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com' }, {
+      sdk.createRelayRequest('coinbase_attestation', { scope: 'myapp.com', oprfDomain: 'myapp.com' }, {
         returnScheme: 'https://myapp.com',
       }),
     ).rejects.toThrow(/returnScheme/);

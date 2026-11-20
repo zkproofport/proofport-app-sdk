@@ -8,12 +8,12 @@
  * unexpired at 0) verifies on chain. So every verify path compares:
  *
  * - the root at 96-127 with HUMAN_PASSPORT_ISSUER_ROOT (./circuits);
- * - `scorer_id` (193) with the scorers Human Passport's chains name
+ * - `scorer_id` (133) with the scorers Human Passport's chains name
  *   (HUMAN_PASSPORT_SCORER_IDS: 335);
- * - `now` (194) with this verifier's clock, the same window as Coinbase's
+ * - `now` (134) with this verifier's clock, the same window as Coinbase's
  *   `attested_at` and OIDC's `now`, so a stored proof re-verified later is
  *   refused (the attestation may have expired since);
- * - `min_score` (192) with the threshold the request asked for, when the
+ * - `min_score` (132) with the threshold the request asked for, when the
  *   verifying caller knows it (`minScore`, in points: 20 = 20.0).
  */
 import { HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT, HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_LAYOUT } from './chain';

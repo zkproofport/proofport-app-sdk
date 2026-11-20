@@ -42,7 +42,7 @@ describe('SDK Relay Methods', () => {
 
       await expect(
         sdk.createRelayRequest('coinbase_attestation', {
-          scope: '0xdef',
+          scope: '0xdef', oprfDomain: 'myapp.com',
         })
       ).rejects.toThrow('Signer not set. Call setSigner() first.');
     });
@@ -62,7 +62,7 @@ describe('SDK Relay Methods', () => {
         json: () => Promise.resolve(mockRelayResponse),
       });
 
-      const inputs = { scope: '0xdef' };
+      const inputs = { scope: '0xdef', oprfDomain: 'myapp.com' };
 
       await sdk.createRelayRequest('coinbase_attestation', inputs);
 
@@ -97,7 +97,7 @@ describe('SDK Relay Methods', () => {
       });
 
       const result = await sdk.createRelayRequest('coinbase_attestation', {
-        scope: '0xdef',
+        scope: '0xdef', oprfDomain: 'myapp.com',
       });
 
       expect(result).toEqual(mockRelayResponse);
@@ -115,7 +115,7 @@ describe('SDK Relay Methods', () => {
         json: () => Promise.resolve(mockRelayResponse),
       });
 
-      const inputs = { scope: '0xdef' };
+      const inputs = { scope: '0xdef', oprfDomain: 'myapp.com' };
 
       await sdk.createRelayRequest('coinbase_attestation', inputs, {
         dappName: 'Test dApp',
@@ -151,7 +151,10 @@ describe('SDK Relay Methods', () => {
           ok: true,
           json: () => Promise.resolve(mockRelayResponse),
         });
-        await sdk.createRelayRequest('coinbase_attestation', inputs as any);
+        // OIDC: the envelope copy is the same for every circuit, and a wallet
+        // credential circuit refuses most of these scopes before the relay is
+        // asked at all (requestScopeIsCheckedAtCreation.test.ts).
+        await sdk.createRelayRequest('oidc_domain_attestation', inputs as any);
         return JSON.parse((global.fetch as any).mock.calls[1][1].body);
       }
 
@@ -201,7 +204,7 @@ describe('SDK Relay Methods', () => {
       });
 
       await expect(
-        sdk.createRelayRequest('coinbase_attestation', { scope: '0xdef' })
+        sdk.createRelayRequest('coinbase_attestation', { scope: '0xdef', oprfDomain: 'myapp.com' })
       ).rejects.toThrow('Relay unavailable');
     });
   });

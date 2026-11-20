@@ -13,18 +13,20 @@ const ANDROID_84532 = '0x00000000000000000000000000000000000a0d01';
 const FACTORY_84532 = '0x00000000000000000000000000000000000fac01';
 
 vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../packages/core/src/pinnedVerifiers.generated')>();
+  // Verifiers awaiting a redeploy stand in as deployed (helpers/redeployedVerifiers.ts).
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  const actual = withRedeployedVerifiers(await importOriginal<typeof import('../../packages/core/src/pinnedVerifiers.generated')>());
   return {
     ...actual,
     PINNED_VARIANT_VERIFIERS: {
       android: {
         oidc_domain_attestation: {
-          84532: { address: ANDROID_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' },
+          84532: { address: ANDROID_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' },
         },
       },
       android_factory: {
         oidc_domain_attestation: {
-          84532: { address: FACTORY_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/84532/run-latest.json' },
+          84532: { address: FACTORY_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/84532/run-latest.json' },
         },
       },
     },
@@ -62,14 +64,14 @@ describe('with an android row pinned', () => {
 
   it('an android proof is judged by the android contract', async () => {
     const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, undefined, { signerVariant: 'android' });
-    expect(r).toEqual({ valid: true });
+    expect(r).toMatchObject({ valid: true });
     expect(called()).toEqual([ANDROID_84532]);
   });
 
   it('an android_factory proof of the same length is judged by the factory contract', async () => {
     expect(getPinnedVariantVerifier('oidc_domain_attestation', 'android_factory', 84532).address).toBe(FACTORY_84532);
     const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10688), {}, { chainId: 84532 }, undefined, { signerVariant: 'android_factory' });
-    expect(r).toEqual({ valid: true });
+    expect(r).toMatchObject({ valid: true });
     expect(called()).toEqual([FACTORY_84532]);
   });
 
@@ -87,7 +89,7 @@ describe('with an android row pinned', () => {
 
   it('a standard proof without the field is judged by the standard contract', async () => {
     const r = await verifyProofOnChain('oidc_domain_attestation', parsed(10304), {}, { chainId: 84532 });
-    expect(r).toEqual({ valid: true });
+    expect(r).toMatchObject({ valid: true });
     expect(called()).toEqual([getPinnedVerifier('oidc_domain_attestation', 84532).address]);
   });
 

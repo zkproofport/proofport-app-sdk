@@ -2,6 +2,7 @@
  * Proofport SDK - Main class
  */
 
+import { requestScopeError, withOprfDomain } from './requestScope';
 import type {
   ProofRequest,
   ProofResponse,
@@ -56,7 +57,7 @@ import {
   VERIFICATION_CHAINS,
 } from './constants';
 import { ALL_CIRCUIT_IDS, CIRCUIT_NEEDS_WALLET_SIGNATURE, circuitActionBinding, humanPassportScoreUnits, isCircuitId, type CircuitId } from './circuits';
-import { countryListError, getPinnedVerifier, type CountryCondition, type VerifierTarget, type OidcRequestContext } from './verifier';
+import { countryListError, getPinnedVerifier, SIGNAL_HASH_CIRCUIT_IDS, type CountryCondition, type VerifierTarget, type ProofRequestContext } from './verifier';
 import { validateTypedAction } from './typedAction';
 import { DEFAULT_RELAY_WAIT_MS, isTerminalRelayStatus } from './relayStatus';
 import type { SDKEnvironment } from './types';
@@ -105,7 +106,7 @@ export class ProofportSDK {
    * dApp passing the request back in. Oldest entries go first past
    * {@link ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS}.
    */
-  private relayRequests: Map<string, OidcRequestContext> = new Map();
+  private relayRequests: Map<string, ProofRequestContext> = new Map();
   /** Bound on {@link relayRequests}; a dApp that verifies later can pass the request explicitly. */
   static readonly MAX_REMEMBERED_RELAY_REQUESTS = 1000;
   /**
@@ -370,6 +371,10 @@ export class ProofportSDK {
     if (!isCircuitId(circuit)) {
       throw new Error(`Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.`);
     }
+    const scopeError = requestScopeError(circuit, inputs);
+    if (scopeError) throw new Error(scopeError);
+    // The OPRF domain: the dApp's, or in a browser the page's hostname (./requestScope).
+    inputs = withOprfDomain(circuit, inputs);
     const builder = ProofportSDK.REQUEST_BUILDERS[circuit];
     switch (builder) {
       case 'country':
@@ -776,7 +781,7 @@ export class ProofportSDK {
     proof: string,
     publicInputs: string[],
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext; signerVariant?: string; countryCondition?: CountryCondition; minScore?: number } = {}
+    options: { request?: ProofRequestContext; signerVariant?: string; countryCondition?: CountryCondition; minScore?: number } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     const parsedProof = parseProofForOnChain(
       proof,
@@ -789,21 +794,24 @@ export class ProofportSDK {
       signerVariant: options.signerVariant,
       countryCondition: options.countryCondition,
       minScore: options.minScore,
+      oprfEnvironment: this.oprfEnvironment(),
     });
   }
 
   /**
-   * The request an `oidc_domain_attestation` response answers: the one the
-   * caller passed, else the relay request this instance created under the
-   * response's requestId. `{ error }` when there is none, or when the two
-   * disagree -- an OIDC proof made with a request-bound nonce is only
-   * meaningful against the request it was bound to, so a response this SDK
-   * cannot place is refused rather than checked without it.
+   * The request a response answers: the one the caller passed, else the
+   * relay request this instance created under the response's requestId, else
+   * (not for OIDC, whose nonce only the relay path binds) the deep-link
+   * request still pending under it. `{ error }` when there is none, or when
+   * the two disagree -- an OIDC proof's request-bound nonce and every other
+   * wallet proof's signal_hash are only meaningful against the request they
+   * were made for, so a response this SDK cannot place is refused rather than
+   * checked without it.
    */
-  private oidcRequestFor(
+  private requestFor(
     response: ProofResponse,
-    explicit: OidcRequestContext | undefined,
-  ): { request: OidcRequestContext } | { error: string } {
+    explicit: ProofRequestContext | undefined,
+  ): { request: ProofRequestContext } | { error: string } {
     if (explicit !== undefined) {
       if (explicit === null || typeof explicit !== 'object' || explicit.requestId !== response.requestId) {
         return {
@@ -813,22 +821,38 @@ export class ProofportSDK {
       return { request: explicit };
     }
     const remembered = this.relayRequests.get(response.requestId);
-    if (!remembered) {
+    if (remembered) return { request: remembered };
+    if (response.circuit !== 'oidc_domain_attestation') {
+      const pending = this.pendingRequests.get(response.requestId);
+      const inputs = pending?.inputs as { scope?: unknown; oprfDomain?: unknown } | undefined;
+      const scope = inputs?.scope;
+      if (pending && pending.circuit === response.circuit && typeof scope === 'string') {
+        const oprfDomain = typeof inputs?.oprfDomain === 'string' ? inputs.oprfDomain : undefined;
+        return { request: oprfDomain === undefined ? { scope, requestId: pending.requestId } : { scope, requestId: pending.requestId, oprfDomain } };
+      }
       return {
         error:
-          `No request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the OIDC proof's ` +
-          'nonce cannot be checked against it. Pass { request: { scope, requestId } } -- the scope and relay ' +
-          'requestId of the request you created.',
+          `No request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the proof's ` +
+          'signal_hash cannot be checked against it. Pass { request: { scope, requestId, oprfDomain } } -- the scope, ' +
+          'requestId and OPRF domain of the request you created.',
       };
     }
-    return { request: remembered };
+    return {
+      error:
+        `No request ${JSON.stringify(response.requestId)} was created by this SDK instance, so the OIDC proof's ` +
+        'nonce cannot be checked against it. Pass { request: { scope, requestId } } -- the scope and relay ' +
+        'requestId of the request you created.',
+    };
   }
 
-  /** @internal Remember a relay request's scope for verifyResponse*. */
-  private rememberRelayRequest(requestId: unknown, scope: unknown): void {
+  /** @internal Remember a relay request's scope (and OPRF domain) for verifyResponse*. */
+  private rememberRelayRequest(requestId: unknown, scope: unknown, oprfDomain?: unknown): void {
     if (typeof requestId !== 'string' || typeof scope !== 'string') return;
     this.relayRequests.delete(requestId);
-    this.relayRequests.set(requestId, { scope, requestId });
+    this.relayRequests.set(
+      requestId,
+      typeof oprfDomain === 'string' ? { scope, requestId, oprfDomain } : { scope, requestId },
+    );
     while (this.relayRequests.size > ProofportSDK.MAX_REMEMBERED_RELAY_REQUESTS) {
       const oldest = this.relayRequests.keys().next().value as string;
       this.relayRequests.delete(oldest);
@@ -919,6 +943,16 @@ export class ProofportSDK {
    * circuit on. `undefined` when neither exists, which core reports as an
    * error. Never anything a proof response said.
    */
+  /**
+   * The environment whose OPRF key a wallet credential proof must come from:
+   * this SDK's own (ProofportSDK.create(env) or config.environment), never a
+   * value from the response. `undefined` when none was given, which core
+   * refuses by name for every circuit with an OPRF nullifier.
+   */
+  private oprfEnvironment(): string | undefined {
+    return this.environment ?? undefined;
+  }
+
   private verifierTarget(circuit: CircuitType): VerifierTarget | undefined {
     const configured = this.config.verifiers[circuit];
     if (configured) return configured;
@@ -936,9 +970,11 @@ export class ProofportSDK {
    *
    * @param response - ProofResponse object from parseResponse()
    * @param providerOrSigner - ethers v6 Provider or Signer (defaults to base mainnet public RPC)
-   * @param options.request - For `oidc_domain_attestation`: the `{ scope, requestId }`
-   *   the response answers. Not needed for a relay request this SDK instance
-   *   created; an OIDC response this instance cannot place is refused without it.
+   * @param options.request - The `{ scope, requestId }` the response answers.
+   *   An OIDC proof's nonce and every wallet proof's signal_hash
+   *   (`computeSignalHash`) are checked against it. Not needed for a request
+   *   this SDK instance created (relay, or deep link for non-OIDC circuits); a
+   *   response this instance cannot place is refused without it.
    * @param options.countryCondition - For `coinbase_country_attestation`: the
    *   `{ countryList, isIncluded }` the request asked for. Not needed for a
    *   request this SDK instance created (relay or deep link); a Country response
@@ -972,15 +1008,15 @@ export class ProofportSDK {
   async verifyResponseOnChain(
     response: ProofResponse,
     providerOrSigner?: any,
-    options: { request?: OidcRequestContext; countryCondition?: CountryCondition; minScore?: number } = {}
+    options: { request?: ProofRequestContext; countryCondition?: CountryCondition; minScore?: number } = {}
   ): Promise<{ valid: boolean; error?: string }> {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
     }
 
-    let request: OidcRequestContext | undefined;
-    if (response.circuit === 'oidc_domain_attestation') {
-      const found = this.oidcRequestFor(response, options.request);
+    let request: ProofRequestContext | undefined;
+    if (response.circuit === 'oidc_domain_attestation' || SIGNAL_HASH_CIRCUIT_IDS.includes(response.circuit)) {
+      const found = this.requestFor(response, options.request);
       if ('error' in found) return { valid: false, error: found.error };
       request = found.request;
     }
@@ -1010,7 +1046,7 @@ export class ProofportSDK {
     return verifyProofOnChain(response.circuit, parsedProof, providerOrSigner, this.verifierTarget(response.circuit), {
       verifierAddress: response.verifierAddress,
       chainId: response.chainId,
-    }, { request, signerVariant: response.signerVariant, countryCondition, minScore });
+    }, { request, signerVariant: response.signerVariant, countryCondition, minScore, oprfEnvironment: this.oprfEnvironment() });
   }
 
   /**
@@ -1044,9 +1080,9 @@ export class ProofportSDK {
     if (response.status !== 'completed' || !response.proof || !response.publicInputs) {
       return { valid: false, error: 'Invalid or incomplete response' };
     }
-    let request: OidcRequestContext | undefined;
-    if (response.circuit === 'oidc_domain_attestation') {
-      const found = this.oidcRequestFor(response, options?.request);
+    let request: ProofRequestContext | undefined;
+    if (response.circuit === 'oidc_domain_attestation' || SIGNAL_HASH_CIRCUIT_IDS.includes(response.circuit)) {
+      const found = this.requestFor(response, options?.request);
       if ('error' in found) return { valid: false, error: found.error };
       request = found.request;
     }
@@ -1066,7 +1102,7 @@ export class ProofportSDK {
       response.circuit,
       response.proof,
       response.publicInputs,
-      { ...options, request, countryCondition, minScore, signerVariant: response.signerVariant }
+      { ...options, request, countryCondition, minScore, signerVariant: response.signerVariant, oprfEnvironment: this.oprfEnvironment() ?? options?.oprfEnvironment }
     );
   }
 
@@ -1510,6 +1546,13 @@ export class ProofportSDK {
       }
     }
 
+    // A scope the OPRF node would refuse is refused here, before a challenge
+    // is spent and before anyone signs (./requestScope).
+    const scopeError = requestScopeError(circuit, inputs);
+    if (scopeError) throw new Error(scopeError);
+    // The OPRF domain: the dApp's, or in a browser the page's hostname (./requestScope).
+    inputs = withOprfDomain(circuit, inputs);
+
     // Get challenge + requestId from relay
     const { requestId, challenge } = await this.getChallenge();
 
@@ -1557,7 +1600,7 @@ export class ProofportSDK {
     }
 
     const created = await response.json() as RelayProofRequest;
-    this.rememberRelayRequest(created.requestId, scope);
+    this.rememberRelayRequest(created.requestId, scope, (inputs as { oprfDomain?: unknown }).oprfDomain);
     if (circuit === 'coinbase_country_attestation') this.rememberCountryRequest(created.requestId, inputs);
     if (circuit === 'human_passport_score') this.rememberPassportRequest(created.requestId, inputs);
     return created;

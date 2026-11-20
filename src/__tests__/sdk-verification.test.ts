@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProofportSDK } from '../ProofportSDK';
 import type { ProofResponse } from '../types';
-import { attestationInputs } from './helpers/signerFixtures';
+import { attestationInputs, TEST_REQUEST } from './helpers/signerFixtures';
 
 describe('SDK Verification', () => {
   let sdk: ProofportSDK;
@@ -9,7 +9,10 @@ describe('SDK Verification', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // An environment, so a wallet credential proof's OPRF key hash has a row
+    // to be compared with; a custom-config SDK without one refuses it.
     sdk = new ProofportSDK({
+      environment: 'staging',
       verifiers: {
         coinbase_attestation: {
           address: '0x1234567890abcdef1234567890abcdef12345678',
@@ -60,13 +63,13 @@ describe('SDK Verification', () => {
   it('verifyResponseOnChain() extracts proof from ProofResponse and verifies', async () => {
     const response: ProofResponse = {
       status: 'completed',
-      requestId: 'req-123',
+      requestId: TEST_REQUEST.requestId,
       circuit: 'coinbase_attestation',
       proof: '0x' + 'b'.repeat(128),
       publicInputs: attestationInputs('coinbase_attestation'),
     };
 
-    const result = await sdk.verifyResponseOnChain(response, mockProvider);
+    const result = await sdk.verifyResponseOnChain(response, mockProvider, { request: TEST_REQUEST });
 
     expect(result.valid).toBe(true);
   });

@@ -21,9 +21,26 @@ import {
 import { verifyProofOffChain } from '../offChainVerifier';
 import { CIRCUIT_METADATA } from '../constants';
 import type { ProofResponse } from '../types';
-import { attestationInputs, type RootCircuit } from './helpers/signerFixtures';
+import { attestationInputs, type RootCircuit, TEST_REQUEST, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
 
-vi.mock('@aztec/bb.js', () => ({
+// Verifiers awaiting a redeploy stand in as deployed: this file tests the
+// wiring, not which contract is deployed (helpers/redeployedVerifiers.ts).
+// The real proofs' OPRF answers come from the circuits' per-circuit test keys;
+// staging stands in for them here (helpers/oprfKeys.ts). The synthetic inputs
+// read whatever staging holds, so they agree either way.
+vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
+  const { withFixtureOprfKeys } = await import('./helpers/oprfKeys');
+  return withFixtureOprfKeys(await importOriginal());
+});
+const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
+const issuer = (circuit: string, inputs: string[]) => checkProofIssuer(circuit, inputs, ENV);
+
+vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOriginal => {
+  const { withRedeployedVerifiers } = await import('./helpers/redeployedVerifiers');
+  return withRedeployedVerifiers(await importOriginal());
+});
+
+vi.mock('@aztec-foundation/bb.js', () => ({
   Barretenberg: { new: vi.fn(async () => ({ destroy: vi.fn() })) },
   UltraHonkVerifierBackend: vi.fn(function (this: any) {
     this.verifyProof = vi.fn(async () => true);
@@ -81,16 +98,16 @@ describe('the expected roots are the roots of the published signer lists', () =>
     const bytes = readFileSync(file);
     const inputs: string[] = [];
     for (let i = 0; i < bytes.length; i += 32) inputs.push('0x' + bytes.subarray(i, i + 32).toString('hex'));
-    expect(await checkProofIssuer(circuit, inputs)).toEqual({ ok: true });
+    expect(await issuer(circuit, inputs)).toEqual({ ok: true });
   });
 
   it('accepts the root inside a real Coinbase KYC v2 proof (committed fixture)', async () => {
     const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'coinbaseKycV2SyntheticAnchors.json'), 'utf8'));
-    const attestedAt = Number(BigInt(fixture.publicInputs[192]));
+    const attestedAt = Number(BigInt(fixture.publicInputs[132]));
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(attestedAt * 1000 + 60_000);
-      expect(await checkProofIssuer('coinbase_attestation', fixture.publicInputs)).toEqual({ ok: true });
+      expect(await issuer('coinbase_attestation', fixture.publicInputs)).toEqual({ ok: true });
     } finally {
       vi.useRealTimers();
     }
@@ -101,55 +118,55 @@ describe.each(ROOT_CIRCUITS)('%s', circuit => {
   const layout = SIGNER_ROOT_LAYOUTS[circuit];
 
   it('accepts the published root', async () => {
-    expect(await checkProofIssuer(circuit, attestationInputs(circuit))).toEqual({ ok: true });
+    expect(await issuer(circuit, attestationInputs(circuit))).toEqual({ ok: true });
   });
 
   it("refuses a root of the attacker's own signer", async () => {
     const forged = await rootOf(['0x000000000000000000000000000000000000dEaD']);
-    const result = await checkProofIssuer(circuit, attestationInputs(circuit, forged));
+    const result = await issuer(circuit, attestationInputs(circuit, forged));
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error).toMatch(/not the root of/);
   });
 
   it('refuses the published signers plus one more', async () => {
     const plus = await rootOf([...layout.set.signers, '0x000000000000000000000000000000000000dEaD']);
-    expect((await checkProofIssuer(circuit, attestationInputs(circuit, plus))).ok).toBe(false);
+    expect((await issuer(circuit, attestationInputs(circuit, plus))).ok).toBe(false);
   });
 
   it("refuses the other issuer's root", async () => {
     const other = layout.set === COINBASE_SIGNER_SET ? GIWA_SIGNER_SET.root : COINBASE_SIGNER_SET.root;
-    expect((await checkProofIssuer(circuit, attestationInputs(circuit, other))).ok).toBe(false);
+    expect((await issuer(circuit, attestationInputs(circuit, other))).ok).toBe(false);
   });
 
   it.each([0, 31])('refuses a root differing in byte %i only', async i => {
     const inputs = attestationInputs(circuit);
     inputs[layout.rootStart + i] = '0x' + ((Number(BigInt(inputs[layout.rootStart + i])) ^ 1).toString(16));
-    expect((await checkProofIssuer(circuit, inputs)).ok).toBe(false);
+    expect((await issuer(circuit, inputs)).ok).toBe(false);
   });
 
   it('refuses the right root one slot early, with zeros where the root belongs', async () => {
     const inputs = attestationInputs(circuit, '0x' + '00'.repeat(32));
     const real = attestationInputs(circuit);
     for (let i = 0; i < 32; i++) inputs[layout.rootStart - 32 + i] = real[layout.rootStart + i];
-    expect((await checkProofIssuer(circuit, inputs)).ok).toBe(false);
+    expect((await issuer(circuit, inputs)).ok).toBe(false);
   });
 
   it('refuses a root field holding more than a byte, even when its low byte is right', async () => {
     const inputs = attestationInputs(circuit);
     inputs[layout.rootStart] = '0x' + (BigInt(inputs[layout.rootStart]) + 256n).toString(16);
-    expect((await checkProofIssuer(circuit, inputs)).ok).toBe(false);
+    expect((await issuer(circuit, inputs)).ok).toBe(false);
   });
 
   it.each([['zz'], [''], ['-1'], ['<script>'], ['%_\\'], ['0x😀']])('refuses a root field %j', async value => {
     const inputs = attestationInputs(circuit);
     inputs[layout.rootStart + 5] = value;
-    expect((await checkProofIssuer(circuit, inputs)).ok).toBe(false);
+    expect((await issuer(circuit, inputs)).ok).toBe(false);
   });
 
   it.each([['empty'], ['one short'], ['one extra']])('refuses a public input array that is %s', async shape => {
     const good = attestationInputs(circuit);
     const inputs = shape === 'empty' ? [] : shape === 'one short' ? good.slice(0, -1) : [...good, good[0]];
-    expect((await checkProofIssuer(circuit, inputs)).ok).toBe(false);
+    expect((await issuer(circuit, inputs)).ok).toBe(false);
   });
 });
 
@@ -157,14 +174,14 @@ describe('every verify path refuses a forged signer root before asking the verif
   const forgedInputs = async () =>
     attestationInputs('coinbase_attestation', await rootOf(['0x000000000000000000000000000000000000dEaD']));
   const response = (publicInputs: string[]): ProofResponse => ({
-    requestId: 'r', circuit: 'coinbase_attestation', status: 'completed', proof: PROOF, publicInputs,
+    requestId: TEST_REQUEST.requestId, circuit: 'coinbase_attestation', status: 'completed', proof: PROOF, publicInputs,
   });
   const paths: Array<[string, (inputs: string[]) => Promise<{ valid: boolean; error?: string }>, boolean]> = [
-    ['core verifyProofOnChain', i => verifyProofOnChain('coinbase_attestation', { proofHex: PROOF, publicInputsHex: i, numPublicInputs: i.length }, {}, { chainId: 84532 }), true],
+    ['core verifyProofOnChain', i => verifyProofOnChain('coinbase_attestation', { proofHex: PROOF, publicInputsHex: i, numPublicInputs: i.length }, {}, { chainId: 84532 }, undefined, ENV), true],
     ['sdk.verifyOnChain', i => ProofportSDK.create('staging').verifyOnChain('coinbase_attestation', PROOF, i, {}), true],
-    ['sdk.verifyResponseOnChain', i => ProofportSDK.create('staging').verifyResponseOnChain(response(i), {}), true],
-    ['verifyProofOffChain', i => verifyProofOffChain('coinbase_attestation', PROOF, i, { verificationKey: VK }), false],
-    ['sdk.verifyResponseOffChain', i => ProofportSDK.create('staging').verifyResponseOffChain(response(i), { verificationKey: VK }), false],
+    ['sdk.verifyResponseOnChain', i => ProofportSDK.create('staging').verifyResponseOnChain(response(i), {}, { request: TEST_REQUEST }), true],
+    ['verifyProofOffChain', i => verifyProofOffChain('coinbase_attestation', PROOF, i, { ...ENV, verificationKey: VK }), false],
+    ['sdk.verifyResponseOffChain', i => ProofportSDK.create('staging').verifyResponseOffChain(response(i), { verificationKey: VK, request: TEST_REQUEST }), false],
   ];
 
   it.each(paths)('%s', async (_name, verify, onChain) => {

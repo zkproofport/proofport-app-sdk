@@ -13,18 +13,42 @@ import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
 import { checkCoinbaseAttestationProof, checkCoinbaseCountryProof, type CountryCondition } from './coinbasePolicy';
 import { checkHumanPassportProof } from './humanPassportPolicy';
+import { SIGNAL_HASH_LAYOUTS, checkSignalHash } from './signalHash';
+import { checkOprfProof } from './oprfPolicy';
+import { OPRF_PUBLIC_INPUT_LAYOUTS } from './oprfLayouts';
+import type { OidcRequestContext } from './oidcPolicy';
 
 /**
  * What a verify function passes down: the JWKS fetch timeout, the request the
- * proof answers (only `oidc_domain_attestation` reads it; see ./oidcPolicy),
+ * proof answers (`oidc_domain_attestation` checks its nonce against it, see
+ * ./oidcPolicy; every circuit with a signal_hash checks that, see ./signalHash),
  * and the country list and direction a Coinbase Country request asked for
  * (only `coinbase_country_attestation` reads it; see ./coinbasePolicy), and
  * the score threshold a Human Passport request asked for, in points
- * (only `human_passport_score` reads it; see ./humanPassportPolicy).
+ * (only `human_passport_score` reads it; see ./humanPassportPolicy), and the
+ * environment a wallet credential proof's OPRF key must belong to
+ * (./oprfPolicy, ./oprfKeys).
  */
 export interface ProofCheckOptions extends OidcKeyCheckOptions, OidcPolicyOptions {
   countryCondition?: CountryCondition;
   minScore?: number;
+  /**
+   * Which environment's OPRF key a wallet credential proof must carry the
+   * hash of: 'production', 'staging' or 'local' (OPRF_KEY_HASHES). Required
+   * for every circuit with an OPRF nullifier; production has no key yet and
+   * refuses.
+   */
+  oprfEnvironment?: string;
+  /**
+   * The request the proof answers. `oprfDomain` is the OPRF domain string the
+   * request named; a wallet credential proof's domain is compared with it.
+   */
+  request?: ProofRequestContext;
+}
+
+/** The request a proof answers: its scope and id, and for a wallet credential, the OPRF domain. */
+export interface ProofRequestContext extends OidcRequestContext {
+  oprfDomain?: string;
 }
 
 export type IssuerCheck = (publicInputs: readonly string[], options: ProofCheckOptions) => Promise<IssuerCheckResult>;
@@ -82,6 +106,21 @@ export async function checkProofIssuer(
 ): Promise<IssuerCheckResult> {
   if (!isCircuitId(circuit)) {
     return { ok: false, error: `Unknown circuit '${circuit}'. Known: ${ALL_CIRCUIT_IDS.join(', ')}.` };
+  }
+  // The request binding first: offline, and a proof made for another request
+  // is refused before any key fetch. Run only when the caller says which
+  // request the proof answers (./signalHash).
+  if (options.request !== undefined && SIGNAL_HASH_LAYOUTS[circuit] !== null) {
+    const bound = checkSignalHash(circuit, publicInputs, options.request);
+    if (!bound.ok) return bound;
+  }
+  // The OPRF key hash always; domain and scope when the request is known.
+  if (OPRF_PUBLIC_INPUT_LAYOUTS[circuit] !== null) {
+    const oprf = checkOprfProof(circuit, publicInputs, {
+      oprfEnvironment: options.oprfEnvironment,
+      request: options.request,
+    });
+    if (!oprf.ok) return oprf;
   }
   const check: IssuerCheck | null = CIRCUIT_ISSUER_CHECKS[circuit];
   if (check === null) return { ok: true };

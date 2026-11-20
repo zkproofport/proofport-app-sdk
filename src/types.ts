@@ -41,6 +41,12 @@ export interface CoinbaseKycInputs {
   userAddress?: string;
   rawTransaction?: string;
   scope: string;
+  /**
+   * The OPRF domain string the nullifier is keyed by, beside `scope`
+   * (keccak256(utf8) mod p in the proof). The verifier compares the proof's
+   * domain with it; a response whose request named none is refused.
+   */
+  oprfDomain?: string;
 }
 
 /**
@@ -73,6 +79,12 @@ export interface CoinbaseCountryInputs {
   countryList: string[];
   isIncluded: boolean;
   scope: string;
+  /**
+   * The OPRF domain string the nullifier is keyed by, beside `scope`
+   * (keccak256(utf8) mod p in the proof). The verifier compares the proof's
+   * domain with it; a response whose request named none is refused.
+   */
+  oprfDomain?: string;
   /**
    * The EIP-712 action this proof authorizes. Optional: without one the wallet
    * personal_signs the request's signal hash (Coinbase Country v2, like KYC v2).
@@ -123,6 +135,12 @@ export interface EmptyInputs {}
  */
 export interface ActionBoundInputs {
   scope: string;
+  /**
+   * The OPRF domain string the nullifier is keyed by, beside `scope`
+   * (keccak256(utf8) mod p in the proof). The verifier compares the proof's
+   * domain with it; a response whose request named none is refused.
+   */
+  oprfDomain?: string;
   userAddress?: string;
   rawTransaction?: string;
   /**

@@ -5,144 +5,160 @@
  * `else` handed Coinbase's byte offsets to every unrecognised circuit — and to
  * every call that named no circuit at all, which is what OpenStoa's AI login
  * route does. The values that came back were the right shape, the right
- * length, and the wrong bytes.
+ * length, and the wrong bytes. They are a table keyed by circuit id now.
  *
- * For `giwa_attestation` it is not a near miss. Its public inputs are
- * signal_hash, domain_separator, action_hash, signer_list_merkle_root, scope,
- * nullifier — so under Coinbase's offsets the nullifier slot holds the MERKLE
- * ROOT, a value identical for every user of the circuit. Anything counting
- * distinct people would have counted one.
+ * Since the OPRF nullifier (circuits-dev.md, "OPRF nullifier in every wallet
+ * credential circuit") every wallet credential circuit publishes oprf_key_hash,
+ * domain, scope and nullifier as ONE Field each where it had scope and
+ * nullifier as 32 bytes each. The expected offsets below are that table,
+ * typed in from the document rather than read from core, so a change on
+ * either side shows here. OIDC keeps its 32-byte scope and nullifier.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   extractScopeFromPublicInputs,
   extractNullifierFromPublicInputs,
+  extractOprfDomainFromPublicInputs,
+  extractOprfKeyHashFromPublicInputs,
+  OPRF_PUBLIC_INPUT_LAYOUTS,
+  readOprfPublicInputs,
+  reduceOprfName,
 } from '../verifier';
 import { ALL_CIRCUIT_IDS } from '../circuits';
+import { oprfQuery } from '../../packages/core/src/oprf';
+import { encodeToCurve, scalarMul } from '../../packages/core/src/oprf/babyjubjub';
+import { poseidon2T4 } from '../../packages/core/src/oprf/poseidon2';
+import { OPRF_DS_OUT } from '../../packages/core/src/oprf/client';
 import dojangProof from './fixtures/dojangPlaygroundPublicInputs.json';
+import vectors from './fixtures/oprf-vectors.json';
 
-/** Public inputs as the prover emits them: one field element per byte. */
-function fieldsWith(marks: Record<number, number>, length = 256): string[] {
-  const out = new Array<string>(length).fill('0x' + '00'.repeat(32));
-  for (const [index, byte] of Object.entries(marks)) {
-    out[Number(index)] = '0x' + '00'.repeat(31) + byte.toString(16).padStart(2, '0');
-  }
+const ZERO = '0x' + '00'.repeat(32);
+const f = (v: number | bigint) => '0x' + BigInt(v).toString(16).padStart(64, '0');
+
+/** Public inputs as the prover emits them, with `marks` placed. */
+function fieldsWith(marks: Record<number, string>, length: number): string[] {
+  const out = new Array<string>(length).fill(ZERO);
+  for (const [index, value] of Object.entries(marks)) out[Number(index)] = value;
   return out;
 }
 
 /** A run of 32 fields all holding the same byte, starting at `start`. */
-function block(start: number, byte: number): Record<number, number> {
-  return Object.fromEntries(Array.from({ length: 32 }, (_, i) => [start + i, byte]));
+function block(start: number, byte: number): Record<number, string> {
+  return Object.fromEntries(Array.from({ length: 32 }, (_, i) => [start + i, f(byte)]));
 }
 
-describe('public inputs are read per circuit', () => {
-  it('reads GIWA at its own offsets, not Coinbase’s', () => {
-    // GIWA: scope at [128..159], nullifier at [160..191].
-    const fields = fieldsWith({
-      ...block(96, 0xee), // signer_list_merkle_root — what the old else returned
-      ...block(128, 0xaa),
-      ...block(160, 0xbb),
-    });
-    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'aa'.repeat(32));
-    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + 'bb'.repeat(32));
-    // v1 Coinbase's nullifier offset (96) holds GIWA's root: never read there.
-    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + 'ee'.repeat(32));
+// circuits-dev.md, "OPRF nullifier in every wallet credential circuit": count,
+// then oprf_key_hash, domain, scope, nullifier.
+const SPEC = {
+  coinbase_attestation: [133, 128, 129, 130, 131],
+  coinbase_country_attestation: [155, 150, 151, 152, 153],
+  giwa_attestation: [132, 128, 129, 130, 131],
+  dojang_playground: [100, 96, 97, 98, 99],
+  human_passport_score: [135, 128, 129, 130, 131],
+} as const;
+
+describe('the OPRF layout is the one the circuits document', () => {
+  it.each(Object.entries(SPEC))('%s', (circuit, [count, keyHash, domain, scope, nullifier]) => {
+    expect(OPRF_PUBLIC_INPUT_LAYOUTS[circuit as keyof typeof SPEC]).toMatchObject({ count, keyHash, domain, scope, nullifier });
   });
 
-  it('reads Coinbase and OIDC at their own offsets', () => {
-    const coinbase = fieldsWith({ ...block(128, 0x11), ...block(160, 0x22) });
-    expect(extractScopeFromPublicInputs(coinbase, 'coinbase_attestation')).toBe('0x' + '11'.repeat(32));
-    expect(extractNullifierFromPublicInputs(coinbase, 'coinbase_attestation')).toBe('0x' + '22'.repeat(32));
+  it('every circuit is listed: OIDC has none, every other has one', () => {
+    expect(OPRF_PUBLIC_INPUT_LAYOUTS.oidc_domain_attestation).toBeNull();
+    expect(Object.keys(OPRF_PUBLIC_INPUT_LAYOUTS).sort()).toEqual([...ALL_CIRCUIT_IDS].sort());
+    expect(Object.keys(SPEC).sort()).toEqual(ALL_CIRCUIT_IDS.filter(id => id !== 'oidc_domain_attestation').sort());
+  });
+});
 
-    const oidc = fieldsWith({ ...block(83, 0x33), ...block(115, 0x44) });
+describe('public inputs are read per circuit', () => {
+  it.each(Object.entries(SPEC))('reads %s at its own offsets, as Fields', (circuit, [count, keyHash, domain, scope, nullifier]) => {
+    // 96-127 is the signer root where a circuit has one (Dojang has none: its OPRF four start at 96).
+    const fields = fieldsWith({ ...(keyHash === 128 || keyHash === 150 ? block(96, 0xee) : {}), [keyHash]: f(0x0a), [domain]: f(0x0d), [scope]: f(0x5c), [nullifier]: f(0x77) }, count);
+    expect(extractOprfKeyHashFromPublicInputs(fields, circuit)).toBe(f(0x0a));
+    expect(extractOprfDomainFromPublicInputs(fields, circuit)).toBe(f(0x0d));
+    expect(extractScopeFromPublicInputs(fields, circuit)).toBe(f(0x5c));
+    expect(extractNullifierFromPublicInputs(fields, circuit)).toBe(f(0x77));
+    expect(readOprfPublicInputs(circuit, fields)).toEqual({ oprfKeyHash: f(0x0a), domain: f(0x0d), scope: f(0x5c), nullifier: f(0x77) });
+  });
+
+  it('GIWA: the nullifier is never read from the signer root (the failure the table replaced)', () => {
+    const fields = fieldsWith({ ...block(96, 0xee), 131: f(0x77) }, 132);
+    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe(f(0x77));
+  });
+
+  it('reads OIDC at its own byte offsets', () => {
+    const oidc = fieldsWith({ ...block(83, 0x33), ...block(115, 0x44) }, 214);
     expect(extractScopeFromPublicInputs(oidc, 'oidc_domain_attestation')).toBe('0x' + '33'.repeat(32));
     expect(extractNullifierFromPublicInputs(oidc, 'oidc_domain_attestation')).toBe('0x' + '44'.repeat(32));
   });
 
+  it('OIDC has no OPRF domain or key hash: asking is an error naming it', () => {
+    const oidc = fieldsWith({}, 214);
+    expect(() => extractOprfDomainFromPublicInputs(oidc, 'oidc_domain_attestation')).toThrow(/oidc_domain_attestation has no OPRF nullifier/);
+    expect(() => extractOprfKeyHashFromPublicInputs(oidc, 'oidc_domain_attestation')).toThrow(/oidc_domain_attestation has no OPRF nullifier/);
+    expect(() => readOprfPublicInputs('oidc_domain_attestation', oidc)).toThrow(/has no OPRF nullifier/);
+  });
+
   it('refuses a call that names no circuit', () => {
-    const fields = fieldsWith({});
-    expect(() => extractScopeFromPublicInputs(fields)).toThrow(/circuit id is required/i);
-    expect(() => extractNullifierFromPublicInputs(fields)).toThrow(/circuit id is required/i);
+    const fields = fieldsWith({}, 133);
+    expect(() => (extractScopeFromPublicInputs as (f: string[]) => unknown)(fields)).toThrow(/circuit id is required/i);
+    expect(() => (extractNullifierFromPublicInputs as (f: string[]) => unknown)(fields)).toThrow(/circuit id is required/i);
+    expect(() => (extractOprfDomainFromPublicInputs as (f: string[]) => unknown)(fields)).toThrow(/circuit id is required/i);
   });
 
-  it('refuses a circuit it has never heard of', () => {
-    const fields = fieldsWith({});
-    expect(() => extractScopeFromPublicInputs(fields, 'coinbase-kyc')).toThrow(/Unknown circuit/);
-    expect(() => extractNullifierFromPublicInputs(fields, 'solana_thing')).toThrow(/Unknown circuit/);
+  it.each([['coinbase-kyc'], ['solana_thing'], ['arc_eligibility'], [''], ['__proto__']])('refuses unknown circuit %j, naming it', id => {
+    const fields = fieldsWith({}, 133);
+    expect(() => extractScopeFromPublicInputs(fields, id)).toThrow(`Unknown circuit '${id}'`);
+    expect(() => extractNullifierFromPublicInputs(fields, id)).toThrow(`Unknown circuit '${id}'`);
+    expect(() => extractOprfKeyHashFromPublicInputs(fields, id)).toThrow(`Unknown circuit '${id}'`);
+    expect(() => readOprfPublicInputs(id, fields)).toThrow(`Unknown circuit '${id}'`);
   });
 
-  // Arc was removed from the SDK on 2026-10-13. Reading an Arc proof must be
-  // refused, naming the id and the known ones -- not answered with the GIWA
-  // offsets it used to share.
-  it('refuses arc_eligibility, which the SDK no longer knows', () => {
-    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
-    for (const read of [extractScopeFromPublicInputs, extractNullifierFromPublicInputs]) {
-      expect(() => read(fields, 'arc_eligibility')).toThrow(
-        /Unknown circuit 'arc_eligibility'\. Expected one of: .*giwa_attestation/,
-      );
-    }
+  it('an earlier Coinbase KYC shape is refused by name; a short array reads as null', () => {
+    const old = fieldsWith({}, 128);
+    expect(extractNullifierFromPublicInputs(old.slice(0, 100), 'coinbase_attestation')).toBeNull();
+    expect(() => readOprfPublicInputs('coinbase_attestation', old)).toThrow(/Coinbase KYC v1 proof made before the OPRF nullifier \(128 public inputs\)/);
+    expect(() => readOprfPublicInputs('coinbase_attestation', fieldsWith({}, 193))).toThrow(/Coinbase KYC v2 proof made before the OPRF nullifier/);
+    expect(() => readOprfPublicInputs('coinbase_attestation', fieldsWith({}, 134))).toThrow('A coinbase_attestation proof has 133 public inputs; got 134.');
   });
 
-  it('has offsets for every circuit the SDK knows', () => {
-    const fields = fieldsWith({});
-    for (const id of ALL_CIRCUIT_IDS) {
-      expect(() => extractScopeFromPublicInputs(fields, id)).not.toThrow();
-      expect(() => extractNullifierFromPublicInputs(fields, id)).not.toThrow();
-    }
+  it.each([
+    ['p', '0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001'],
+    ['2^256 - 1', '0x' + 'ff'.repeat(32)],
+  ])('refuses a Field at or above the modulus (%s), never reducing it', (_label, value) => {
+    const fields = fieldsWith({ 130: value }, 133);
+    expect(() => extractScopeFromPublicInputs(fields, 'coinbase_attestation')).toThrow(/not below the field modulus/);
+    expect(() => readOprfPublicInputs('coinbase_attestation', fields)).toThrow(/Public input 130 \(scope\) is not below the field modulus/);
   });
 
-  it('reads Coinbase KYC v2 after signal_hash, the EIP-712 pair and the merkle root', () => {
-    // v2: signal_hash 0-31, domain_separator 32-63, action_hash 64-95, root
-    // 96-127, scope 128-159, nullifier 160-191, attested_at 192. v1's scope
-    // (64) is now action_hash and its nullifier (96) the merkle root.
-    const fields = fieldsWith({ ...block(64, 0x44), ...block(96, 0xee), ...block(128, 0x55), ...block(160, 0x66) }, 193);
-    expect(extractScopeFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '55'.repeat(32));
-    expect(extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toBe('0x' + '66'.repeat(32));
-    // A v1 proof (128 fields) has no bytes at v2's offsets: null, not v1's values.
-    const v1 = fieldsWith({ ...block(64, 0x55), ...block(96, 0x66) }, 128);
-    expect(extractScopeFromPublicInputs(v1, 'coinbase_attestation')).toBeNull();
-    expect(extractNullifierFromPublicInputs(v1, 'coinbase_attestation')).toBeNull();
+  it('accepts p - 1, the largest Field', () => {
+    const pMinus1 = '0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000';
+    expect(extractScopeFromPublicInputs(fieldsWith({ 130: pMinus1 }, 133), 'coinbase_attestation')).toBe(pMinus1);
   });
 
-  it('reads GIWA two fields further along, because it gained the EIP-712 pair', () => {
-    // GIWA and Coinbase shared a layout until GIWA gained an optional signed
-    // action. Its `fn main` now reads signal_hash, domain_separator,
-    // action_hash, merkle root, scope, nullifier -- so scope
-    // and nullifier sit at 128 and 160 rather than Coinbase's 64 and 96.
-    //
-    // This assertion IS the check on that move. The test it replaces pinned
-    // the two circuits to one layout so that changing either would be a
-    // visible decision, and this is the decision.
-    const fields = fieldsWith({ ...block(128, 0x77), ...block(160, 0x88) });
-    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + '77'.repeat(32));
-    expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe('0x' + '88'.repeat(32));
+  it.each([['zz'], [''], ['-1'], ['<script>'], ['%_\\'], ['0x😀']])('refuses a non-number Field %j', value => {
+    const fields = fieldsWith({ 131: value }, 133);
+    expect(() => extractNullifierFromPublicInputs(fields, 'coinbase_attestation')).toThrow(/Public input 131 \(nullifier\) is not a number/);
   });
+});
 
-  it('does not read GIWA at Coinbase offsets any more', () => {
-    // The failure that matters: reading a GIWA proof with the old offsets
-    // returns the merkle ROOT where the nullifier should be -- a value
-    // identical for every user, which duplicate detection would read as one
-    // person.
-    const fields = fieldsWith({ ...block(64, 0x55), ...block(128, 0x77), ...block(160, 0x88) });
-    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe('0x' + '55'.repeat(32));
-  });
-
-  it('reads Dojang Playground off a real proof, not a hand-placed fixture', async () => {
-    // setup.ts mocks ethers; the hashes here must be the real ones.
-    const { concat, getBytes, keccak256, toUtf8Bytes } = await vi.importActual<typeof import('ethers')>('ethers');
-    // The public inputs of a proof that verifies on the GIWA Sepolia verifier.
-    // Scope and nullifier are recomputed here the way the circuit derives them,
-    // so a wrong offset reads bytes that cannot match by accident.
+describe('a real Dojang Playground proof (fixtures/dojangPlaygroundPublicInputs.json)', () => {
+  it('carries the fixture key hash, the domain and scope reduced mod p, and the nullifier core recomputes', () => {
+    // Recomputed here, with core's own client, from what the circuits fixture
+    // generator used: the Playground wallet, keccak256 mod p of the two strings,
+    // and the circuits' public test key for dojang_playground (oprf.js
+    // fixtureKey). A wrong offset reads values that cannot match by accident.
     const fields = dojangProof.publicInputs;
-    expect(fields).toHaveLength(160);
-    const scope = keccak256(toUtf8Bytes('dojang-playground-scope'));
-    const tag = keccak256(toUtf8Bytes('dojang_playground'));
-    const secret = keccak256(concat([getBytes('0x5A3E649208Ae15ec52496c1Ae23b2Ff89Ac02f0c'), getBytes(tag)]));
-    const nullifier = keccak256(concat([getBytes(secret), getBytes(scope)]));
-    expect(extractScopeFromPublicInputs(fields, 'dojang_playground')).toBe(scope);
-    expect(extractNullifierFromPublicInputs(fields, 'dojang_playground')).toBe(nullifier);
-    // GIWA's offsets on the same proof run off its end: there is no merkle
-    // root in this circuit, so everything sits 32 fields earlier.
-    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).not.toBe(scope);
+    expect(fields).toHaveLength(100);
+    const read = readOprfPublicInputs('dojang_playground', fields);
+    const fixture = vectors.evaluations.find(e => e.note === 'circuits fixture key for dojang_playground (oprf.js fixtureKey)')!;
+    expect(read.oprfKeyHash).toBe(fixture.keyHash);
+    expect(read.domain).toBe(reduceOprfName('zkproofport.app'));
+    expect(read.scope).toBe(reduceOprfName('dojang-playground-scope'));
+    const query = oprfQuery({ address: '0x5A3E649208Ae15ec52496c1Ae23b2Ff89Ac02f0c', domain: read.domain, scope: read.scope });
+    const p = scalarMul(encodeToCurve(BigInt(query)), BigInt(fixture.secretKey));
+    expect(f(poseidon2T4([OPRF_DS_OUT, BigInt(query), p.x, p.y])[1])).toBe(read.nullifier);
+    expect(extractNullifierFromPublicInputs(fields, 'dojang_playground')).toBe(read.nullifier);
+    // GIWA's offsets on the same proof run off its end.
+    expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBeNull();
   });
 });

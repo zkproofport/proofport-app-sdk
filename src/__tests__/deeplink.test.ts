@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { computeSignalHash } from '../verifier';
 import {
   generateRequestId,
   encodeData,
@@ -28,6 +29,45 @@ describe('Deep Link Utilities', () => {
       const id1 = generateRequestId();
       const id2 = generateRequestId();
       expect(id1).not.toBe(id2);
+    });
+
+    it('is req-{base36 timestamp}-{32 hex} and fits the signal_hash requestId rule', () => {
+      const id = generateRequestId();
+      expect(id).toMatch(/^req-[0-9a-z]+-[0-9a-f]{32}$/);
+      expect(() => computeSignalHash({ scope: 'app:scope', circuitId: 'coinbase_attestation', requestId: id })).not.toThrow();
+    });
+
+    it('does not repeat across many calls in the same millisecond', () => {
+      const ids = new Set(Array.from({ length: 2000 }, () => generateRequestId()));
+      expect(ids.size).toBe(2000);
+    });
+
+    it('takes its random part from crypto.getRandomValues, never Math.random', () => {
+      const mathRandom = vi.spyOn(Math, 'random');
+      const getRandomValues = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(<T extends ArrayBufferView | null>(array: T): T => {
+        (array as unknown as Uint8Array).fill(0xab);
+        return array;
+      });
+      try {
+        expect(generateRequestId()).toMatch(/-(ab){16}$/);
+        expect(getRandomValues).toHaveBeenCalledTimes(1);
+        expect(mathRandom).not.toHaveBeenCalled();
+      } finally {
+        mathRandom.mockRestore();
+        getRandomValues.mockRestore();
+      }
+    });
+
+    it.each([
+      ['no crypto at all', undefined],
+      ['crypto without getRandomValues', {}],
+    ])('throws instead of using a weaker source when the runtime has %s', (_name, value) => {
+      vi.stubGlobal('crypto', value);
+      try {
+        expect(() => generateRequestId()).toThrow(/no Web Crypto/);
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 

@@ -29,13 +29,14 @@ a verifier needs:
   that an app proof's nonce is bound to that request (`checkOidcPolicy`,
   `deriveOidcNonceBinding`). A 148-input proof from the earlier circuit version
   is refused.
-- **Coinbase KYC and Coinbase country** (`coinbase_attestation`, 193 public
-  inputs; `coinbase_country_attestation`, 215): `attested_at`, when the
+- **Coinbase KYC and Coinbase country** (`coinbase_attestation`, 133 public
+  inputs; `coinbase_country_attestation`, 155): `attested_at`, when the
   attestation was seen unrevoked, must be within 15 minutes behind and 5
   minutes ahead of the verifier's clock (`checkCoinbaseAttestationProof`,
   `checkCoinbaseCountryAttestationProof`). A proof from either circuit's
-  earlier version (128 or 150 public inputs) is refused by name.
-- **Human Passport score** (`human_passport_score`, 195 public inputs): the
+  earlier shapes (68 / 90 for v1, 128 / 150 and 193 / 215 from before the
+  current nullifier) is refused by name.
+- **Human Passport score** (`human_passport_score`, 135 public inputs): the
   issuer root must be Human Passport's (`HUMAN_PASSPORT_ISSUER_ROOT`, its issuer
   on the GitcoinVerifier of every chain in `HUMAN_PASSPORT_CHAINS`), `scorer_id`
   must be one of `HUMAN_PASSPORT_SCORER_IDS` (335), `min_score`

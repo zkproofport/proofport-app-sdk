@@ -1,4 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
+
+// Core from source, as in vitest.config.ts.
+const core = (path: string) => fileURLToPath(new URL(`./packages/core/src/${path}`, import.meta.url));
 
 /**
  * Checks that need the network, kept out of the normal run.
@@ -13,6 +17,14 @@ import { defineConfig } from 'vitest/config';
  * meaning is what the other end answers.
  */
 export default defineConfig({
+  resolve: {
+    alias: [
+      { find: /^@zkproofport-app\/core\/circuits$/, replacement: core('circuits.ts') },
+      { find: /^@zkproofport-app\/core\/typedAction$/, replacement: core('typedAction.ts') },
+      { find: /^@zkproofport-app\/core\/oprf$/, replacement: core('oprf.ts') },
+      { find: /^@zkproofport-app\/core$/, replacement: core('index.ts') },
+    ],
+  },
   test: {
     include: ['src/__tests__/**/*.live.ts'],
     testTimeout: 30_000,
