@@ -6,7 +6,8 @@
  * report the chain as having nothing deployed.
  *
  * Also holds the real generated table to the state it is in on this branch:
- * every verifier awaits the redeploy after the Noir 1.0.0 / bb 6.0.0 rebuild.
+ * the testnet verifiers are the bb 6.0.0 redeploy, the mainnet ones still
+ * await it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ethers } from 'ethers';
@@ -83,30 +84,49 @@ describe('a chain whose verifier awaits a redeploy', () => {
   });
 });
 
-describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, verifiers not yet redeployed)', () => {
-  // Rewrite this block when the redeploy is regenerated: AWAITING_REDEPLOY
-  // then empties and every row below comes back with its new address.
-  it('pins nothing and lists every previous verifier as awaiting a redeploy', () => {
-    const pinned = [
+describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, testnets redeployed)', () => {
+  // circuits 5a1f906 (2026-11-20) redeployed every shipped package on Base
+  // Sepolia, Ethereum Sepolia and GIWA Sepolia. Mainnet (1, 8453) waits for
+  // its own redeploy: rewrite this block when that is regenerated.
+  const pinnedRows = () =>
+    [
       ...Object.values(real.PINNED_VERIFIERS),
       ...Object.values(real.PINNED_VARIANT_VERIFIERS).flatMap(byCircuit => Object.values(byCircuit)),
-    ].flatMap(byChain => Object.values(byChain ?? {}));
-    expect(pinned).toEqual([]);
-    expect(real.AWAITING_REDEPLOY.length).toBe(41);
+    ].flatMap(byChain => Object.entries(byChain ?? {}).map(([chain, row]) => ({ chain: Number(chain), ...(row as { address: string; circuitsCommit: string; vkSha256: string }) })));
+
+  it('pins the 22 testnet verifiers and lists the 20 mainnet ones as awaiting a redeploy', () => {
+    const pinned = pinnedRows();
+    expect(pinned.length).toBe(22);
+    expect([...new Set(pinned.map(r => r.chain))].sort((a, b) => a - b)).toEqual([84532, 91342, 11155111]);
+    expect(real.AWAITING_REDEPLOY.length).toBe(20);
+    expect([...new Set(real.AWAITING_REDEPLOY.map(r => r.chainId))].sort((a, b) => a - b)).toEqual([1, 8453]);
   });
 
-  it('every waiting row was built from another key than the current one', () => {
+  it('every pinned row was built from the current key, every waiting row from another', () => {
+    for (const [circuit, byChain] of Object.entries(real.PINNED_VERIFIERS)) {
+      for (const row of Object.values(byChain ?? {})) expect(row.vkSha256).toBe(real.VERIFICATION_KEYS[circuit].standard?.sha256);
+    }
+    for (const [variant, byCircuit] of Object.entries(real.PINNED_VARIANT_VERIFIERS)) {
+      for (const [circuit, byChain] of Object.entries(byCircuit)) {
+        for (const row of Object.values(byChain ?? {})) expect(row.vkSha256).toBe(real.VERIFICATION_KEYS[circuit][variant]?.sha256);
+      }
+    }
     for (const row of real.AWAITING_REDEPLOY) {
       expect(row.previousVkSha256).not.toBe(real.VERIFICATION_KEYS[row.circuit][row.variant]?.sha256);
     }
   });
 
+  it('no pinned address is a contract awaiting a redeploy', () => {
+    const waiting = new Set(real.AWAITING_REDEPLOY.map(r => r.previousAddress));
+    for (const row of pinnedRows()) expect(waiting.has(row.address)).toBe(false);
+  });
+
   it('the keys are bb 6.0.0 keys fetched at the committed circuits rebuild, the one source of every key', () => {
     expect(real.VERIFICATION_KEY_BB_VERSION).toBe('6.0.0');
-    // circuits toolchain-upgrade ddf11f0: the 1.0.0 / bb 6.0.0 artifacts with
-    // the OPRF nullifier. A full commit, never a branch, and the commit the
-    // table itself was generated from.
-    expect(real.VERIFICATION_KEYS_REF).toBe('ddf11f03d6f0af70e42cea35b93f53f9c614ea85');
+    // circuits toolchain-upgrade 2181748: the 1.0.0 / bb 6.0.0 artifacts with
+    // the OPRF nullifier and the testnet verifier records. A full commit,
+    // never a branch, and the commit the table itself was generated from.
+    expect(real.VERIFICATION_KEYS_REF).toBe('2181748bfb7216552ffdd9109486f7ebfbce2cb6');
     expect(real.VERIFICATION_KEYS_REF).toBe(real.PINNED_VERIFIERS_SOURCE_COMMIT);
   });
 });

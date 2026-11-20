@@ -11,9 +11,15 @@
 import { describe, it, expect } from 'vitest';
 import { AWAITING_REDEPLOY, PINNED_VERIFIERS, PINNED_VERIFIERS_SOURCE_COMMIT } from '@zkproofport-app/core';
 
-const PROVIDER_KEY_VERIFIERS: Record<number, string> = {
+// The provider-key circuit's bb 4.2 testnet contracts (artifacts 5081cfd),
+// replaced on 2026-11-20 by the bb 6.0.0 redeploy below (circuits 5a1f906).
+const PREVIOUS_PROVIDER_KEY_VERIFIERS: Record<number, string> = {
   84532: '0xea5933abc598401c89f63b3f13ae56a7e78984e8',
   11155111: '0x8e8f481d98149f13fb756cab69376814fa854180',
+};
+const PROVIDER_KEY_VERIFIERS: Record<number, string> = {
+  84532: '0x14a2241b0a24679825befaaa562d4a204262d84f',
+  11155111: '0x4253eef617ee2d1fc4e551f448fbfdaaaeb9fc90',
 };
 
 // v2 before the claim-quote fix, v2 with it -- neither checks the key.
@@ -25,15 +31,13 @@ const WITHOUT_PROVIDER_KEY_CHECK = [
 ];
 
 describe('OIDC testnet verifiers check the provider-key statement', () => {
-  // Built from 5081cfd's bb 4.2 key (and without the RSA limb fix), so since
-  // the Noir 1.0.0 / bb 6.0.0 rebuild each awaits a redeploy: recorded as the
-  // previous contract, pinned nowhere. After the redeploy, regenerate and
-  // write the new addresses here.
+  // Rebuilt with nargo 1.0.0 / bb 6.0.0 and the RSA limb fix, redeployed on
+  // both testnets: the pinned row is the new contract, never the previous one.
   for (const [chain, address] of Object.entries(PROVIDER_KEY_VERIFIERS)) {
-    it(`chain ${chain}: ${address} awaits a redeploy and is pinned nowhere`, () => {
-      const row = AWAITING_REDEPLOY.find(v => v.circuit === 'oidc_domain_attestation' && v.variant === 'standard' && v.chainId === Number(chain));
-      expect(row?.previousAddress).toBe(address);
-      expect(PINNED_VERIFIERS.oidc_domain_attestation[Number(chain)]).toBeUndefined();
+    it(`chain ${chain}: pins ${address}, not the bb 4.2 contract`, () => {
+      expect(PINNED_VERIFIERS.oidc_domain_attestation[Number(chain)]?.address).toBe(address);
+      expect(PINNED_VERIFIERS.oidc_domain_attestation[Number(chain)]?.address).not.toBe(PREVIOUS_PROVIDER_KEY_VERIFIERS[Number(chain)]);
+      expect(AWAITING_REDEPLOY.some(v => v.circuit === 'oidc_domain_attestation' && v.chainId === Number(chain))).toBe(false);
     });
   }
 

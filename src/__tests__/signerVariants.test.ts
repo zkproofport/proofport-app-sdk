@@ -210,12 +210,22 @@ describe('the package table', () => {
       real.AWAITING_REDEPLOY.find(v => v.circuit === 'coinbase_attestation' && v.variant === variant && v.chainId === chainId)?.previousAddress;
     expect(awaiting('standard', 8453)).toBe('0x6fc22d3576fb70457d1529b3f70f711a3cba7a7f');
     expect(awaiting('standard', 1)).toBe('0x0e458610bd79893a0855c8f90ceded70cf7553b6');
-    expect(awaiting('standard', 84532)).toBe('0x1885aa2283db21ad0fc63a2df98efe92f31908e6');
     expect(awaiting('android', 8453)).toBe('0x836d8b0fd01bed4e34220ebcee6d63265951fbf9');
     expect(awaiting('android', 1)).toBe('0x099bacd621d896d9b7618d8e7ec330ae7867c117');
     expect(awaiting('android_factory', 8453)).toBe('0x87d9a66cacac95b2bc43bac8e610c59acb67c5e0');
     expect(awaiting('android_factory', 1)).toBe('0x5798eee099da12eeb995ad6a09a8ab87c240b72b');
-    expect(Object.keys(real.PINNED_VERIFIERS.coinbase_attestation)).toEqual([]);
+    // The testnets carry the bb 6.0.0 redeploy (circuits 5a1f906, 2026-11-20);
+    // Ethereum Sepolia had no standard Coinbase KYC v2 verifier before it.
+    for (const chainId of [84532, 11155111]) {
+      for (const variant of ['standard', 'android', 'android_factory']) expect(awaiting(variant, chainId)).toBeUndefined();
+    }
+    expect(real.PINNED_VERIFIERS.coinbase_attestation[84532]?.address).toBe('0xe78fcdc7562ce3afceadaf29f4b8b96dc997c01a');
+    expect(real.PINNED_VERIFIERS.coinbase_attestation[11155111]?.address).toBe('0x42972771718ef5096f884da45e53dd7fa54d4180');
+    expect(real.PINNED_VARIANT_VERIFIERS.android.coinbase_attestation[84532]?.address).toBe('0x551af332b494658ece6124c1a5c48202c0580e28');
+    expect(real.PINNED_VARIANT_VERIFIERS.android.coinbase_attestation[11155111]?.address).toBe('0x6238395267684550b382291e9172470705a1a94a');
+    expect(real.PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation[84532]?.address).toBe('0xe0982a6ecffc0ef1bd43d1d8bfe8c5089f3ff5bd');
+    expect(real.PINNED_VARIANT_VERIFIERS.android_factory.coinbase_attestation[11155111]?.address).toBe('0xeaf299f32dfb1c33fdde7cd4a13fd61306d25b26');
+    expect(Object.keys(real.PINNED_VERIFIERS.coinbase_attestation).sort()).toEqual(['11155111', '84532']);
     // v1's contracts appear nowhere in the table.
     const all = JSON.stringify([PINNED_VERIFIERS, PINNED_VARIANT_VERIFIERS]);
     for (const v1 of ['0xf7ded73e7a7fc8fb030c35c5a88d40abe6865382', '0x42d165a48256ae184e1de4e7e6372e870e2bc883', '0xf3d5a09d2c85b28c52ef2905c1be3a852b609d0c']) {
@@ -261,8 +271,9 @@ describe('lookups end at an error naming the key', () => {
 
   // Coinbase KYC v2's standard package has no Ethereum Sepolia deployment.
   it('a package with no deployment on the chain asked for names the chains that have one', () => {
-    expect(() => getPinnedVariantVerifier('coinbase_attestation', 'standard', 11155111)).toThrow(
-      'No coinbase_attestation verifier is deployed on chain 11155111. Chains with one: 1, 8453, 84532.',
+    // GIWA Sepolia carries only the GIWA and Dojang verifiers.
+    expect(() => getPinnedVariantVerifier('coinbase_attestation', 'standard', 91342)).toThrow(
+      'No coinbase_attestation verifier is deployed on chain 91342. Chains with one: 1, 8453, 84532, 11155111.',
     );
   });
 

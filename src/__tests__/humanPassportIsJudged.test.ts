@@ -313,16 +313,24 @@ describe('on-chain verify', () => {
   it.each([
     [1, '0xbb8a7e058f86680ddcfe0df00e8f729ebcf27605'],
     [8453, '0x2d055c42a2b0c1024ac4aa83b4995fc8fd45662e'],
-    [84532, '0x39df92d9c603fe6d229c7b00272a1e874a628ace'],
-    [11155111, '0xc78585718fd27d428d7a90970d09a2121be36066'],
-  ])('the verifier on chain %i (built from a bb 4.2 key) awaits a redeploy and is pinned nowhere', async (chainId, address) => {
+  ])('the verifier on mainnet %i (built from a bb 4.2 key) awaits a redeploy and is pinned nowhere', async (chainId, address) => {
     // The real generated table: this file's mock stands redeployed verifiers in.
-    // After the redeploy, regenerate and write the new addresses here.
     const real = await vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
     expect(real.AWAITING_REDEPLOY).toContainEqual(
       expect.objectContaining({ circuit: 'human_passport_score', variant: 'standard', chainId, previousAddress: address }),
     );
     expect(real.PINNED_VERIFIERS.human_passport_score[chainId]).toBeUndefined();
+  });
+
+  it.each([
+    // [chain, bb 6.0.0 redeploy (circuits 5a1f906), previous bb 4.2 contract]
+    [84532, '0x223e372553739678365486a3ded05310b5bcbc0c', '0x39df92d9c603fe6d229c7b00272a1e874a628ace'],
+    [11155111, '0x9904a8d852ddeabf7d9c8cf7116609da8e39c2eb', '0xc78585718fd27d428d7a90970d09a2121be36066'],
+  ])('the verifier on testnet %i is the bb 6.0.0 redeploy %s, not %s', async (chainId, address, previous) => {
+    const real = await vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
+    expect(real.PINNED_VERIFIERS.human_passport_score[chainId]?.address).toBe(address);
+    expect(real.PINNED_VERIFIERS.human_passport_score[chainId]?.address).not.toBe(previous);
+    expect(real.AWAITING_REDEPLOY.some(r => r.circuit === 'human_passport_score' && r.chainId === chainId)).toBe(false);
   });
 });
 

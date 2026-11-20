@@ -24,8 +24,12 @@ export const VERIFIER_BY_SCRIPT = Object.freeze({
   HumanPassportScore: { circuit: 'human_passport_score', variant: 'standard' },
 });
 
-/** Deployed by these scripts, and not proof verifiers. */
-export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifierRegistry', 'TranscriptLib']);
+/**
+ * Deployed by these scripts, and not proof verifiers. VerifierLibrary is
+ * circuits' script/DeployVerifierLibrary.s.sol: the libraries a bb 6.0.0
+ * verifier links (ZKTranscriptLib, RelationsLib), recorded by code hash.
+ */
+export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifierRegistry', 'TranscriptLib', 'VerifierLibrary']);
 
 /**
  * Verifiers this core version deliberately does not pin, each with its reason.

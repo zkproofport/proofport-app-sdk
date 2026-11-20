@@ -245,28 +245,37 @@ describe('wiring', () => {
 });
 
 describe('pinned verifiers', () => {
-  // From circuits ad0df5e (deploy records of 2026-10-30): every package on
-  // Base Sepolia, Ethereum Sepolia, Base and Ethereum. Built from bb 4.2 keys,
-  // so since the Noir 1.0.0 / bb 6.0.0 rebuild each awaits a redeploy: kept in
-  // the generated AWAITING_REDEPLOY as the previous contract and pinned
-  // nowhere. After the redeploy, regenerate and write the new addresses here.
-  const DEPLOYED = {
+  // bb 4.2 contracts (circuits ad0df5e, deploy records of 2026-10-30). The
+  // mainnet ones still await a redeploy: kept in the generated
+  // AWAITING_REDEPLOY as the previous contract and pinned nowhere.
+  const PREVIOUS = {
     standard: { 84532: '0xc5363d7587bd580148373d0d8b7909be423242cb', 11155111: '0x99489796751b4939879dcaf5db35eb4964c58f6c', 8453: '0x509dee10cc1578361b450fed7475ea3bd69c6e8d', 1: '0xcd23a61d194d3b00906c49457774cb7e207ccc7b' },
     android: { 84532: '0x98013abb7ac83b6c985dcfbd5748ad2ae04c8c12', 11155111: '0x00f5ab7c6450a6ea91d2db8a91409c1b7504f3cc', 8453: '0xb57182062141f59ddbb98da73764ec1676689832', 1: '0xc0255ef1eb2a77e441a4745df9b61859e586ae83' },
     android_factory: { 84532: '0xd7bfd6d7bcc6c627da12cfcdf39fca6f64fdc0b9', 11155111: '0x81a7bb9c81d244d80f98ebeec455f252ee585911', 8453: '0x1f2975abd0711cf6b98084829e04712ee105d8f7', 1: '0xeab893ce6cc1e0d149fba880595038e48430a25e' },
   } as const;
-  it.each([
-    ...Object.entries(DEPLOYED.standard).map(([c, a]) => ['standard', c, a] as const),
-    ...Object.entries(DEPLOYED.android).map(([c, a]) => ['android', c, a] as const),
-    ...Object.entries(DEPLOYED.android_factory).map(([c, a]) => ['android_factory', c, a] as const),
-  ])('%s on chain %s awaits a redeploy and is pinned nowhere', async (variant, chain, address) => {
+  // bb 6.0.0 testnet redeploy (circuits 5a1f906, 2026-11-20).
+  const REDEPLOYED = {
+    standard: { 84532: '0xe88033179576869c8730160ecbfaa7e5b2c1a4a9', 11155111: '0xbcc01efce38cda8f4ffed8eb5260810545ab0206' },
+    android: { 84532: '0x8e86cc23c908792ad4f2eb1df9a485a518eeea0e', 11155111: '0x1e34e8057809e76639da74e432ca481f0622fcc0' },
+    android_factory: { 84532: '0x26d4cfae6654c31d10d669c0ebc6428802adf9d0', 11155111: '0x4857ca327be7ea2b6c34aef6fbf38d13273b81b8' },
+  } as const;
+  const realTable = () => vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
+  const rowsOf = (real: Awaited<ReturnType<typeof realTable>>, variant: 'standard' | 'android' | 'android_factory') =>
+    variant === 'standard' ? real.PINNED_VERIFIERS.coinbase_country_attestation : real.PINNED_VARIANT_VERIFIERS[variant].coinbase_country_attestation;
+  const VARIANTS = ['standard', 'android', 'android_factory'] as const;
+  it.each(VARIANTS.flatMap(v => ([1, 8453] as const).map(c => [v, c] as const)))('%s on mainnet %s awaits a redeploy and is pinned nowhere', async (variant, chain) => {
     // The real generated table: this file's mock stands redeployed verifiers in.
-    const real = await vi.importActual<typeof import('../../packages/core/src/pinnedVerifiers.generated')>('../../packages/core/src/pinnedVerifiers.generated');
+    const real = await realTable();
     expect(real.AWAITING_REDEPLOY).toContainEqual(
-      expect.objectContaining({ circuit: 'coinbase_country_attestation', variant, chainId: Number(chain), previousAddress: address }),
+      expect.objectContaining({ circuit: 'coinbase_country_attestation', variant, chainId: chain, previousAddress: PREVIOUS[variant][chain] }),
     );
-    const byChain = variant === 'standard' ? real.PINNED_VERIFIERS.coinbase_country_attestation : real.PINNED_VARIANT_VERIFIERS[variant].coinbase_country_attestation;
-    expect(byChain?.[Number(chain)]).toBeUndefined();
+    expect(rowsOf(real, variant)?.[chain]).toBeUndefined();
+  });
+  it.each(VARIANTS.flatMap(v => ([84532, 11155111] as const).map(c => [v, c] as const)))('%s on testnet %s is the bb 6.0.0 redeploy, not the previous contract', async (variant, chain) => {
+    const real = await realTable();
+    expect(rowsOf(real, variant)?.[chain]?.address).toBe(REDEPLOYED[variant][chain]);
+    expect(rowsOf(real, variant)?.[chain]?.address).not.toBe(PREVIOUS[variant][chain]);
+    expect(real.AWAITING_REDEPLOY.some(r => r.circuit === 'coinbase_country_attestation' && r.variant === variant && r.chainId === chain)).toBe(false);
   });
   it("v1's Country contracts are not pinned anywhere", () => {
     for (const v1 of ['0x2eb64d21fb29f26cd58901767ad232841a945d46', '0x8e89f11e65f219203f5be9d6a69a4da084630c56', '0x9deea2189ae694d7a36f65fb7d7dbe9f75abddce', '0x0b3af3dfc67dc65e0145c37ee00230139d579f64']) {
