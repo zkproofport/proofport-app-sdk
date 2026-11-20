@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-beta.9](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.8...core-v0.4.0-beta.9) (2026-11-20)
+
+
+### Features
+
+* bb.js 6.0.0, OPRF nullifier, wallet-free signal_hash ([e23a686](https://github.com/zkproofport/proofport-app-sdk/commit/e23a68699294e38b34de23cfc95de7ea95172075))
+
 ## [0.4.0-beta.8](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.7...core-v0.4.0-beta.8) (2026-11-03)
 
 
