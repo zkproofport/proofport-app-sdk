@@ -101,8 +101,12 @@ describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, ver
     }
   });
 
-  it('the keys are bb 6.0.0 keys read from the uncommitted circuits working tree', () => {
+  it('the keys are bb 6.0.0 keys fetched at the committed circuits rebuild, the one source of every key', () => {
     expect(real.VERIFICATION_KEY_BB_VERSION).toBe('6.0.0');
-    expect(real.VERIFICATION_KEYS_REF).toBeNull();
+    // circuits toolchain-upgrade ddf11f0: the 1.0.0 / bb 6.0.0 artifacts with
+    // the OPRF nullifier. A full commit, never a branch, and the commit the
+    // table itself was generated from.
+    expect(real.VERIFICATION_KEYS_REF).toBe('ddf11f03d6f0af70e42cea35b93f53f9c614ea85');
+    expect(real.VERIFICATION_KEYS_REF).toBe(real.PINNED_VERIFIERS_SOURCE_COMMIT);
   });
 });
