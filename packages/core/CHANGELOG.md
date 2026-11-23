@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-beta.10](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.9...core-v0.4.0-beta.10) (2026-11-23)
+
+
+### Features
+
+* **core:** check a readable ProofRequest against the request it answers ([51d092b](https://github.com/zkproofport/proofport-app-sdk/commit/51d092b5e69da69e6687d8c810eb8c7b695998ba))
+
 ## [0.4.0-beta.9](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.8...core-v0.4.0-beta.9) (2026-11-20)
 
 
