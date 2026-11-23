@@ -166,8 +166,7 @@ export function computeSignalHash(request: { scope: string; circuitId: string; r
   if (scopeError) throw new Error(scopeError);
   const idError = signalHashRequestIdError(request.requestId);
   if (idError) throw new Error(idError);
-  const encoder = new TextEncoder();
-  const parts = [encoder.encode(request.scope), encoder.encode(request.circuitId), encoder.encode(request.requestId)];
+  const parts = [utf8(request.scope), utf8(request.circuitId), utf8(request.requestId)];
   const packed = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
   for (const p of parts) {
@@ -203,8 +202,13 @@ export const PROOF_REQUEST_TYPE = 'ProofRequest(string statement,string scope,st
 /** The fixed first field: what the person is approving. */
 export const PROOF_REQUEST_STATEMENT = 'Approve this proof request in ZKProofport';
 
+/**
+ * UTF-8 bytes as this module's own Uint8Array. Under jsdom, TextEncoder hands
+ * back another realm's Uint8Array, which ethers v6 refuses as BytesLike; demo
+ * and OpenStoa tests failed to load core on 2026-11-23 for exactly this.
+ */
 function utf8(value: string): Uint8Array {
-  return new TextEncoder().encode(value);
+  return Uint8Array.from(new TextEncoder().encode(value));
 }
 
 function hexBytes(hex: string): Uint8Array {
@@ -220,12 +224,21 @@ function keccakOfWords(words: string[]): string {
   return keccakHex(packed).toLowerCase();
 }
 
-/** keccak256(abi.encode(typeHash(EIP712Domain(string name,string version)), keccak(name), keccak(version))). */
-export const PROOF_REQUEST_DOMAIN_SEPARATOR: string = keccakOfWords([
-  keccakHex(utf8('EIP712Domain(string name,string version)')),
-  keccakHex(utf8(PROOF_REQUEST_DOMAIN.name)),
-  keccakHex(utf8(PROOF_REQUEST_DOMAIN.version)),
-]);
+/**
+ * keccak256(abi.encode(typeHash(EIP712Domain(string name,string version)),
+ * keccak("ZKProofport"), keccak("1"))), written out so importing this module
+ * hashes nothing; a test recomputes it.
+ */
+export const PROOF_REQUEST_DOMAIN_SEPARATOR = '0xfb55791a6a9498fe44192976708e3dd8fabca9a6957d4f4a3a4046bb1f9a560f';
+
+/** The same value computed from the domain, for the test that holds the literal. */
+export function computeProofRequestDomainSeparator(): string {
+  return keccakOfWords([
+    keccakHex(utf8('EIP712Domain(string name,string version)')),
+    keccakHex(utf8(PROOF_REQUEST_DOMAIN.name)),
+    keccakHex(utf8(PROOF_REQUEST_DOMAIN.version)),
+  ]);
+}
 
 /**
  * The EIP-712 struct hash of the proof request a wallet signs when the dApp

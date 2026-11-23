@@ -33,6 +33,7 @@ import {
   checkSignalHash,
   computeSignalHash,
   computeProofRequestHash,
+  computeProofRequestDomainSeparator,
   PROOF_REQUEST_DOMAIN_SEPARATOR,
 } from '../verifier';
 import type { ProofResponse } from '../types';
@@ -321,3 +322,33 @@ describe('the SDK checks the signal_hash of the requests it created', () => {
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/is not the one this response answers/) });
   });
 });
+
+describe('hashing under a test DOM (jsdom)', () => {
+  // 2026-11-23: core 0.4.0-beta.10 hashed at import time with TextEncoder's
+  // output; under jsdom that is another realm's Uint8Array, ethers v6 refused
+  // it, and every demo test file that imported core failed to load.
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('the domain separator literal is the one computed from the domain', () => {
+    expect(computeProofRequestDomainSeparator()).toBe(PROOF_REQUEST_DOMAIN_SEPARATOR);
+  });
+
+  it('hashes when TextEncoder returns another realm\'s Uint8Array', async () => {
+    const { runInNewContext } = await import('node:vm');
+    const Foreign = runInNewContext('Uint8Array') as Uint8ArrayConstructor;
+    const real = new TextEncoder();
+    class ForeignEncoder {
+      encode(v: string) {
+        const out = new Foreign(real.encode(v).length);
+        out.set(real.encode(v));
+        return out;
+      }
+    }
+    vi.stubGlobal('TextEncoder', ForeignEncoder);
+    expect(new TextEncoder().encode('x') instanceof Uint8Array).toBe(false);
+    expect(computeSignalHash({ scope: SCOPE, circuitId: 'coinbase_attestation', requestId: REQ })).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(computeProofRequestHash({ scope: SCOPE, circuitId: 'coinbase_attestation', requestId: REQ })).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(computeProofRequestDomainSeparator()).toBe(PROOF_REQUEST_DOMAIN_SEPARATOR);
+  });
+});
+
