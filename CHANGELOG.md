@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.14](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.13...v0.5.0-beta.14) (2026-11-23)
+
+
+### Features
+
+* **core:** check a readable ProofRequest against the request it answers ([51d092b](https://github.com/zkproofport/proofport-app-sdk/commit/51d092b5e69da69e6687d8c810eb8c7b695998ba))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.9 to 0.4.0-beta.10
+
 ## [0.5.0-beta.13](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.12...v0.5.0-beta.13) (2026-11-20)
 
 
