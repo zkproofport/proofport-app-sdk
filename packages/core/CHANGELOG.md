@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-beta.11](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.10...core-v0.4.0-beta.11) (2026-11-23)
+
+
+### Bug Fixes
+
+* **core:** hash nothing at import and accept TextEncoder bytes from another realm ([167c7bd](https://github.com/zkproofport/proofport-app-sdk/commit/167c7bd0693fa9997eb7204fe79d9ee53ffdab42))
+
 ## [0.4.0-beta.10](https://github.com/zkproofport/proofport-app-sdk/compare/core-v0.4.0-beta.9...core-v0.4.0-beta.10) (2026-11-23)
 
 
