@@ -32,6 +32,8 @@ import {
   checkProofIssuer,
   checkSignalHash,
   computeSignalHash,
+  computeProofRequestHash,
+  PROOF_REQUEST_DOMAIN_SEPARATOR,
 } from '../verifier';
 import type { ProofResponse } from '../types';
 import { fillOprf, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
@@ -166,6 +168,53 @@ describe('checkSignalHash', () => {
   it('accepts an action-bound proof (zero signal_hash) whatever the request', () => {
     const action = '0x' + '5a'.repeat(32);
     expect(checkSignalHash('giwa_attestation', publicInputs('0x' + '00'.repeat(32), action), { scope: 'x', requestId: OTHER_REQ })).toEqual({ ok: true });
+  });
+
+  // A request with no dApp action is signed as the readable ProofRequest
+  // (app 1.7.3+): zero signal_hash, the ProofRequest domain separator, and the
+  // struct hash of THIS request.
+  const proofRequestInputs = (actionHash: string, domain = PROOF_REQUEST_DOMAIN_SEPARATOR) => {
+    const p = publicInputs('0x' + '00'.repeat(32), actionHash);
+    bytes(domain).forEach((b, i) => (p[32 + i] = field(b)));
+    return p;
+  };
+
+  it.each(SIGNAL_HASH_CIRCUIT_IDS.map(id => [id]))('%s: accepts a proof signed as the ProofRequest for this request', id => {
+    const a = computeProofRequestHash({ scope: SCOPE, circuitId: id, requestId: REQ });
+    expect(checkSignalHash(id, proofRequestInputs(a), request)).toEqual({ ok: true });
+  });
+
+  it('refuses a ProofRequest made for another request, scope or circuit, naming the request', () => {
+    const id = 'coinbase_attestation';
+    for (const other of [
+      { scope: SCOPE, circuitId: id, requestId: OTHER_REQ },
+      { scope: 'other.com', circuitId: id, requestId: REQ },
+      { scope: SCOPE, circuitId: 'coinbase_country_attestation', requestId: REQ },
+    ]) {
+      const r = checkSignalHash(id, proofRequestInputs(computeProofRequestHash(other)), request);
+      expect(r).toEqual({ ok: false, error: expect.stringMatching(new RegExp(`signed request .* is not the one for request ${REQ}`)) });
+    }
+  });
+
+  it('builds the same ProofRequest hashes as the app (shared literal)', () => {
+    // proofport-app src/utils/__tests__/oneAnswerFeedsSignRecoverAndProve.test.ts holds the same two values,
+    // computed there with ethers' TypedDataEncoder from the wallet payload.
+    expect(PROOF_REQUEST_DOMAIN_SEPARATOR).toBe('0xfb55791a6a9498fe44192976708e3dd8fabca9a6957d4f4a3a4046bb1f9a560f');
+    expect(computeProofRequestHash({ scope: 'zkproofport-demo:common:kyc', circuitId: 'coinbase_attestation', requestId: 'dfc6f61c-fa7d-400e-b0f7-e9e302b9defc' }))
+      .toBe('0x769763eaeaa70539e93b7e787a806936097e39efc98701eda13e206a02e2ae77');
+    // And the same as ethers' own EIP-712 encoder.
+    const types = { ProofRequest: [{ name: 'statement', type: 'string' }, { name: 'scope', type: 'string' }, { name: 'proof', type: 'string' }, { name: 'requestId', type: 'string' }] };
+    const message = { statement: 'Approve this proof request in ZKProofport', scope: SCOPE, proof: 'giwa_attestation', requestId: REQ };
+    expect(computeProofRequestHash({ scope: SCOPE, circuitId: 'giwa_attestation', requestId: REQ }))
+      .toBe(ethers.TypedDataEncoder.hashStruct('ProofRequest', types, message));
+    expect(PROOF_REQUEST_DOMAIN_SEPARATOR).toBe(ethers.TypedDataEncoder.hashDomain({ name: 'ZKProofport', version: '1' }));
+  });
+
+  it('refuses to hash a ProofRequest the signal_hash rules refuse', () => {
+    for (const bad of [{ scope: '', requestId: REQ }, { scope: SCOPE, requestId: 'has space' }]) {
+      expect(() => computeProofRequestHash({ ...bad, circuitId: 'coinbase_attestation' })).toThrow();
+    }
+    expect(() => computeProofRequestHash({ scope: SCOPE, circuitId: 'oidc_domain_attestation', requestId: REQ })).toThrow(/has no signal_hash/);
   });
 
   it('refuses a proof that carries both an action and a signal_hash', () => {

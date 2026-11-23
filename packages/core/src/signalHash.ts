@@ -25,6 +25,14 @@
  * zeros (the circuit refuses a proof that carries both), so the action itself
  * is what ties that proof to a request.
  *
+ * A request with no dApp action is signed as the PROOF REQUEST itself, a
+ * readable EIP-712 struct (see {@link PROOF_REQUEST_TYPE}), since app 1.7.3:
+ * a wallet showed the 32 bytes of a personal_sign request as unreadable text.
+ * Its fields are exactly this hash's preimage, so {@link checkSignalHash}
+ * rebuilds the struct hash from the same request and refuses a proof made for
+ * another one. A proof carrying the plain signal_hash (the AI server, older
+ * apps) is still accepted.
+ *
  * Mirrored, until this package's next release reaches them, by
  * proofport-app `src/utils/signalHash.ts`, proofport-ai
  * `packages/sdk/src/signalHash.ts` and circuits `scripts/lib/signal-hash.js`.
@@ -188,6 +196,54 @@ function readBytesHex(publicInputs: readonly string[], start: number, name: stri
 
 const ZERO32 = '0x' + '00'.repeat(32);
 
+/** The EIP-712 domain a request with no dApp action is signed under. No chainId: the request names no chain. */
+export const PROOF_REQUEST_DOMAIN = Object.freeze({ name: 'ZKProofport', version: '1' });
+/** The struct a wallet signs for a request with no dApp action. */
+export const PROOF_REQUEST_TYPE = 'ProofRequest(string statement,string scope,string proof,string requestId)';
+/** The fixed first field: what the person is approving. */
+export const PROOF_REQUEST_STATEMENT = 'Approve this proof request in ZKProofport';
+
+function utf8(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function hexBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+function keccakOfWords(words: string[]): string {
+  const packed = new Uint8Array(words.length * 32);
+  words.forEach((w, i) => packed.set(hexBytes(w), i * 32));
+  return keccakHex(packed).toLowerCase();
+}
+
+/** keccak256(abi.encode(typeHash(EIP712Domain(string name,string version)), keccak(name), keccak(version))). */
+export const PROOF_REQUEST_DOMAIN_SEPARATOR: string = keccakOfWords([
+  keccakHex(utf8('EIP712Domain(string name,string version)')),
+  keccakHex(utf8(PROOF_REQUEST_DOMAIN.name)),
+  keccakHex(utf8(PROOF_REQUEST_DOMAIN.version)),
+]);
+
+/**
+ * The EIP-712 struct hash of the proof request a wallet signs when the dApp
+ * bound no action: the `action_hash` public input of such a proof.
+ *
+ * @throws Error naming the problem, under the same rules as {@link computeSignalHash}.
+ */
+export function computeProofRequestHash(request: { scope: string; circuitId: string; requestId: string }): string {
+  computeSignalHash(request);
+  return keccakOfWords([
+    keccakHex(utf8(PROOF_REQUEST_TYPE)),
+    keccakHex(utf8(PROOF_REQUEST_STATEMENT)),
+    keccakHex(utf8(request.scope)),
+    keccakHex(utf8(request.circuitId)),
+    keccakHex(utf8(request.requestId)),
+  ]);
+}
+
 /**
  * Check a proof's signal_hash against the request the relying party issued.
  *
@@ -223,6 +279,19 @@ export function checkSignalHash(
   if (action !== ZERO32) {
     if (signal !== ZERO32) {
       return { ok: false, error: `The proof carries both an action and signal_hash ${signal}; an action-bound proof has none.` };
+    }
+    const domain = readBytesHex(publicInputs, layout.signalStart + 32, 'domain_separator');
+    if (typeof domain !== 'string') return { ok: false, error: domain.error };
+    if (domain === PROOF_REQUEST_DOMAIN_SEPARATOR) {
+      // Signed as this SDK's proof request: it must be THIS request.
+      const expectedAction = computeProofRequestHash({ scope: request.scope, circuitId, requestId: request.requestId });
+      if (action !== expectedAction) {
+        return {
+          ok: false,
+          error: `The proof's signed request ${action} is not the one for request ${request.requestId} ` +
+            `(expected ${expectedAction}), so it was made for another request, scope or circuit.`,
+        };
+      }
     }
     return { ok: true };
   }
