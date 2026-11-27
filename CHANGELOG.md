@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-beta.16](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.15...v0.5.0-beta.16) (2026-11-27)
+
+
+### Features
+
+* **core:** GIWA KYC and Dojang Playground v2 with revocation and expiry bound ([6ac9faa](https://github.com/zkproofport/proofport-app-sdk/commit/6ac9faa3e9006e4e5a2a01d5fbc78ba9735ce50f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zkproofport-app/core bumped from 0.4.0-beta.11 to 0.4.0-beta.12
+
 ## [0.5.0-beta.15](https://github.com/zkproofport/proofport-app-sdk/compare/v0.5.0-beta.14...v0.5.0-beta.15) (2026-11-23)
 
 
