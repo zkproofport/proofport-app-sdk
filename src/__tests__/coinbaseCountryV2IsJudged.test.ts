@@ -119,7 +119,7 @@ describe('count', () => {
     expect(r).toEqual({
       ok: false,
       error:
-        `This is a ${what} (${n} public inputs). Only Coinbase Country v2 proofs with the OPRF nullifier (155 public inputs) ` +
+        `This is a ${what} (${n} public inputs). Only current Coinbase Country proofs (155 public inputs) ` +
         'are accepted; generate the proof again with a current ZKProofport app or prover.',
     });
   });

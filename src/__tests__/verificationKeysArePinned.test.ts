@@ -16,11 +16,12 @@
  *               no fetch, no load; a provided key still verifies
  *   provided    a caller's key skips the table entirely
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { ALL_CIRCUIT_IDS, getCircuitPackage, signerVariantsOf } from '../circuits';
+import { DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT } from '../../packages/core/src/chain';
 
 const bbLoaded = vi.fn();
 vi.mock('@aztec-foundation/bb.js', () => {
@@ -51,18 +52,23 @@ vi.mock('@zkproofport-app/core', async importOriginal => {
 const core = await vi.importActual<typeof import('@zkproofport-app/core')>('@zkproofport-app/core');
 const { verifyProofOffChain, BB_JS_VERSION, clearVerificationKeyCache } = await import('../offChainVerifier');
 
-// dojang_playground has no issuer anchor, so these reach the key handling
-// once its OPRF key hash passes (the real proof's, under the circuits' test
-// key: helpers/oprfKeys.ts). 2^19 since the OPRF nullifier: 9,920-byte proofs.
+// dojang_playground has no signer root, so these reach the key handling once
+// its OPRF key hash passes (the real proof's, under the circuits' test key:
+// helpers/oprfKeys.ts) and its attested_at is fresh (the clock is set just
+// after the fixture's). v2 standard package (2026-11-27): 2^20, 10,304-byte proofs.
 vi.mock('../../packages/core/src/oprfKeyHashes', async importOriginal => {
   const { withFixtureOprfKeys } = await import('./helpers/oprfKeys');
   return withFixtureOprfKeys(await importOriginal());
 });
 const ENV = { oprfEnvironment: 'staging' };
-const PROOF = '0x' + 'ab'.repeat(9920);
+const PROOF = '0x' + 'ab'.repeat(10304);
 const INPUTS = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'dojangPlaygroundPublicInputs.json'), 'utf8')).publicInputs as string[];
+const ATTESTED_AT_MS = Number(BigInt(INPUTS[DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT])) * 1000;
 
+afterEach(() => vi.useRealTimers());
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(ATTESTED_AT_MS + 60_000);
   state.ref = null;
   state.bb = core.VERIFICATION_KEY_BB_VERSION;
   bbLoaded.mockClear();
@@ -108,7 +114,8 @@ describe('the key table', () => {
 
   it('an unknown circuit or variant is refused by name', () => {
     expect(() => core.getVerificationKeyRecord('not_a_circuit', 'standard')).toThrow(/not_a_circuit/);
-    expect(() => core.getVerificationKeyRecord('dojang_playground', 'android')).toThrow(/dojang_playground/);
+    expect(() => core.getVerificationKeyRecord('human_passport_score', 'android')).toThrow(/human_passport_score/);
+    expect(() => core.getVerificationKeyRecord('dojang_playground', 'ios')).toThrow(/dojang_playground/);
   });
 });
 

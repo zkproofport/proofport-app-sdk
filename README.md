@@ -340,9 +340,12 @@ await sdk.createRelayRequest(
 ```
 
 Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
-`signer_list_merkle_root`, `oprf_key_hash`, `domain`, `scope`, `nullifier`:
-Coinbase KYC's order without its final `attested_at`. Its nullifier is built
-the same way as Coinbase KYC's.
+`signer_list_merkle_root`, `oprf_key_hash`, `domain`, `scope`, `nullifier`,
+`attested_at` (133 fields): Coinbase KYC's order. Right before proving, the
+app confirms that the GIWA attestation is neither revoked nor expired, and the
+proof carries the time it did (`attested_at`), which every
+verify method checks against your clock (at most 15 minutes behind, 5 minutes
+ahead). Its nullifier is built the same way as Coinbase KYC's.
 
 The verifier is deployed on GIWA Sepolia (chain `91342`). The mobile app shows
 this circuit in its Laboratory, which the user turns on in More.
@@ -366,9 +369,11 @@ An action is optional, exactly as for `giwa_attestation`: send one and the
 wallet signs EIP-712 typed data, send none and it signs the signal hash.
 
 Its public inputs are `signal_hash`, `domain_separator`, `action_hash`,
-`oprf_key_hash`, `domain`, `scope`, `nullifier` (100 fields). There is no
-issuer list, so there is no Merkle root, and the last four sit 32 fields
-earlier than in `giwa_attestation`. Read them with
+`oprf_key_hash`, `domain`, `scope`, `nullifier`, `attested_at` (101 fields).
+There is no issuer list, so there is no Merkle root, and the last five sit 32
+fields earlier than in `giwa_attestation`. `attested_at` is the time the app
+confirmed the Dojang unrevoked and unexpired, checked against your clock as
+for `giwa_attestation`. Read them with
 `extractScopeFromPublicInputs(inputs, 'dojang_playground')`, never with another
 circuit's id. Its nullifier is built the same way as Coinbase KYC's.
 

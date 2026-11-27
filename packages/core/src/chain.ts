@@ -134,10 +134,12 @@ export const COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT = {
 export const COINBASE_COUNTRY_PUBLIC_INPUT_COUNT = 155;
 
 /**
- * GIWA attestation public input layout, 132 fields (giwa-attestation/src/main.nr):
+ * GIWA attestation public input layout, 133 fields (giwa-attestation-v2 and its Android packages, src/main.nr):
  * signal_hash 0-31, domain_separator 32-63, action_hash 64-95,
- * signer_list_merkle_root 96-127, then the OPRF four at 128-131.
- * 192 before the OPRF nullifier.
+ * signer_list_merkle_root 96-127, the OPRF four at 128-131, then
+ * attested_at 132: the unix seconds of the device-signed statement that the
+ * attestation was neither revoked nor expired (circuits giwa-v2-libs).
+ * 132 before the statement, 192 before the OPRF nullifier.
  */
 export const GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -152,15 +154,18 @@ export const GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT = {
   OPRF_DOMAIN: 129,
   SCOPE: 130,
   NULLIFIER: 131,
+  ATTESTED_AT: 132,
 } as const;
 
 /** GIWA attestation public input count. */
-export const GIWA_ATTESTATION_PUBLIC_INPUT_COUNT = 132;
+export const GIWA_ATTESTATION_PUBLIC_INPUT_COUNT = 133;
 
 /**
- * Dojang Playground public input layout, 100 fields (dojang-playground/src/main.nr):
+ * Dojang Playground public input layout, 101 fields (dojang-playground-v2 and its Android packages, src/main.nr):
  * signal_hash 0-31, domain_separator 32-63, action_hash 64-95 (no issuer
- * list, so no root), then the OPRF four at 96-99. 160 before the OPRF nullifier.
+ * list, so no root), the OPRF four at 96-99, then attested_at 100 (the
+ * device statement's time, as for GIWA). 100 before the statement, 160
+ * before the OPRF nullifier.
  */
 export const DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT = {
   SIGNAL_HASH_START: 0,
@@ -173,10 +178,11 @@ export const DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT = {
   OPRF_DOMAIN: 97,
   SCOPE: 98,
   NULLIFIER: 99,
+  ATTESTED_AT: 100,
 } as const;
 
 /** Dojang Playground public input count. */
-export const DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT = 100;
+export const DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT = 101;
 
 /**
  * Human Passport score circuit public input layout (field offsets), 135 fields

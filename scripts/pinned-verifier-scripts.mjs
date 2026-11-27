@@ -19,8 +19,12 @@ export const VERIFIER_BY_SCRIPT = Object.freeze({
   OidcDomainAttestation: { circuit: 'oidc_domain_attestation', variant: 'standard' },
   OidcDomainAttestationAndroid: { circuit: 'oidc_domain_attestation', variant: 'android' },
   OidcDomainAttestationAndroidFactory: { circuit: 'oidc_domain_attestation', variant: 'android_factory' },
-  GiwaAttestation: { circuit: 'giwa_attestation', variant: 'standard' },
-  DojangPlayground: { circuit: 'dojang_playground', variant: 'standard' },
+  GiwaAttestationV2: { circuit: 'giwa_attestation', variant: 'standard' },
+  GiwaAttestationV2Android: { circuit: 'giwa_attestation', variant: 'android' },
+  GiwaAttestationV2AndroidFactory: { circuit: 'giwa_attestation', variant: 'android_factory' },
+  DojangPlaygroundV2: { circuit: 'dojang_playground', variant: 'standard' },
+  DojangPlaygroundV2Android: { circuit: 'dojang_playground', variant: 'android' },
+  DojangPlaygroundV2AndroidFactory: { circuit: 'dojang_playground', variant: 'android_factory' },
   HumanPassportScore: { circuit: 'human_passport_score', variant: 'standard' },
 });
 
@@ -44,9 +48,18 @@ export const NOT_VERIFIERS = new Set(['NullifierRegistry', 'ZKProofPortNullifier
  *   CoinbaseCountryAttestation  Coinbase Country v1 (150 public inputs); core
  *                          judges coinbase_country_attestation by the v2
  *                          layout (215), so the same reason.
+ *   GiwaAttestation        GIWA KYC without the device status statement (132
+ *                          public inputs); core judges giwa_attestation by the
+ *                          v2 layout (133), which refuses it by count. It
+ *                          proved only the issuing transaction, so a revoked
+ *                          or expired attestation passed (2026-11-27).
+ *   DojangPlayground       The Dojang Playground without the statement (100);
+ *                          the same reason (v2: 101).
  */
 export const NOT_PINNED_HERE = new Set([
   'CoinbaseAppAttestPoc',
   'CoinbaseAttestation',
   'CoinbaseCountryAttestation',
+  'GiwaAttestation',
+  'DojangPlayground',
 ]);

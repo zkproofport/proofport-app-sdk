@@ -14,12 +14,21 @@
  *
  * Also here: the signer-list root (./signerRoots), because both circuits still
  * prove the attestation transaction against a root the prover supplies.
+ *
+ * GIWA KYC and the Dojang Playground (v2, 2026-11-27) carry the same kind of
+ * statement about their GIWA Sepolia attestation -- neither revoked nor
+ * expired at `attested_at` (circuits giwa-v2-libs/src/statement.nr) -- and are
+ * judged here by the same rule. The Dojang Playground has no signer list.
  */
 import {
   COINBASE_ATTESTATION_PUBLIC_INPUT_COUNT,
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_COUNT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_COUNT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from './chain';
 import type { IssuerCheckResult } from './oidcProviderKeys';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck, type SignerRootLayout } from './signerRoots';
@@ -35,7 +44,8 @@ export const COINBASE_COUNTRY_ATTESTATION_V1_PUBLIC_INPUT_COUNT = 90;
  * How far `attested_at` may lag the verifier's clock. The same window as an
  * OIDC proof's `now`: on-device proving (2^20, or 2^21 for the Android
  * packages), relay delivery and a dApp that polls. A stored proof re-verified
- * later than this is refused. Both Coinbase circuits use it.
+ * later than this is refused. Both Coinbase circuits use it, and GIWA KYC and
+ * the Dojang Playground v2 too.
  */
 export const COINBASE_ATTESTED_AT_MAX_AGE_SECONDS = 15 * 60;
 
@@ -51,11 +61,12 @@ interface CoinbaseV2Shape {
   /** Earlier shapes of this circuit, by count, named in the refusal. */
   superseded: Readonly<Record<number, string>>;
   attestedAt: number;
-  root: SignerRootLayout;
+  /** `null`: the circuit proves no signer list (the Dojang Playground), said here so it is not read as forgotten. */
+  root: SignerRootLayout | null;
 }
 
 function coinbaseV2Check(shape: CoinbaseV2Shape) {
-  const rootCheck = signerRootCheck(shape.root);
+  const rootCheck = shape.root === null ? null : signerRootCheck(shape.root);
   return async (publicInputs: readonly string[]): Promise<IssuerCheckResult> => {
     if (!Array.isArray(publicInputs)) {
       return { ok: false, error: `Expected ${shape.count} public inputs; got ${typeof publicInputs}.` };
@@ -66,12 +77,16 @@ function coinbaseV2Check(shape: CoinbaseV2Shape) {
         ok: false,
         error:
           `This is a ${earlier} (${publicInputs.length} public inputs). ` +
-          `Only ${shape.label} v2 proofs with the OPRF nullifier (${shape.count} public inputs) are accepted; ` +
+          `Only current ${shape.label} proofs (${shape.count} public inputs) are accepted; ` +
           'generate the proof again with a current ZKProofport app or prover.',
       };
     }
-    const root = await rootCheck(publicInputs);
-    if (!root.ok) return root;
+    if (rootCheck) {
+      const root = await rootCheck(publicInputs);
+      if (!root.ok) return root;
+    } else if (publicInputs.length !== shape.count) {
+      return { ok: false, error: `Expected ${shape.count} public inputs; got ${publicInputs.length}.` };
+    }
 
     const index = shape.attestedAt;
     let attestedAt: bigint;
@@ -127,6 +142,32 @@ export const checkCoinbaseCountryAttestationProof: (publicInputs: readonly strin
   superseded: OPRF_PUBLIC_INPUT_LAYOUTS.coinbase_country_attestation.superseded,
   attestedAt: COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
   root: SIGNER_ROOT_LAYOUTS.coinbase_country_attestation,
+});
+
+/**
+ * Check a `giwa_attestation` (GIWA KYC v2) proof's public input count,
+ * signer-list root (96) and `attested_at` (132). Never throws for anything the
+ * proof's sender controls.
+ */
+export const checkGiwaAttestationProof: (publicInputs: readonly string[]) => Promise<IssuerCheckResult> = coinbaseV2Check({
+  label: 'GIWA KYC',
+  count: GIWA_ATTESTATION_PUBLIC_INPUT_COUNT,
+  superseded: OPRF_PUBLIC_INPUT_LAYOUTS.giwa_attestation.superseded,
+  attestedAt: GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
+  root: SIGNER_ROOT_LAYOUTS.giwa_attestation,
+});
+
+/**
+ * Check a `dojang_playground` (v2) proof's public input count and
+ * `attested_at` (100). No signer list: the faucet and the chain are constants
+ * in the circuit. Never throws for anything the proof's sender controls.
+ */
+export const checkDojangPlaygroundProof: (publicInputs: readonly string[]) => Promise<IssuerCheckResult> = coinbaseV2Check({
+  label: 'Dojang Playground',
+  count: DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT,
+  superseded: OPRF_PUBLIC_INPUT_LAYOUTS.dojang_playground.superseded,
+  attestedAt: DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
+  root: null,
 });
 
 /** How many countries a Coinbase Country proof's public list holds (`country_list: [[u8; 2]; 10]`). */

@@ -49,6 +49,7 @@ export function withRedeployedVerifiers(actual: GeneratedModule): GeneratedModul
       deployedAt: '2026-12-01T00:00:00.000Z',
       circuitsCommit: 'redeploy',
       vkSha256: key.sha256,
+      keyFrom: 'commit',
       record: row.record,
     };
     if (row.variant === 'standard') standard[row.circuit][row.chainId] = pinned;

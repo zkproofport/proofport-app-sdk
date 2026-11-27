@@ -6,7 +6,7 @@
  * the proof has the other package's length.
  *
  * Matrix written before the code:
- *   table      every circuit has `standard`; only the two have `android`; the
+ *   table      every circuit has `standard`; every device-signed one has `android`; the
  *              vk paths agree with CIRCUIT_VK_PATHS; every row of a
  *              multi-package circuit has a size; the generator's script map
  *              and core's table name the same scripts.
@@ -99,16 +99,41 @@ afterEach(() => {
 });
 
 describe('the package table', () => {
-  it('every circuit has a standard package; only OIDC, Coinbase KYC and Coinbase Country have the two android ones', () => {
+  it('every circuit has a standard package; every device-signed one also has the two android ones', () => {
     for (const id of ALL_CIRCUIT_IDS) expect(signerVariantsOf(id)[0]).toBe('standard');
     for (const variant of ['android', 'android_factory'] as const) {
       expect(ALL_CIRCUIT_IDS.filter(id => signerVariantsOf(id).includes(variant)), variant).toEqual([
         'coinbase_attestation',
         'coinbase_country_attestation',
         'oidc_domain_attestation',
+        'giwa_attestation',
+        'dojang_playground',
       ]);
     }
     expect(signerVariantsOf('oidc_domain_attestation')).toEqual(['standard', 'android', 'android_factory']);
+    // The wallet signs a Human Passport proof: one package for every signer.
+    expect(signerVariantsOf('human_passport_score')).toEqual(['standard']);
+  });
+
+  // GIWA KYC and the Dojang Playground v2 (2026-11-27): the device status
+  // statement made them device-signed, so three packages like Coinbase KYC v2.
+  it.each([
+    ['giwa_attestation', 'giwa-attestation-v2', 'GiwaAttestationV2'],
+    ['dojang_playground', 'dojang-playground-v2', 'DojangPlaygroundV2'],
+  ] as const)('%s names its three v2 packages', (id, dir, script) => {
+    expect(getCircuitPackage(id, 'standard')).toEqual({ packageDir: dir, vkPath: `${dir}/target/vk/vk`, deployScriptName: script, logCircuitSize: 20 });
+    expect(getCircuitPackage(id, 'android')).toEqual({
+      packageDir: `${dir}-android`,
+      vkPath: `${dir}-android/target/vk/vk`,
+      deployScriptName: `${script}Android`,
+      logCircuitSize: 21,
+    });
+    expect(getCircuitPackage(id, 'android_factory')).toEqual({
+      packageDir: `${dir}-android-factory`,
+      vkPath: `${dir}-android-factory/target/vk/vk`,
+      deployScriptName: `${script}AndroidFactory`,
+      logCircuitSize: 21,
+    });
   });
 
   it('names the android packages the circuits repository builds and deploys', () => {
@@ -249,8 +274,8 @@ describe('lookups end at an error naming the key', () => {
   });
 
   it('a variant the circuit has no package for names the ones it has', () => {
-    expect(() => getCircuitPackage('giwa_attestation', 'android')).toThrow(
-      "Circuit 'giwa_attestation' has no 'android' signer variant. Known for giwa_attestation: standard.",
+    expect(() => getCircuitPackage('human_passport_score', 'android')).toThrow(
+      "Circuit 'human_passport_score' has no 'android' signer variant. Known for human_passport_score: standard.",
     );
   });
 
@@ -351,8 +376,31 @@ describe('resolveSignerVariant', () => {
   });
 
   it('a single-package circuit has nothing to tell apart and ignores the length', () => {
-    expect(resolveSignerVariant('dojang_playground', undefined, proofOf(ANDROID))).toEqual({ variant: 'standard' });
-    expect(resolveSignerVariant('giwa_attestation', 'standard', 'not hex')).toEqual({ variant: 'standard' });
+    expect(resolveSignerVariant('human_passport_score', undefined, proofOf(ANDROID))).toEqual({ variant: 'standard' });
+    expect(resolveSignerVariant('human_passport_score', 'standard', 'not hex')).toEqual({ variant: 'standard' });
+  });
+
+  // GIWA KYC and the Dojang Playground v2: standard 2^20, both android packages 2^21.
+  it.each([['giwa_attestation'], ['dojang_playground']] as const)('%s tells its three packages apart like Coinbase KYC', id => {
+    expect(resolveSignerVariant(id, undefined, proofOf(STANDARD_KYC))).toEqual({ variant: 'standard' });
+    expect(resolveSignerVariant(id, 'standard', proofOf(STANDARD_KYC))).toEqual({ variant: 'standard' });
+    expect(resolveSignerVariant(id, 'android', proofOf(ANDROID))).toEqual({ variant: 'android' });
+    expect(resolveSignerVariant(id, 'android_factory', proofOf(ANDROID))).toEqual({ variant: 'android_factory' });
+    expect(resolveSignerVariant(id, undefined, proofOf(ANDROID))).toEqual({
+      error:
+        `This ${id} proof is 10688 bytes, the length of a 'android' or 'android_factory' proof, but its result does not say which signer made it. ` +
+        "Refusing rather than checking it against the 'standard' verifier. Pass the result's signerVariant through unchanged.",
+    });
+    expect(resolveSignerVariant(id, 'android', proofOf(STANDARD_KYC))).toEqual({
+      error: expect.stringMatching(/is 10304 bytes, the length of a 'standard' proof, but its result says signerVariant 'android'/),
+    });
+    expect(resolveSignerVariant(id, 'android_factory', proofOf(STANDARD_KYC))).toEqual({
+      error: expect.stringMatching(/is 10304 bytes, the length of a 'standard' proof, but its result says signerVariant 'android_factory'/),
+    });
+    expect('error' in resolveSignerVariant(id, 'standard', proofOf(ANDROID))).toBe(true);
+    expect(resolveSignerVariant(id, 'ios', proofOf(STANDARD_KYC))).toEqual({
+      error: `Circuit '${id}' has no "ios" signer variant. Known for ${id}: standard, android, android_factory.`,
+    });
   });
 
   it.each([['ios'], [''], ['Android'], [42], [true], [{}], [['android']]])('refuses the claim %j by name', claimed => {
@@ -361,8 +409,8 @@ describe('resolveSignerVariant', () => {
   });
 
   it('refuses an android claim for a circuit without that package', () => {
-    expect(resolveSignerVariant('giwa_attestation', 'android', proofOf(64))).toEqual({
-      error: `Circuit 'giwa_attestation' has no "android" signer variant. Known for giwa_attestation: standard.`,
+    expect(resolveSignerVariant('human_passport_score', 'android', proofOf(64))).toEqual({
+      error: `Circuit 'human_passport_score' has no "android" signer variant. Known for human_passport_score: standard.`,
     });
   });
 

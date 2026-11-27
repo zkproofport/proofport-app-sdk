@@ -30,9 +30,13 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { verifyProofOffChain } from '../offChainVerifier';
-import { COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT } from '../verifier';
+import {
+  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+} from '../verifier';
 import { OPRF_TEST_ENVIRONMENT } from './helpers/oprfKeys';
-import { fillOprf } from './helpers/signerFixtures';
+import { dojangInputs as dojangInputsAt } from './helpers/signerFixtures';
 
 // The real proofs' OPRF answers come from the circuits' per-circuit test keys;
 // staging stands in for them here (helpers/oprfKeys.ts).
@@ -51,12 +55,6 @@ const ATTESTED_AT_MS = Number(BigInt(FIXTURE.publicInputs[COINBASE_ATTESTATION_P
 const toHex = (b: Uint8Array) =>
   '0x' + Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
 
-/** The public_inputs file is field elements back to back, 32 bytes each. */
-function splitPublicInputs(bytes: Uint8Array): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < bytes.length; i += 32) out.push(toHex(bytes.subarray(i, i + 32)));
-  return out;
-}
 
 describe('off-chain verification against a real proof', () => {
   let proofHex: string;
@@ -201,11 +199,10 @@ describe('off-chain verification against a real proof', () => {
   }, 120_000);
 });
 
-// Run on dojang_playground: it has no issuer anchor, so with its OPRF four
-// filled in (the only check it has before the proof) these reach the input
-// handling instead of stopping at a signer-root or key check first.
-const dojangInputs = (): string[] =>
-  fillOprf(Array.from({ length: 100 }, () => '0x' + '00'.repeat(32)), 'dojang_playground');
+// Run on dojang_playground: it has no signer root, so with its OPRF four and a
+// current attested_at filled in (the only checks it has before the proof)
+// these reach the input handling instead of stopping at an issuer check first.
+const dojangInputs = (): string[] => dojangInputsAt();
 
 describe('off-chain verification input handling', () => {
   it('reports an empty proof rather than asking Barretenberg about it', async () => {
@@ -235,60 +232,60 @@ describe('off-chain verification input handling', () => {
 });
 
 /**
- * The same check across every circuit that has a real proof committed.
+ * The same check across the other circuits that have a real proof committed.
  *
  * The cases above prove the mechanism on one circuit. This proves the mechanism
- * is not specific to it — same verification key format, same proof shape, same
- * entry point — which is the question "does off-chain verification cover every
+ * is not specific to it -- same verification key format, same proof shape, same
+ * entry point -- which is the question "does off-chain verification cover every
  * circuit" actually asks.
  *
- * Proofs are not committed; these are the circuits whose build writes one
- * (build.sh with a Prover.toml). Coinbase KYC v2 is covered above from its committed fixture.
- * OIDC has no committed witness. Those go through the identical code
- * path but are NOT exercised end to end here.
+ * GIWA KYC v2 and the Dojang Playground v2 (2026-11-27): their committed
+ * fixtures are the synthetic-anchors twins (test Apple / server keys sign the
+ * device status statement), written by scripts/export-proof-fixtures.mjs, so
+ * each verifies against the vk in its own file and against no deployed
+ * verifier. Coinbase Country v2 is covered from its committed fixture in
+ * coinbaseCountryV2IsJudged.test.ts; OIDC has no committed witness and goes
+ * through the identical code path without being exercised end to end here.
  */
-// Coinbase Country is not here: the proof its v1 build writes is refused by the
-// v2 layout (coinbaseCountryV2IsJudged.test.ts), and v2 is covered from its
-// committed fixture there.
 const CIRCUITS_WITH_COMMITTED_PROOFS = [
-  {circuit: 'giwa_attestation' as const, dir: ['giwa-attestation']},
-  {circuit: 'dojang_playground' as const, dir: ['dojang-playground']},
+  { circuit: 'giwa_attestation' as const, file: 'giwaKycV2SyntheticAnchors.json', attestedAt: GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT },
+  { circuit: 'dojang_playground' as const, file: 'dojangPlaygroundPublicInputs.json', attestedAt: DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT },
 ];
+const committed = (file: string) =>
+  JSON.parse(readFileSync(join(__dirname, 'fixtures', file), 'utf8')) as { proof: string; publicInputs: string[]; vk: string };
 
-describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)(
-  'off-chain verification for $circuit',
-  ({circuit, dir}) => {
-    const target = join(process.cwd(), '..', 'circuits', ...dir, 'target');
-    const proofFile = join(target, 'proof', 'proof');
-    const inputsFile = join(target, 'proof', 'public_inputs');
-    const keyFile = join(target, 'vk', 'vk');
-    const present = existsSync(proofFile) && existsSync(inputsFile) && existsSync(keyFile);
+describe.each(CIRCUITS_WITH_COMMITTED_PROOFS)('off-chain verification for $circuit', ({ circuit, file, attestedAt }) => {
+  const own = committed(file);
+  const at = Number(BigInt(own.publicInputs[attestedAt])) * 1000;
+  afterEach(() => vi.useRealTimers());
+  const at_ = (ms: number) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(ms);
+  };
 
-    it.skipIf(!present)('accepts its own proof', async () => {
-      const result = await verifyProofOffChain(
-        circuit,
-        toHex(new Uint8Array(readFileSync(proofFile))),
-        splitPublicInputs(new Uint8Array(readFileSync(inputsFile))),
-        {...ENV, verificationKey: new Uint8Array(readFileSync(keyFile))},
-      );
-      expect(result.error).toBeUndefined();
-      expect(result.valid).toBe(true);
-    }, 120_000);
+  it('accepts its own proof', async () => {
+    at_(at + 60_000);
+    const result = await verifyProofOffChain(circuit, own.proof, own.publicInputs, { ...ENV, verificationKey: fromHex(own.vk) });
+    expect(result.error).toBeUndefined();
+    expect(result.valid).toBe(true);
+  }, 120_000);
 
-    it.skipIf(!present)('rejects another circuit\'s proof against its key', async () => {
-      // Each key must reject a proof it did not sign. Without this, a verifier
-      // that ignored the key would pass every case above.
-      const other = CIRCUITS_WITH_COMMITTED_PROOFS.find(c => c.circuit !== circuit)!;
-      const otherProof = join(process.cwd(), '..', 'circuits', ...other.dir, 'target', 'proof');
-      if (!existsSync(join(otherProof, 'proof'))) return;
+  it('refuses the same proof re-verified after the 900 s window, before asking Barretenberg', async () => {
+    at_(at + 901_000);
+    const result = await verifyProofOffChain(circuit, own.proof, own.publicInputs, { ...ENV, verificationKey: fromHex(own.vk) });
+    expect(result).toEqual({ valid: false, error: expect.stringMatching(/attested_at .* is 901s behind this verifier's clock/) });
+  });
 
-      const result = await verifyProofOffChain(
-        circuit,
-        toHex(new Uint8Array(readFileSync(join(otherProof, 'proof')))),
-        splitPublicInputs(new Uint8Array(readFileSync(join(otherProof, 'public_inputs')))),
-        {...ENV, verificationKey: new Uint8Array(readFileSync(keyFile))},
-      );
-      expect(result.valid).toBe(false);
-    }, 120_000);
-  },
-);
+  it('rejects another circuit\'s proof against its key', async () => {
+    // Each key must reject a proof it did not sign. Without this, a verifier
+    // that ignored the key would pass every case above.
+    const other = committed(CIRCUITS_WITH_COMMITTED_PROOFS.find(c => c.circuit !== circuit)!.file);
+    at_(at + 60_000);
+    // This circuit's own public inputs, so the checks before the proof pass
+    // and the key is what decides.
+    const result = await verifyProofOffChain(circuit, other.proof, own.publicInputs, { ...ENV, verificationKey: fromHex(own.vk) });
+    expect(result.valid).toBe(false);
+    const againstOtherKey = await verifyProofOffChain(circuit, own.proof, own.publicInputs, { ...ENV, verificationKey: fromHex(other.vk) });
+    expect(againstOtherKey.valid).toBe(false);
+  }, 120_000);
+});

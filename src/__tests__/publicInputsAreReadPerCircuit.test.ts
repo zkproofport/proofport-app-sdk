@@ -25,6 +25,13 @@ import {
   reduceOprfName,
 } from '../verifier';
 import { ALL_CIRCUIT_IDS } from '../circuits';
+import { CIRCUIT_METADATA } from '../constants';
+import {
+  COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+  COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
+} from '../verifier';
 import { oprfQuery } from '../../packages/core/src/oprf';
 import { encodeToCurve, scalarMul } from '../../packages/core/src/oprf/babyjubjub';
 import { poseidon2T4 } from '../../packages/core/src/oprf/poseidon2';
@@ -48,18 +55,50 @@ function block(start: number, byte: number): Record<number, string> {
 }
 
 // circuits-dev.md, "OPRF nullifier in every wallet credential circuit": count,
-// then oprf_key_hash, domain, scope, nullifier.
+// then oprf_key_hash, domain, scope, nullifier. GIWA KYC and the Dojang
+// Playground from "giwa_attestation / dojang_playground v2: status statement
+// with expiry" (2026-11-27): attested_at appended last, 133 / 101.
 const SPEC = {
   coinbase_attestation: [133, 128, 129, 130, 131],
   coinbase_country_attestation: [155, 150, 151, 152, 153],
-  giwa_attestation: [132, 128, 129, 130, 131],
-  dojang_playground: [100, 96, 97, 98, 99],
+  giwa_attestation: [133, 128, 129, 130, 131],
+  dojang_playground: [101, 96, 97, 98, 99],
   human_passport_score: [135, 128, 129, 130, 131],
+} as const;
+
+// attested_at, where a circuit has one: the device statement's time, last.
+const ATTESTED_AT = {
+  coinbase_attestation: [COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT, 132],
+  coinbase_country_attestation: [COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.ATTESTED_AT, 154],
+  giwa_attestation: [GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT, 132],
+  dojang_playground: [DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT, 100],
 } as const;
 
 describe('the OPRF layout is the one the circuits document', () => {
   it.each(Object.entries(SPEC))('%s', (circuit, [count, keyHash, domain, scope, nullifier]) => {
     expect(OPRF_PUBLIC_INPUT_LAYOUTS[circuit as keyof typeof SPEC]).toMatchObject({ count, keyHash, domain, scope, nullifier });
+  });
+
+  it.each(Object.entries(ATTESTED_AT))('%s puts attested_at last, at the documented index', (circuit, [core, documented]) => {
+    expect(core).toBe(documented);
+    expect(core).toBe(SPEC[circuit as keyof typeof SPEC][0] - 1);
+  });
+
+  it('the SDK metadata agrees with core on every wallet circuit\'s count, and names attested_at where there is one', () => {
+    for (const [circuit, [count]] of Object.entries(SPEC)) {
+      const meta = CIRCUIT_METADATA[circuit as keyof typeof SPEC];
+      expect(meta.publicInputsCount, circuit).toBe(count);
+      expect(meta.publicInputNames.includes('attested_at'), circuit).toBe(circuit in ATTESTED_AT);
+    }
+  });
+
+  it.each([
+    ['giwa_attestation', 132, /^This is a GIWA KYC proof made before the device status statement .*\(132 public inputs\)/],
+    ['giwa_attestation', 192, /^This is a GIWA proof made before the OPRF nullifier/],
+    ['dojang_playground', 100, /^This is a Dojang Playground proof made before the device status statement .*\(100 public inputs\)/],
+    ['dojang_playground', 160, /^This is a Dojang Playground proof made before the OPRF nullifier/],
+  ] as const)('%s: an earlier shape of %i public inputs is refused by name', (circuit, n, message) => {
+    expect(() => readOprfPublicInputs(circuit, fieldsWith({}, n))).toThrow(message);
   });
 
   it('every circuit is listed: OIDC has none, every other has one', () => {
@@ -81,7 +120,7 @@ describe('public inputs are read per circuit', () => {
   });
 
   it('GIWA: the nullifier is never read from the signer root (the failure the table replaced)', () => {
-    const fields = fieldsWith({ ...block(96, 0xee), 131: f(0x77) }, 132);
+    const fields = fieldsWith({ ...block(96, 0xee), 131: f(0x77) }, 133);
     expect(extractNullifierFromPublicInputs(fields, 'giwa_attestation')).toBe(f(0x77));
   });
 
@@ -141,24 +180,27 @@ describe('public inputs are read per circuit', () => {
   });
 });
 
-describe('a real Dojang Playground proof (fixtures/dojangPlaygroundPublicInputs.json)', () => {
+describe('a real Dojang Playground v2 proof (fixtures/dojangPlaygroundPublicInputs.json)', () => {
   it('carries the fixture key hash, the domain and scope reduced mod p, and the nullifier core recomputes', () => {
     // Recomputed here, with core's own client, from what the circuits fixture
-    // generator used: the Playground wallet, keccak256 mod p of the two strings,
-    // and the circuits' public test key for dojang_playground (oprf.js
-    // fixtureKey). A wrong offset reads values that cannot match by accident.
+    // generator used (scripts/coinbase-attestation-v2/generate-prover-toml.js,
+    // SCOPE_STRING 'proofport'): the Playground wallet, keccak256 mod p of the
+    // two strings, and the circuits' public test key for dojang_playground
+    // (oprf.js fixtureKey). A wrong offset reads values that cannot match by accident.
     const fields = dojangProof.publicInputs;
-    expect(fields).toHaveLength(100);
+    expect(fields).toHaveLength(101);
     const read = readOprfPublicInputs('dojang_playground', fields);
     const fixture = vectors.evaluations.find(e => e.note === 'circuits fixture key for dojang_playground (oprf.js fixtureKey)')!;
     expect(read.oprfKeyHash).toBe(fixture.keyHash);
     expect(read.domain).toBe(reduceOprfName('zkproofport.app'));
-    expect(read.scope).toBe(reduceOprfName('dojang-playground-scope'));
+    expect(read.scope).toBe(reduceOprfName('proofport'));
     const query = oprfQuery({ address: '0x5A3E649208Ae15ec52496c1Ae23b2Ff89Ac02f0c', domain: read.domain, scope: read.scope });
     const p = scalarMul(encodeToCurve(BigInt(query)), BigInt(fixture.secretKey));
     expect(f(poseidon2T4([OPRF_DS_OUT, BigInt(query), p.x, p.y])[1])).toBe(read.nullifier);
     expect(extractNullifierFromPublicInputs(fields, 'dojang_playground')).toBe(read.nullifier);
     // GIWA's offsets on the same proof run off its end.
     expect(extractScopeFromPublicInputs(fields, 'giwa_attestation')).toBeNull();
+    // attested_at, last: the time the fixture generator signed the statement.
+    expect(BigInt(fields[DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT]) > 1_700_000_000n).toBe(true);
   });
 });

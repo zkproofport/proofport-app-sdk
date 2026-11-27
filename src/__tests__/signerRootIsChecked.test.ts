@@ -5,7 +5,7 @@
  * verifier compares R with the published signer set. Every verify path must.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ethers } from 'ethers';
 import { ProofportSDK } from '../ProofportSDK';
@@ -74,40 +74,35 @@ describe('the expected roots are the roots of the published signer lists', () =>
     expect(await rootOf([...GIWA_SIGNER_SET.signers])).toBe(GIWA_SIGNER_SET.root);
   });
 
-  it('every circuit whose public inputs name a signer root has a check; the rest say why not', () => {
+  it('every circuit whose public inputs name a signer root has a check, and every circuit has one', () => {
     for (const id of ALL_CIRCUIT_IDS) {
       const hasRoot = CIRCUIT_METADATA[id].publicInputNames.includes('signer_list_merkle_root');
       const check = (CIRCUIT_ISSUER_CHECKS as Record<string, unknown>)[id];
       if (hasRoot) expect(check, id).not.toBeNull();
     }
-    expect(Object.entries(CIRCUIT_ISSUER_CHECKS).filter(([, c]) => c === null).map(([id]) => id).sort()).toEqual(
-      ['dojang_playground'],
+    // The Dojang Playground had none (no issuer list) until v2 gave it
+    // attested_at to judge (2026-11-27).
+    expect(Object.entries(CIRCUIT_ISSUER_CHECKS).filter(([, c]) => c === null).map(([id]) => id)).toEqual([]);
+  });
+
+  // Real v2 proofs (committed fixtures, synthetic device anchors): their root
+  // is what a genuine mobile proof carries. Coinbase Country v1's real proof
+  // is not here: the v2 layout refuses it by count
+  // (coinbaseCountryV2IsJudged.test.ts reads it for that).
+  it.each([
+    ['coinbase_attestation', 'coinbaseKycV2SyntheticAnchors.json', 132],
+    ['giwa_attestation', 'giwaKycV2SyntheticAnchors.json', 132],
+  ] as const)('accepts the root inside a real %s v2 proof (committed fixture)', async (circuit, file, attestedAtIndex) => {
+    const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', file), 'utf8'));
+    expect(fixture.publicInputs).toHaveLength(133);
+    expect('0x' + fixture.publicInputs.slice(96, 128).map((f: string) => BigInt(f).toString(16).padStart(2, '0')).join('')).toBe(
+      SIGNER_ROOT_LAYOUTS[circuit].set.root,
     );
-  });
-
-  // The real proofs the circuits build writes (not committed; present where
-  // the circuits were built). Their root is what a genuine mobile proof carries.
-  // Coinbase Country v1's real proof is not here: the v2 layout refuses it by
-  // count (coinbaseCountryV2IsJudged.test.ts reads it for that).
-  const REAL = [
-    ['giwa_attestation', 'giwa-attestation'],
-  ] as const;
-  it.each(REAL)('accepts the root inside a real %s proof', async (circuit, dir) => {
-    const file = join(process.cwd(), '..', 'circuits', dir, 'target', 'proof', 'public_inputs');
-    if (!existsSync(file)) return;
-    const bytes = readFileSync(file);
-    const inputs: string[] = [];
-    for (let i = 0; i < bytes.length; i += 32) inputs.push('0x' + bytes.subarray(i, i + 32).toString('hex'));
-    expect(await issuer(circuit, inputs)).toEqual({ ok: true });
-  });
-
-  it('accepts the root inside a real Coinbase KYC v2 proof (committed fixture)', async () => {
-    const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'coinbaseKycV2SyntheticAnchors.json'), 'utf8'));
-    const attestedAt = Number(BigInt(fixture.publicInputs[132]));
+    const attestedAt = Number(BigInt(fixture.publicInputs[attestedAtIndex]));
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(attestedAt * 1000 + 60_000);
-      expect(await issuer('coinbase_attestation', fixture.publicInputs)).toEqual({ ok: true });
+      expect(await issuer(circuit, fixture.publicInputs)).toEqual({ ok: true });
     } finally {
       vi.useRealTimers();
     }

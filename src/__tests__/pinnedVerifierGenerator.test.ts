@@ -47,9 +47,9 @@ const KEYS: Record<string, Buffer | string> = { ...Object.fromEntries(VK_PATHS.m
 /** Stands for "the commit holding the keys" in a broadcast; replaced on write. */
 const KEYS_COMMIT = '__KEYS_COMMIT__';
 
-function broadcast(chain: number, addr: string, commit = KEYS_COMMIT) {
+function broadcast(chain: number, addr: string, commit = KEYS_COMMIT, input?: string) {
   return JSON.stringify({
-    transactions: [{ transactionType: 'CREATE', contractName: 'HonkVerifier', contractAddress: addr }],
+    transactions: [{ transactionType: 'CREATE', contractName: 'HonkVerifier', contractAddress: addr, ...(input ? { transaction: { input } } : {}) }],
     receipts: [{ contractAddress: addr, status: '0x1' }],
     chain,
     timestamp: 1798502400000,
@@ -108,8 +108,12 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(text).toContain(`84532: Object.freeze({ address: '${address(1)}'`);
     expect(text).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {4}84532: Object\\.freeze\\(\\{ address: '${address(2)}'`));
     expect(text).toContain('export const PINNED_VARIANT_VERIFIERS');
-    expect(text).toMatch(/android: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}coinbase_country_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
-    expect(text).toMatch(/android_factory: Object\.freeze\(\{\n {4}coinbase_attestation: Object\.freeze\(\{\}\),\n {4}coinbase_country_attestation: Object\.freeze\(\{\}\),\n {4}oidc_domain_attestation: Object\.freeze\(\{\}\),\n {2}\}\),/);
+    // Every circuit with an android package has a row, empty when nothing is deployed.
+    const emptyRows = ['coinbase_attestation', 'coinbase_country_attestation', 'oidc_domain_attestation', 'giwa_attestation', 'dojang_playground']
+      .map(id => `\\n {4}${id}: Object\\.freeze\\(\\{\\}\\),`)
+      .join('');
+    expect(text).toMatch(new RegExp(`android: Object\\.freeze\\(\\{${emptyRows}\\n {2}\\}\\),`));
+    expect(text).toMatch(new RegExp(`android_factory: Object\\.freeze\\(\\{${emptyRows}\\n {2}\\}\\),`));
   });
 
   it('a DeployOidcDomainAttestationAndroid broadcast becomes an android row, not a standard one', () => {
@@ -126,7 +130,7 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(standardPart).not.toContain(address(0xa1));
     const androidKey = sha256(key('oidc-domain-attestation-android/target/vk/vk'));
     expect(variantPart).toContain(
-      `      84532: Object.freeze({ address: '${address(0xa1)}', deployedAt: '2026-12-29T00:00:00.000Z', circuitsCommit: '${keysCommitOf(repo)}', vkSha256: '${androidKey}', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' }),`,
+      `      84532: Object.freeze({ address: '${address(0xa1)}', deployedAt: '2026-12-29T00:00:00.000Z', circuitsCommit: '${keysCommitOf(repo)}', vkSha256: '${androidKey}', keyFrom: 'commit', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' }),`,
     );
     expect(variantPart).toContain(`      11155111: Object.freeze({ address: '${address(0xa2)}'`);
     expect(variantPart).not.toContain(address(1));
@@ -184,6 +188,39 @@ describe('generate-pinned-verifiers.mjs', () => {
     expect(factoryPart).toMatch(new RegExp(`coinbase_attestation: Object\\.freeze\\(\\{\\n {6}84532: Object\\.freeze\\(\\{ address: '${address(0xb2)}'`));
     expect(androidPart).not.toContain(address(0xb2));
     expect(factoryPart).not.toContain(address(0xb1));
+  });
+
+  it('GIWA KYC and the Dojang Playground v2 pin their three packages each; v1 (DeployGiwaAttestation, DeployDojangPlayground) is not pinned', () => {
+    const scripts = [
+      ['GiwaAttestationV2', 0xd1], ['GiwaAttestationV2Android', 0xd2], ['GiwaAttestationV2AndroidFactory', 0xd3],
+      ['DojangPlaygroundV2', 0xe1], ['DojangPlaygroundV2Android', 0xe2], ['DojangPlaygroundV2AndroidFactory', 0xe3],
+    ] as const;
+    const r = generate(circuitsRepo({
+      ...STANDARD,
+      'broadcast/DeployGiwaAttestation.s.sol/91342/run-latest.json': broadcast(91342, address(0xc1)),
+      'deployments/91342/GiwaAttestation.json': JSON.stringify({ address: address(0xc1) }),
+      'broadcast/DeployDojangPlayground.s.sol/91342/run-latest.json': broadcast(91342, address(0xc2)),
+      'deployments/91342/DojangPlayground.json': JSON.stringify({ address: address(0xc2) }),
+      ...Object.fromEntries(scripts.flatMap(([name, n]) => [
+        [`broadcast/Deploy${name}.s.sol/91342/run-latest.json`, broadcast(91342, address(n))],
+        [`deployments/91342/${name}.json`, JSON.stringify({ address: address(n) })],
+      ])),
+    }));
+    expect(r.status, r.stderr).toBe(0);
+    const text = r.text();
+    expect(text).not.toContain(address(0xc1));
+    expect(text).not.toContain(address(0xc2));
+    const [standardPart, variants] = text.split('export const PINNED_VARIANT_VERIFIERS');
+    const [androidPart, factoryPart] = variants.split('  android_factory: Object.freeze({');
+    const row = (id: string, n: number, indent: number) =>
+      new RegExp(`${id}: Object\\.freeze\\(\\{\\n {${indent}}91342: Object\\.freeze\\(\\{ address: '${address(n)}'`);
+    expect(standardPart).toMatch(row('giwa_attestation', 0xd1, 4));
+    expect(standardPart).toMatch(row('dojang_playground', 0xe1, 4));
+    expect(androidPart).toMatch(row('giwa_attestation', 0xd2, 6));
+    expect(androidPart).toMatch(row('dojang_playground', 0xe2, 6));
+    expect(factoryPart).toMatch(row('giwa_attestation', 0xd3, 6));
+    expect(factoryPart).toMatch(row('dojang_playground', 0xe3, 6));
+    for (const [, n] of scripts) expect(text.split(address(n)).length - 1, address(n)).toBe(1);
   });
 
   it('an Android deploy script nobody mapped stops the generator, naming it', () => {
@@ -351,6 +388,84 @@ describe('generate-pinned-verifiers.mjs: keys and redeploys', () => {
     );
     expect(text).toContain(`sha256: '${sha256(key(OIDC_VK, 'rebuilt'))}', path: '${OIDC_VK}'`);
     expect(text).toContain("export const VERIFICATION_KEY_BB_VERSION = '7.0.0';");
+  });
+
+  /** Creation code holding every word of `vk` as a PUSH constant, between filler bytes. */
+  const initcodeWith = (vk: Buffer) => {
+    const parts: Buffer[] = [Buffer.from('6080604052', 'hex')];
+    for (let i = 0; i < vk.length; i += 32) {
+      const word = vk.subarray(i, i + 32);
+      let start = 0;
+      while (start < 32 && word[start] === 0) start++;
+      if (start === 32) continue;
+      parts.push(Buffer.from([0x5f + 32 - start]), word.subarray(start), Buffer.from('50', 'hex'));
+    }
+    return '0x' + Buffer.concat(parts).toString('hex');
+  };
+  /** Keys committed AFTER the deployment, as on 2026-11-27: the broadcast names the commit before them. */
+  function deployedBeforeKeys(input: string | undefined, keys: Record<string, Buffer | string> = KEYS) {
+    const r0 = repo();
+    const before = r0.commit({ 'README.md': 'before the keys\n' });
+    const keysCommit = r0.commit(keys);
+    r0.commit({
+      'broadcast/DeployOidcDomainAttestation.s.sol/84532/run-latest.json': broadcast(84532, address(1), before, input),
+      'broadcast/DeployCoinbaseAttestationV2.s.sol/84532/run-latest.json': broadcast(84532, address(2)),
+    }, { [KEYS_COMMIT]: keysCommit });
+    return r0.dir;
+  }
+
+  it("a key not committed at the deployment's commit is established from the creation code, and the row says so", () => {
+    const dir = deployedBeforeKeys(initcodeWith(key(OIDC_VK)));
+    const r = generate(dir);
+    expect(r.status, r.stderr).toBe(0);
+    const text = r.text();
+    expect(text).toMatch(new RegExp(`84532: Object\\.freeze\\(\\{ address: '${address(1)}', deployedAt: '[^']+', circuitsCommit: '[0-9a-f]{40}', vkSha256: '${sha256(key(OIDC_VK))}', keyFrom: 'initcode', record: `));
+    expect(text).toMatch(new RegExp(`address: '${address(2)}', [^\\n]*keyFrom: 'commit'`));
+  });
+
+  it('a word of the key with leading zero bytes is matched as the shorter PUSH solc writes', () => {
+    const vk = Buffer.from(key(OIDC_VK));
+    vk.fill(0, 0, 31); // word 0 = 0x...01: PUSH1 0x01
+    vk.fill(0, 32, 64); // word 1 = zero: no constant needed
+    const keys = { ...KEYS, [OIDC_VK]: vk };
+    const r = generate(deployedBeforeKeys(initcodeWith(vk), keys));
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.text()).toContain(`vkSha256: '${sha256(vk)}', keyFrom: 'initcode'`);
+  });
+
+  it('a creation code missing one word of the current key stops the generator, naming the word', () => {
+    // key() repeats its text, so its words repeat too: build one whose 59 words all differ.
+    const vk = Buffer.concat(Array.from({ length: 59 }, (_, i) => createHash('sha256').update(`word ${i}`).digest()));
+    const other = Buffer.from(vk);
+    other.fill(7, 32 * 5, 32 * 6);
+    const r = generate(deployedBeforeKeys(initcodeWith(other), { ...KEYS, [OIDC_VK]: vk }));
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/lacks 1 word\(s\) of the current key \(first: word 5\), so the key this verifier was built from is unknown/);
+  });
+
+  it("another package's creation code stops the generator", () => {
+    const r = generate(deployedBeforeKeys(initcodeWith(key('coinbase-attestation-v2/target/vk/vk'))));
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/lacks 59 word\(s\) of the current key/);
+  });
+
+  it.each([['no creation code', undefined], ['not hex', '0xzz'], ['odd hex', '0xabc']])('%s with no key at the commit stops the generator', (_name, input) => {
+    const r = generate(deployedBeforeKeys(input));
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/and the verifier's creation code is not in the broadcast, so the key this verifier was built from is unknown/);
+  });
+
+  it('a key committed at the deployment decides even when the creation code holds the current key (the commit is never overruled)', () => {
+    const r0 = repo();
+    const keysCommit = r0.commit(KEYS);
+    r0.commit(
+      { ...STANDARD, 'broadcast/DeployOidcDomainAttestation.s.sol/84532/run-latest.json': broadcast(84532, address(1), KEYS_COMMIT, initcodeWith(key(OIDC_VK, 'rebuilt'))) },
+      { [KEYS_COMMIT]: keysCommit },
+    );
+    r0.commit({ [OIDC_VK]: key(OIDC_VK, 'rebuilt') });
+    const r = generate(r0.dir);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.text()).toContain(`previousAddress: '${address(1)}', previousVkSha256: '${sha256(key(OIDC_VK))}'`);
   });
 
   it('a broadcast whose commit cannot be read stops the generator: the key behind the contract is unknown', () => {

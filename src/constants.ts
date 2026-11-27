@@ -141,24 +141,27 @@ export const CIRCUIT_METADATA: Record<CircuitType, {
   // zero; without one it signs signal_hash and the pair is zero. Read off the
   // compiled ABI: signal_hash 0-31, domain_separator 32-63, action_hash
   // 64-95, signer_list_merkle_root 96-127, then the OPRF nullifier's
-  // oprf_key_hash 128, domain 129, scope 130, nullifier 131 = 132 fields.
+  // oprf_key_hash 128, domain 129, scope 130, nullifier 131, then attested_at
+  // 132, the time of the device-signed statement that the attestation was
+  // neither revoked nor expired (giwa-attestation-v2, 2026-11-27) = 133 fields.
   giwa_attestation: {
     name: 'GIWA Attestation',
     description: 'Prove GIWA identity verification, optionally authorizing one EIP-712 action (planned — not officially supported yet)',
-    publicInputsCount: 132,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier'],
+    publicInputsCount: 133,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'signer_list_merkle_root', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'attested_at'],
   },
   // Experimental, GIWA Sepolia only. The wallet signs the request (an EIP-712
   // action, or signal_hash when none is given -- the same branch as GIWA), and
   // the same key must have signed a payAndIssueEAS() call to the Playground
   // faucet. No issuer list, so no merkle root: signal_hash 0-31,
   // domain_separator 32-63, action_hash 64-95, then oprf_key_hash 96, domain
-  // 97, scope 98, nullifier 99 = 100 fields.
+  // 97, scope 98, nullifier 99, then attested_at 100 (the device statement's
+  // time, as for GIWA; dojang-playground-v2, 2026-11-27) = 101 fields.
   dojang_playground: {
     name: 'Dojang Playground',
     description: 'Prove this wallet issued itself a Dojang through the GIWA Playground, optionally authorizing one EIP-712 action',
-    publicInputsCount: 100,
-    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'oprf_key_hash', 'domain', 'scope', 'nullifier'],
+    publicInputsCount: 101,
+    publicInputNames: ['signal_hash', 'domain_separator', 'action_hash', 'oprf_key_hash', 'domain', 'scope', 'nullifier', 'attested_at'],
   },
   // human-passport-score/src/main.nr: GIWA's four `pub [u8; 32]` and the OPRF
   // four (128-131), then min_score (u32, score x 10^4), scorer_id and now

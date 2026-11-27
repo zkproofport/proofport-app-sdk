@@ -157,6 +157,14 @@ SDK's `verifyOnChain`, `verifyResponseOnChain`, `verifyResponseOffChain`:
 - `dojang_playground`: no issuer anchor among its public inputs. The faucet
   address and chain id are circuit constants, pinned by the verification key,
   and the issuance is self-signed by design.
+- `giwa_attestation` and `dojang_playground` v2 (2026-11-27): the circuit
+  checks a device-signed 233-byte statement that the GIWA Sepolia EAS record
+  was neither revoked nor expired at `attested_at`, published last (GIWA 132
+  of 133, Dojang 100 of 101). `checkGiwaAttestationProof` /
+  `checkDojangPlaygroundProof` (`coinbasePolicy.ts`, Coinbase KYC v2's rule)
+  hold it to the verifier clock: at most 900 s behind, 300 s ahead, below
+  2^64. The earlier 132 / 100 shapes are refused by name ("made before the
+  device status statement"); Dojang's check has no signer root.
 
 **Country Codes:**
 
@@ -599,6 +607,19 @@ and lists it in `AWAITING_REDEPLOY` (`circuit`, `variant`, `chainId`,
 deployed there (0x...) was built from a verification key that is no longer
 this circuit's, so it is not used". The redeploy fills the slot: once the new
 broadcast records a commit holding the current key, the row is pinned again.
+
+When the key is not committed at `run.commit` at all -- the verifier was
+deployed from a local build and the keys were committed afterwards, as the six
+GIWA KYC / Dojang Playground v2 verifiers were on 2026-11-27 (broadcasts name
+circuits `a585b57`, keys arrived with the CI artifacts commit) -- the generator
+reads the broadcast's HonkVerifier creation code instead: bb writes every
+32-byte word of the key into the Solidity verifier as a constant, so each
+non-zero word of the CURRENT key must appear as a PUSH immediate (leading zero
+bytes dropped, as solc does). Measured on those six: 59 of 59 words found in
+each; another package's key against the same code, 6 of 59. Such rows carry
+`keyFrom: 'initcode'` (all others `'commit'`). Any missing word, or no creation
+code in the broadcast, stops the generator. A key that IS committed at
+`run.commit` always decides; the creation code never overrules it.
 
 `--worktree` reads the circuits working tree over HEAD, for keys rebuilt but
 not yet committed. When any key or `toolchain.env` differs from HEAD,

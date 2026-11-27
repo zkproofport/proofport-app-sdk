@@ -231,7 +231,13 @@ describe('values and counts', () => {
     expect(checkOprfProof('giwa_attestation', inputs, STAGING).ok).toBe(false);
   });
 
-  it.each([[192, /GIWA proof made before the OPRF nullifier/], [131, /has 132 public inputs; got 131/], [133, /got 133/], [0, /got 0/]])('%i public inputs are refused', (n, message) => {
+  it.each([
+    [192, /GIWA proof made before the OPRF nullifier/],
+    [132, /^This is a GIWA KYC proof made before the device status statement .*\(132 public inputs\)\. Only current giwa_attestation proofs \(133 public inputs\)/],
+    [131, /has 133 public inputs; got 131/],
+    [134, /has 133 public inputs; got 134/],
+    [0, /got 0/],
+  ])('%i public inputs are refused', (n, message) => {
     const inputs = Array.from({ length: n }, () => hex(0n));
     expect(checkOprfProof('giwa_attestation', inputs, STAGING)).toEqual({ ok: false, error: expect.stringMatching(message) });
   });

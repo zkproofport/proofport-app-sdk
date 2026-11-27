@@ -80,7 +80,7 @@ describe('count', () => {
     [193, 'Coinbase KYC v2 proof made before the OPRF nullifier (its nullifier is derived from the wallet address)'],
   ])('refuses an earlier shape (%i inputs) naming what it is', async (n, what) => {
     const r = await checkCoinbaseAttestationProof(Array.from({ length: n }, () => field(0)));
-    expect(r).toEqual({ ok: false, error: expect.stringContaining(`This is a ${what} (${n} public inputs). Only Coinbase KYC v2 proofs with the OPRF nullifier (133`) });
+    expect(r).toEqual({ ok: false, error: expect.stringContaining(`This is a ${what} (${n} public inputs). Only current Coinbase KYC proofs (133`) });
   });
 
   it.each([[0], [132], [134]])('refuses %i inputs by count', async n => {

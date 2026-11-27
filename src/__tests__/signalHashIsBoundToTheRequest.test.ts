@@ -35,6 +35,10 @@ import {
   computeProofRequestHash,
   computeProofRequestDomainSeparator,
   PROOF_REQUEST_DOMAIN_SEPARATOR,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_COUNT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
 } from '../verifier';
 import type { ProofResponse } from '../types';
 import { fillOprf, OPRF_TEST_ENVIRONMENT } from './helpers/signerFixtures';
@@ -52,9 +56,20 @@ const bytes = (hex: string) => Array.from(ethers.getBytes(hex));
 
 const OPRF_DOMAIN = 'zkproofport.app';
 const ENV = { oprfEnvironment: OPRF_TEST_ENVIRONMENT };
-/** `inputs` with the OPRF four an honest prover for SCOPE / OPRF_DOMAIN under the test key writes. */
-const withOprf = (inputs: string[], circuit: 'dojang_playground' | 'giwa_attestation') =>
+/** Each circuit's v2 public input count and where its attested_at is. */
+const V2 = {
+  dojang_playground: { count: DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT, attestedAt: DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT },
+  giwa_attestation: { count: GIWA_ATTESTATION_PUBLIC_INPUT_COUNT, attestedAt: GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT },
+} as const;
+/**
+ * `inputs` with the OPRF four an honest prover for SCOPE / OPRF_DOMAIN under
+ * the test key writes, and attested_at = now (the device statement's time).
+ */
+const withOprf = (inputs: string[], circuit: keyof typeof V2) => {
   fillOprf(inputs, circuit, { scope: SCOPE, oprfDomain: OPRF_DOMAIN });
+  inputs[V2[circuit].attestedAt] = '0x' + BigInt(Math.floor(Date.now() / 1000)).toString(16).padStart(64, '0');
+  return inputs;
+};
 
 /** Public inputs of a wallet circuit with the given signal and action hash; the rest zero. */
 function publicInputs(signal: string, actionHash = '0x' + '00'.repeat(32), count = 160): string[] {
@@ -252,8 +267,8 @@ describe('checkSignalHash', () => {
 });
 
 describe('checkProofIssuer runs the request binding', () => {
-  it('refuses a dojang_playground proof for another request (no issuer check of its own)', async () => {
-    const p = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: OTHER_REQ }), undefined, 100), 'dojang_playground');
+  it('refuses a dojang_playground proof for another request (its own check judges only attested_at)', async () => {
+    const p = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: OTHER_REQ }), undefined, V2.dojang_playground.count), 'dojang_playground');
     expect(await checkProofIssuer('dojang_playground', p, { ...ENV, request: { scope: SCOPE, requestId: REQ, oprfDomain: OPRF_DOMAIN } })).toEqual({
       ok: false, error: expect.stringMatching(/not the one for request/),
     });
@@ -261,12 +276,12 @@ describe('checkProofIssuer runs the request binding', () => {
   });
 
   it('does not run it when no request is given', async () => {
-    const p = withOprf(publicInputs('0x' + '77'.repeat(32), undefined, 100), 'dojang_playground');
+    const p = withOprf(publicInputs('0x' + '77'.repeat(32), undefined, V2.dojang_playground.count), 'dojang_playground');
     expect(await checkProofIssuer('dojang_playground', p, ENV)).toEqual({ ok: true });
   });
 
   it('runs it before the circuit issuer check (a wrong signal is the reason, not the signer root)', async () => {
-    const p = withOprf(publicInputs('0x' + '77'.repeat(32), undefined, 132), 'giwa_attestation');
+    const p = withOprf(publicInputs('0x' + '77'.repeat(32), undefined, V2.giwa_attestation.count), 'giwa_attestation');
     expect(await checkProofIssuer('giwa_attestation', p, { ...ENV, request: { scope: SCOPE, requestId: REQ, oprfDomain: OPRF_DOMAIN } })).toEqual({
       ok: false, error: expect.stringMatching(/signal_hash/),
     });
@@ -297,27 +312,27 @@ describe('the SDK checks the signal_hash of the requests it created', () => {
 
   it('refuses a response made for another request, with nothing passed back in', async () => {
     const sdk = await sdkWithRelayRequest('dojang_playground');
-    const inputs = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: OTHER_REQ }), undefined, 100), 'dojang_playground');
+    const inputs = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: OTHER_REQ }), undefined, V2.dojang_playground.count), 'dojang_playground');
     const r = await sdk.verifyResponseOffChain(resp('dojang_playground', inputs), { verificationKey: new Uint8Array(1) });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/not the one for request/) });
   });
 
   it('passes the binding for the right request (the failure is then elsewhere, never the request)', async () => {
     const sdk = await sdkWithRelayRequest('dojang_playground');
-    const inputs = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: REQ }), undefined, 100), 'dojang_playground');
+    const inputs = withOprf(publicInputs(computeSignalHash({ scope: SCOPE, circuitId: 'dojang_playground', requestId: REQ }), undefined, V2.dojang_playground.count), 'dojang_playground');
     const r = await sdk.verifyResponseOffChain(resp('dojang_playground', inputs), { verificationKey: new Uint8Array(1) });
     expect(r.error ?? '').not.toMatch(/signal_hash|request/);
   });
 
   it('refuses a wallet response for a requestId it never created, naming the option to pass', async () => {
     const sdk = ProofportSDK.create('staging');
-    const r = await sdk.verifyResponseOnChain(resp('giwa_attestation', withOprf(publicInputs('0x' + '77'.repeat(32), undefined, 132), 'giwa_attestation')), {});
+    const r = await sdk.verifyResponseOnChain(resp('giwa_attestation', withOprf(publicInputs('0x' + '77'.repeat(32), undefined, V2.giwa_attestation.count), 'giwa_attestation')), {});
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/signal_hash cannot be checked.*Pass \{ request: \{ scope, requestId, oprfDomain \} \}/) });
   });
 
   it('refuses an explicit request whose requestId is not the response\'s', async () => {
     const sdk = ProofportSDK.create('staging');
-    const r = await sdk.verifyResponseOnChain(resp('giwa_attestation', withOprf(publicInputs('0x' + '77'.repeat(32), undefined, 132), 'giwa_attestation')), {},
+    const r = await sdk.verifyResponseOnChain(resp('giwa_attestation', withOprf(publicInputs('0x' + '77'.repeat(32), undefined, V2.giwa_attestation.count), 'giwa_attestation')), {},
       { request: { scope: SCOPE, requestId: OTHER_REQ } });
     expect(r).toEqual({ valid: false, error: expect.stringMatching(/is not the one this response answers/) });
   });

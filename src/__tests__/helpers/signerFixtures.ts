@@ -1,8 +1,8 @@
 /**
  * Public inputs for the signer-root circuits, shaped as each circuit emits
  * them: the right count, one byte per field, the signer root at its offset.
- * Everything else is zero, except a Coinbase KYC or Country proof's
- * attested_at (now), a Country proof's list (one entry, inclusion),
+ * Everything else is zero, except attested_at (now: every signer-root
+ * circuit ends with the device statement's time), a Country proof's list (one entry, inclusion),
  * signal_hash, which is the one TEST_REQUEST's (no action bound), and the
  * OPRF four: the key hash pinned for OPRF_TEST_ENVIRONMENT (whatever that
  * table holds when the test runs), TEST_REQUEST's domain and scope reduced
@@ -12,6 +12,9 @@ import {
   SIGNER_ROOT_LAYOUTS,
   COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT,
+  DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT,
+  GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT,
   OPRF_PUBLIC_INPUT_LAYOUTS,
   computeSignalHash,
   getPinnedOprfKeyHash,
@@ -45,6 +48,13 @@ export type RootCircuit = keyof typeof SIGNER_ROOT_LAYOUTS;
 
 const field = (v: number | bigint) => '0x' + BigInt(v).toString(16).padStart(64, '0');
 
+/** Where each signer-root circuit puts attested_at. */
+const ATTESTED_AT_INDEX: Readonly<Record<RootCircuit, number>> = {
+  coinbase_attestation: COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
+  coinbase_country_attestation: COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
+  giwa_attestation: GIWA_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT,
+};
+
 export function attestationInputs(circuit: RootCircuit, root: string = SIGNER_ROOT_LAYOUTS[circuit].set.root): string[] {
   const layout = SIGNER_ROOT_LAYOUTS[circuit];
   const inputs = Array.from({ length: layout.publicInputCount }, () => field(0));
@@ -53,16 +63,28 @@ export function attestationInputs(circuit: RootCircuit, root: string = SIGNER_RO
   const signal = computeSignalHash({ ...TEST_REQUEST, circuitId: circuit }).slice(2).match(/../g)!;
   signal.forEach((b, i) => (inputs[i] = field(parseInt(b, 16))));
   fillOprf(inputs, circuit);
-  // Coinbase KYC v2 ends with attested_at, held to the verifier's clock.
+  // attested_at, held to the verifier's clock.
   const now = field(Math.floor(Date.now() / 1000));
-  if (circuit === 'coinbase_attestation') inputs[COINBASE_ATTESTATION_PUBLIC_INPUT_LAYOUT.ATTESTED_AT] = now;
+  inputs[ATTESTED_AT_INDEX[circuit]] = now;
   if (circuit === 'coinbase_country_attestation') {
     const L = COINBASE_COUNTRY_PUBLIC_INPUT_LAYOUT;
     inputs[L.COUNTRY_LIST_START] = field(0x4b); // 'K'
     inputs[L.COUNTRY_LIST_START + 1] = field(0x52); // 'R'
     inputs[L.COUNTRY_LIST_LENGTH] = field(1);
     inputs[L.IS_INCLUDED] = field(1);
-    inputs[L.ATTESTED_AT] = now;
   }
+  return inputs;
+}
+
+/**
+ * A Dojang Playground v2 proof's public inputs (no signer root): TEST_REQUEST's
+ * signal_hash, the OPRF four, attested_at = `attestedAt` (default now).
+ */
+export function dojangInputs(attestedAt: number | bigint = Math.floor(Date.now() / 1000)): string[] {
+  const inputs = Array.from({ length: DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT }, () => field(0));
+  const signal = computeSignalHash({ ...TEST_REQUEST, circuitId: 'dojang_playground' }).slice(2).match(/../g)!;
+  signal.forEach((b, i) => (inputs[i] = field(parseInt(b, 16))));
+  fillOprf(inputs, 'dojang_playground');
+  inputs[DOJANG_PLAYGROUND_PUBLIC_INPUT_LAYOUT.ATTESTED_AT] = field(attestedAt);
   return inputs;
 }

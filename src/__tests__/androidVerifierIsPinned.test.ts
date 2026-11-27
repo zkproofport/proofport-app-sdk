@@ -21,12 +21,12 @@ vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOrigina
     PINNED_VARIANT_VERIFIERS: {
       android: {
         oidc_domain_attestation: {
-          84532: { address: ANDROID_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' },
+          84532: { address: ANDROID_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', keyFrom: 'commit', record: 'broadcast/DeployOidcDomainAttestationAndroid.s.sol/84532/run-latest.json' },
         },
       },
       android_factory: {
         oidc_domain_attestation: {
-          84532: { address: FACTORY_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/84532/run-latest.json' },
+          84532: { address: FACTORY_84532, deployedAt: '2026-10-29T00:00:00.000Z', circuitsCommit: 'test', vkSha256: 'test', keyFrom: 'commit', record: 'broadcast/DeployOidcDomainAttestationAndroidFactory.s.sol/84532/run-latest.json' },
         },
       },
     },

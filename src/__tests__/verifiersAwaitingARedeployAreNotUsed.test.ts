@@ -22,7 +22,7 @@ vi.mock('../../packages/core/src/pinnedVerifiers.generated', async importOrigina
     PINNED_VERIFIERS: {
       ...empty(real.PINNED_VERIFIERS),
       coinbase_attestation: {
-        8453: { address: '0x00000000000000000000000000000000000ba5e1', deployedAt: '2026-12-01T00:00:00.000Z', circuitsCommit: 'new', vkSha256: 'new', record: 'r' },
+        8453: { address: '0x00000000000000000000000000000000000ba5e1', deployedAt: '2026-12-01T00:00:00.000Z', circuitsCommit: 'new', vkSha256: 'new', keyFrom: 'commit', record: 'r' },
       },
     },
     PINNED_VARIANT_VERIFIERS: {
@@ -86,17 +86,20 @@ describe('a chain whose verifier awaits a redeploy', () => {
 
 describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, testnets redeployed)', () => {
   // circuits 5a1f906 (2026-11-20) redeployed every shipped package on Base
-  // Sepolia, Ethereum Sepolia and GIWA Sepolia. Mainnet (1, 8453) waits for
-  // its own redeploy: rewrite this block when that is regenerated.
+  // Sepolia, Ethereum Sepolia and GIWA Sepolia; circuits 951f273 (2026-11-27)
+  // replaced GIWA Sepolia's two with the six GIWA KYC / Dojang Playground v2
+  // packages. Mainnet (1, 8453) waits for its own redeploy: rewrite this
+  // block when that is regenerated.
   const pinnedRows = () =>
     [
       ...Object.values(real.PINNED_VERIFIERS),
       ...Object.values(real.PINNED_VARIANT_VERIFIERS).flatMap(byCircuit => Object.values(byCircuit)),
-    ].flatMap(byChain => Object.entries(byChain ?? {}).map(([chain, row]) => ({ chain: Number(chain), ...(row as { address: string; circuitsCommit: string; vkSha256: string }) })));
+    ].flatMap(byChain => Object.entries(byChain ?? {}).map(([chain, row]) => ({ chain: Number(chain), ...(row as { address: string; circuitsCommit: string; vkSha256: string; keyFrom: string }) })));
 
-  it('pins the 22 testnet verifiers and lists the 20 mainnet ones as awaiting a redeploy', () => {
+  it('pins the 26 testnet verifiers and lists the 20 mainnet ones as awaiting a redeploy', () => {
     const pinned = pinnedRows();
-    expect(pinned.length).toBe(22);
+    expect(pinned.length).toBe(26);
+    expect(pinned.filter(r => r.chain === 91342).length).toBe(6);
     expect([...new Set(pinned.map(r => r.chain))].sort((a, b) => a - b)).toEqual([84532, 91342, 11155111]);
     expect(real.AWAITING_REDEPLOY.length).toBe(20);
     expect([...new Set(real.AWAITING_REDEPLOY.map(r => r.chainId))].sort((a, b) => a - b)).toEqual([1, 8453]);
@@ -116,6 +119,23 @@ describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, tes
     }
   });
 
+  it('only the six GIWA Sepolia v2 verifiers had their key established from the creation code', () => {
+    // Deployed from the local build before the keys were committed (sdk-dev.md,
+    // "GIWA KYC and Dojang Playground v2 in core").
+    const fromCode = pinnedRows().filter(r => r.keyFrom === 'initcode');
+    expect(fromCode.map(r => r.chain)).toEqual([91342, 91342, 91342, 91342, 91342, 91342]);
+    expect(pinnedRows().filter(r => r.keyFrom !== 'initcode').every(r => r.keyFrom === 'commit')).toBe(true);
+  });
+
+  it('the GIWA KYC / Dojang Playground verifiers without the status statement are pinned nowhere', () => {
+    const addresses = new Set(pinnedRows().map(r => r.address));
+    expect(addresses.has('0xa272056866453f0182426a29b9ca6382d6c6a060')).toBe(false);
+    expect(addresses.has('0x400474e78a793289d091a5f556f78158956b5d01')).toBe(false);
+    // An orphan Dojang Android deploy left in the broadcast history (0x3a2d5de9...) is not the recorded one.
+    expect([...addresses].some(a => a.startsWith('0x3a2d5de9'))).toBe(false);
+    expect(real.ACCEPTED_LEGACY_VERIFIERS).toEqual([]);
+  });
+
   it('no pinned address is a contract awaiting a redeploy', () => {
     const waiting = new Set(real.AWAITING_REDEPLOY.map(r => r.previousAddress));
     for (const row of pinnedRows()) expect(waiting.has(row.address)).toBe(false);
@@ -123,10 +143,11 @@ describe('the generated table on this branch (Noir 1.0.0 / bb 6.0.0 rebuild, tes
 
   it('the keys are bb 6.0.0 keys fetched at the committed circuits rebuild, the one source of every key', () => {
     expect(real.VERIFICATION_KEY_BB_VERSION).toBe('6.0.0');
-    // circuits toolchain-upgrade 2181748: the 1.0.0 / bb 6.0.0 artifacts with
-    // the OPRF nullifier and the testnet verifier records. A full commit,
-    // never a branch, and the commit the table itself was generated from.
-    expect(real.VERIFICATION_KEYS_REF).toBe('2181748bfb7216552ffdd9109486f7ebfbce2cb6');
+    // circuits main 9993bc5 (2026-11-27): build-circuits.yml run 45965954869's
+    // artifacts commit on top of 951f273, which added the six GIWA KYC /
+    // Dojang Playground v2 packages and their GIWA Sepolia records. A full
+    // commit, never a branch, and the commit the table itself was generated from.
+    expect(real.VERIFICATION_KEYS_REF).toBe('9993bc5d263b78817b637830ab093af9e0258c31');
     expect(real.VERIFICATION_KEYS_REF).toBe(real.PINNED_VERIFIERS_SOURCE_COMMIT);
   });
 });

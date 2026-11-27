@@ -27,6 +27,15 @@
  * AWAITING_REDEPLOY instead, so it can be neither used nor mistaken for the
  * new one. Its address is recorded there for the record only.
  *
+ * When the key is not committed at that commit (the verifier was deployed
+ * from a local build and the keys were committed afterwards, as GIWA KYC and
+ * the Dojang Playground v2 were on 2026-11-27), the deployed bytes decide:
+ * bb writes every 32-byte word of the key into the Solidity verifier as a
+ * constant, so the broadcast's HonkVerifier creation code must hold each
+ * non-zero word of the CURRENT key as a PUSH immediate. Such a row is marked
+ * `keyFrom: 'initcode'` (otherwise 'commit'). A creation code missing any word
+ * stops the generator: which key that contract carries is then unknown.
+ *
  * Read through `git show <ref>:<path>`, so the circuits checkout may sit on any
  * branch. Fetch first so the ref is current:
  *
@@ -101,6 +110,31 @@ const bytesAt = (commit, path) => {
   }
 };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+/**
+ * Which 32-byte words of `key` the creation code `initcodeHex` does not hold
+ * as a PUSH immediate (PUSHn followed by the word without its leading zero
+ * bytes), by index; null when there is no creation code to read. An all-zero
+ * word needs no constant and is never missing. A key whose length is not a
+ * whole number of words is reported as missing its last word.
+ */
+function keyWordsMissingFromInitcode(key, initcodeHex) {
+  if (typeof initcodeHex !== 'string' || !/^0x(?:[0-9a-fA-F]{2})+$/.test(initcodeHex)) return null;
+  const code = Buffer.from(initcodeHex.slice(2), 'hex');
+  const missing = [];
+  for (let i = 0; i * 32 < key.length; i++) {
+    const word = key.subarray(i * 32, i * 32 + 32);
+    if (word.length !== 32) {
+      missing.push(i);
+      continue;
+    }
+    let start = 0;
+    while (start < 32 && word[start] === 0) start++;
+    if (start === 32) continue;
+    const immediate = word.subarray(start);
+    if (!code.includes(Buffer.concat([Buffer.from([0x5f + immediate.length]), immediate]))) missing.push(i);
+  }
+  return missing;
+}
 const bbVersionOf = (text, where) => {
   const m = String(text).match(/^BB_VERSION=(\S+)\s*$/m);
   if (!m) throw new Error(`${where} has no BB_VERSION= line; cannot tell which bb wrote the verification keys.`);
@@ -187,10 +221,24 @@ for (const path of files) {
   const deployCommit = String(run.commit ?? '');
   const vkPath = vkPathByScript[name];
   const deployedKey = deployCommit ? bytesAt(deployCommit, vkPath) : null;
-  if (!deployedKey) {
-    throw new Error(`${path}: cannot read ${vkPath} at the deployment's circuits commit '${deployCommit}', so the key this verifier was built from is unknown.`);
+  let vkSha256;
+  let keyFrom;
+  if (deployedKey) {
+    vkSha256 = sha256(deployedKey);
+    keyFrom = 'commit';
+  } else {
+    const missing = keyWordsMissingFromInitcode(showBytes(vkPath), created[0].transaction?.input);
+    if (missing !== null && missing.length === 0) {
+      vkSha256 = keys[circuit][variant].sha256;
+      keyFrom = 'initcode';
+    } else {
+      throw new Error(
+        `${path}: cannot read ${vkPath} at the deployment's circuits commit '${deployCommit}', and the verifier's creation code ` +
+          (missing === null ? 'is not in the broadcast' : `lacks ${missing.length} word(s) of the current key (first: word ${missing[0]})`) +
+          ', so the key this verifier was built from is unknown.',
+      );
+    }
   }
-  const vkSha256 = sha256(deployedKey);
   if (vkSha256 !== keys[circuit][variant].sha256) {
     awaiting.push({ circuit, variant, chainId: Number(chain), previousAddress: address, previousVkSha256: vkSha256, record: path });
     continue;
@@ -200,6 +248,7 @@ for (const path of files) {
     deployedAt: new Date(Number(run.timestamp)).toISOString(),
     circuitsCommit: deployCommit,
     vkSha256,
+    keyFrom,
     record: path,
   };
 }
@@ -296,8 +345,14 @@ const lines = [
   '  readonly deployedAt: string;',
   '  /** circuits commit forge recorded for the deployment. */',
   '  readonly circuitsCommit: string;',
-  '  /** sha256 of the verification key at that commit: the key the contract was built from. Always the current key. */',
+  '  /** sha256 of the key the contract was built from. Always the current key. */',
   '  readonly vkSha256: string;',
+  '  /**',
+  "   * How that key was established: 'commit' = it is the key at circuitsCommit;",
+  "   * 'initcode' = it was not committed there (deployed from a local build), and",
+  '   * every word of it is a constant in the broadcast creation code.',
+  '   */',
+  "  readonly keyFrom: 'commit' | 'initcode';",
   '  /** The deployment record, relative to the circuits repository. */',
   '  readonly record: string;',
   '}',
@@ -371,7 +426,7 @@ const chainRows = (byChain, indent) => {
   const chains = Object.keys(byChain).map(Number).sort((a, b) => a - b);
   return chains.map(c => {
     const v = byChain[c];
-    return `${indent}${c}: Object.freeze({ address: '${v.address}', deployedAt: '${v.deployedAt}', circuitsCommit: '${v.circuitsCommit}', vkSha256: '${v.vkSha256}', record: '${v.record}' }),`;
+    return `${indent}${c}: Object.freeze({ address: '${v.address}', deployedAt: '${v.deployedAt}', circuitsCommit: '${v.circuitsCommit}', vkSha256: '${v.vkSha256}', keyFrom: '${v.keyFrom}', record: '${v.record}' }),`;
   });
 };
 const circuitBlock = (id, byChain, indent) => {

@@ -179,11 +179,17 @@ const CIRCUIT_PACKAGE_ROWS = {
     android: { packageDir: 'oidc-domain-attestation-android', vkPath: 'oidc-domain-attestation-android/target/vk/vk', deployScriptName: 'OidcDomainAttestationAndroid', logCircuitSize: 21 },
     android_factory: { packageDir: 'oidc-domain-attestation-android-factory', vkPath: 'oidc-domain-attestation-android-factory/target/vk/vk', deployScriptName: 'OidcDomainAttestationAndroidFactory', logCircuitSize: 21 },
   },
+  // GIWA KYC and the Dojang Playground with the device status statement
+  // (2026-11-27): the same three signer packages as Coinbase KYC v2.
   giwa_attestation: {
-    standard: { packageDir: 'giwa-attestation', vkPath: 'giwa-attestation/target/vk/vk', deployScriptName: 'GiwaAttestation' },
+    standard: { packageDir: 'giwa-attestation-v2', vkPath: 'giwa-attestation-v2/target/vk/vk', deployScriptName: 'GiwaAttestationV2', logCircuitSize: 20 },
+    android: { packageDir: 'giwa-attestation-v2-android', vkPath: 'giwa-attestation-v2-android/target/vk/vk', deployScriptName: 'GiwaAttestationV2Android', logCircuitSize: 21 },
+    android_factory: { packageDir: 'giwa-attestation-v2-android-factory', vkPath: 'giwa-attestation-v2-android-factory/target/vk/vk', deployScriptName: 'GiwaAttestationV2AndroidFactory', logCircuitSize: 21 },
   },
   dojang_playground: {
-    standard: { packageDir: 'dojang-playground', vkPath: 'dojang-playground/target/vk/vk', deployScriptName: 'DojangPlayground' },
+    standard: { packageDir: 'dojang-playground-v2', vkPath: 'dojang-playground-v2/target/vk/vk', deployScriptName: 'DojangPlaygroundV2', logCircuitSize: 20 },
+    android: { packageDir: 'dojang-playground-v2-android', vkPath: 'dojang-playground-v2-android/target/vk/vk', deployScriptName: 'DojangPlaygroundV2Android', logCircuitSize: 21 },
+    android_factory: { packageDir: 'dojang-playground-v2-android-factory', vkPath: 'dojang-playground-v2-android-factory/target/vk/vk', deployScriptName: 'DojangPlaygroundV2AndroidFactory', logCircuitSize: 21 },
   },
   // One package for every signer: the wallet signs, no device attestation.
   human_passport_score: {

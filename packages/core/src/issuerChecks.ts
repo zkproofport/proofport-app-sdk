@@ -11,7 +11,13 @@ import { ALL_CIRCUIT_IDS, isCircuitId, type CircuitId } from './circuits';
 import { checkOidcProviderKey, type IssuerCheckResult, type OidcKeyCheckOptions } from './oidcProviderKeys';
 import { checkOidcPolicy, type OidcPolicyOptions } from './oidcPolicy';
 import { SIGNER_ROOT_LAYOUTS, signerRootCheck } from './signerRoots';
-import { checkCoinbaseAttestationProof, checkCoinbaseCountryProof, type CountryCondition } from './coinbasePolicy';
+import {
+  checkCoinbaseAttestationProof,
+  checkCoinbaseCountryProof,
+  checkDojangPlaygroundProof,
+  checkGiwaAttestationProof,
+  type CountryCondition,
+} from './coinbasePolicy';
 import { checkHumanPassportProof } from './humanPassportPolicy';
 import { SIGNAL_HASH_LAYOUTS, checkSignalHash } from './signalHash';
 import { checkOprfProof } from './oprfPolicy';
@@ -81,12 +87,13 @@ export const CIRCUIT_ISSUER_CHECKS = {
   // pubkey_modulus_limbs is chosen by the prover (./oidcProviderKeys), and the
   // audience, nonce and time it exposes need judging (./oidcPolicy).
   oidc_domain_attestation: checkOidcProof,
-  giwa_attestation: signerRootCheck(SIGNER_ROOT_LAYOUTS.giwa_attestation),
+  // signer_list_merkle_root and attested_at, as for Coinbase KYC v2 (./coinbasePolicy).
+  giwa_attestation: checkGiwaAttestationProof,
   // No issuer anchor: the Playground faucet address and GIWA Sepolia's chain
-  // id are constants compiled into the circuit (dojang-playground/src/main.nr,
-  // PLAYGROUND_FAUCET, GIWA_SEPOLIA_CHAIN_ID), so the verification key already
-  // pins them, and the issuance is self-signed by design -- no issuer exists.
-  dojang_playground: null,
+  // id are constants compiled into the circuit (dojang-playground-v2/src/main.nr),
+  // so the verification key already pins them. What is judged is attested_at,
+  // the device statement's time (./coinbasePolicy).
+  dojang_playground: checkDojangPlaygroundProof,
   // The issuer root, the scorer and `now` are the prover's choice; the
   // threshold too, compared when the caller knows the request
   // (./humanPassportPolicy).

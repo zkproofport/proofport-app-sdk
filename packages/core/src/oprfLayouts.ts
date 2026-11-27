@@ -49,6 +49,7 @@ const row = (
   });
 
 const PRE_OPRF = 'proof made before the OPRF nullifier (its nullifier is derived from the wallet address)';
+const PRE_STATEMENT = 'proof made before the device status statement (it does not show the attestation was unrevoked and unexpired)';
 
 /** `null`: the circuit has no OPRF nullifier, with the reason beside it. */
 export const OPRF_PUBLIC_INPUT_LAYOUTS = Object.freeze({
@@ -65,8 +66,14 @@ export const OPRF_PUBLIC_INPUT_LAYOUTS = Object.freeze({
   // An ID token, not a wallet credential: its nullifier is from the token's
   // subject and the circuit has no wallet address to key an OPRF query with.
   oidc_domain_attestation: null,
-  giwa_attestation: row(GIWA_ATTESTATION_PUBLIC_INPUT_COUNT, GIWA, { 192: `GIWA ${PRE_OPRF}` }),
-  dojang_playground: row(DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT, DOJANG, { 160: `Dojang Playground ${PRE_OPRF}` }),
+  giwa_attestation: row(GIWA_ATTESTATION_PUBLIC_INPUT_COUNT, GIWA, {
+    192: `GIWA ${PRE_OPRF}`,
+    132: `GIWA KYC ${PRE_STATEMENT}`,
+  }),
+  dojang_playground: row(DOJANG_PLAYGROUND_PUBLIC_INPUT_COUNT, DOJANG, {
+    160: `Dojang Playground ${PRE_OPRF}`,
+    100: `Dojang Playground ${PRE_STATEMENT}`,
+  }),
   human_passport_score: row(HUMAN_PASSPORT_SCORE_PUBLIC_INPUT_COUNT, HP, { 195: `Human Passport ${PRE_OPRF}` }),
 } satisfies Record<CircuitId, OprfPublicInputLayout | null>);
 
@@ -130,8 +137,8 @@ export function readOprfPublicInputs(circuit: unknown, publicInputs: readonly st
     const earlier = layout.superseded[publicInputs.length];
     if (earlier !== undefined) {
       throw new Error(
-        `This is a ${earlier} (${publicInputs.length} public inputs). Only ${String(circuit)} proofs with the ` +
-          `OPRF nullifier (${layout.count} public inputs) are accepted; generate the proof again with a current ZKProofport app or prover.`,
+        `This is a ${earlier} (${publicInputs.length} public inputs). Only current ${String(circuit)} proofs ` +
+          `(${layout.count} public inputs) are accepted; generate the proof again with a current ZKProofport app or prover.`,
       );
     }
     throw new Error(`A ${String(circuit)} proof has ${layout.count} public inputs; got ${publicInputs.length}.`);

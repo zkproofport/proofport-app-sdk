@@ -76,11 +76,19 @@ const FIXTURES = [
   },
   {
     out: 'src/__tests__/fixtures/dojangPlaygroundPublicInputs.json',
-    dir: 'dojang-playground',
-    twinOf: 'dojang-playground',
+    dir: 'dojang-playground-v2-synthetic-anchors',
+    twinOf: 'dojang-playground-v2',
     flat: 'proof',
-    differs: "the acceptance fixture (scripts/dojang-playground fixtures), a real Playground issuance's wallet",
-    what: 'witness_action (action mode); OPRF answer under the circuits fixture key for dojang_playground.',
+    differs: "test Apple / server keys (scripts/giwa-v2 fixtures) signing the device status statement, a real Playground issuance's wallet",
+    what: 'witness_action (action mode, app signer kind, status statement with an expiry); OPRF answer under the circuits fixture key for dojang_playground.',
+  },
+  {
+    out: 'src/__tests__/fixtures/giwaKycV2SyntheticAnchors.json',
+    dir: 'giwa-attestation-v2-synthetic-anchors',
+    twinOf: 'giwa-attestation-v2',
+    flat: 'proof',
+    differs: 'test Apple / server keys (scripts/giwa-v2 fixtures) signing the device status statement',
+    what: 'witness_action (action mode, app signer kind); OPRF answer under the circuits fixture key for giwa_attestation.',
   },
 ];
 
